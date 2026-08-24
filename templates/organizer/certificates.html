@@ -1,0 +1,427 @@
+{% extends "base.html" %}
+{% block title %}Certificate Management: {{ event.title }} - FastFest{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge bg-warning text-dark">{{ event.event_type }}</span>
+                    <span class="badge bg-light text-dark">{{ event.status }}</span>
+                </div>
+                <h2 class="fw-bold mb-1"><i class="bi bi-award me-2"></i> Certificate Management & Distribution</h2>
+                <p class="text-light opacity-90 mb-0">Upload organizer-created certificates in bulk (PDF/Images/ZIP). The system reads roll numbers automatically and distributes them to students.</p>
+            </div>
+            <a href="{{ url_for('organizer.manage_event', event_id=event.id) }}" class="btn btn-light btn-sm fw-bold">
+                <i class="bi bi-arrow-left me-1"></i> Back to Event Hub
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Status Metrics Grid -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-4 col-lg">
+            <div class="metric-card shadow-sm p-3">
+                <div class="metric-icon-box bg-secondary text-white">
+                    <i class="bi bi-files"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ total_uploaded }}</div>
+                    <div class="metric-label">Total Uploaded</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <div class="metric-card shadow-sm p-3 border-start border-success border-4">
+                <div class="metric-icon-box bg-success text-white">
+                    <i class="bi bi-check-circle-fill"></i>
+                </div>
+                <div>
+                    <div class="metric-number text-success">{{ matched_count }}</div>
+                    <div class="metric-label">Matched & Ready</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <div class="metric-card shadow-sm p-3 border-start border-warning border-4">
+                <div class="metric-icon-box bg-warning text-dark">
+                    <i class="bi bi-question-circle-fill"></i>
+                </div>
+                <div>
+                    <div class="metric-number text-warning">{{ unmatched_count }}</div>
+                    <div class="metric-label">Unmatched</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <div class="metric-card shadow-sm p-3 border-start border-info border-4">
+                <div class="metric-icon-box bg-info text-white">
+                    <i class="bi bi-copy"></i>
+                </div>
+                <div>
+                    <div class="metric-number text-info">{{ duplicate_count }}</div>
+                    <div class="metric-label">Duplicates</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <div class="metric-card shadow-sm p-3 border-start border-danger border-4">
+                <div class="metric-icon-box bg-danger text-white">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                </div>
+                <div>
+                    <div class="metric-number text-danger">{{ invalid_count }}</div>
+                    <div class="metric-label">Invalid Files</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Upload Box Card -->
+    <div class="ff-card p-4 shadow-sm mb-4">
+        <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2">
+            <h5 class="fw-bold mb-0 text-primary">
+                <i class="bi bi-cloud-arrow-up-fill me-2"></i> Upload Certificate Files or Bulk ZIP
+            </h5>
+            <span class="badge bg-light text-secondary border">Supports PDF, PNG, JPG, JPEG, WEBP & ZIP</span>
+        </div>
+
+        <form method="POST" action="{{ url_for('organizer.upload_certificates', event_id=event.id) }}" enctype="multipart/form-data" id="certUploadForm">
+            <div class="row g-3">
+                <div class="col-md-7">
+                    <label class="form-label fw-semibold small">Select Certificate Files (Multiple Allowed) or ZIP Archive:</label>
+                    <input type="file" name="certificates" class="form-control" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.zip" id="certFileInput">
+                    <div class="form-text small text-muted">
+                        You can upload individual PDF/Image certificates or a single <code>.zip</code> file containing all certificates.
+                    </div>
+                </div>
+                <div class="col-md-5">
+                    <label class="form-label fw-semibold small">Roll Number Regex Pattern (Optional / Configurable):</label>
+                    <input type="text" name="custom_pattern" class="form-control font-monospace small" placeholder="e.g. Roll No:\s*([A-Za-z0-9]+)" value="{{ config.ROLL_NUMBER_REGEX_PATTERN }}">
+                    <div class="form-text small text-muted">
+                        Pattern used to extract roll numbers from certificates. Leave default or customize.
+                    </div>
+                </div>
+                <div class="col-12 text-end">
+                    <button type="submit" class="btn btn-primary fw-bold px-4 shadow-sm" id="uploadBtn">
+                        <i class="bi bi-cpu me-1"></i> Upload & Auto-Identify Roll Numbers
+                    </button>
+                </div>
+            </div>
+        </form>
+
+        <!-- Progress overlay (hidden by default) -->
+        <div id="uploadProgressBox" class="mt-3 d-none p-3 bg-light rounded text-center border">
+            <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+            <span class="fw-semibold text-dark">Uploading and analyzing certificates with OCR/Text extraction engine... Please wait.</span>
+        </div>
+    </div>
+
+    <!-- Certificate Management Tabs & Table -->
+    <div class="ff-card shadow-sm overflow-hidden">
+        <!-- Filter Navigation Tabs -->
+        <div class="bg-light border-bottom p-3">
+            <ul class="nav nav-pills gap-2">
+                <li class="nav-item">
+                    <a class="nav-link btn-sm py-1 px-3 {% if tab_filter == 'all' or not tab_filter %}active fw-bold{% endif %}" href="{{ url_for('organizer.certificates', event_id=event.id, tab='all') }}">
+                        All Certificates ({{ total_uploaded }})
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link btn-sm py-1 px-3 text-success {% if tab_filter == 'matched' %}active bg-success text-white fw-bold{% endif %}" href="{{ url_for('organizer.certificates', event_id=event.id, tab='matched') }}">
+                        <i class="bi bi-check2-circle me-1"></i> Matched ({{ matched_count }})
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link btn-sm py-1 px-3 text-warning {% if tab_filter == 'unmatched' %}active bg-warning text-dark fw-bold{% endif %}" href="{{ url_for('organizer.certificates', event_id=event.id, tab='unmatched') }}">
+                        <i class="bi bi-question-circle me-1"></i> Unmatched ({{ unmatched_count }})
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link btn-sm py-1 px-3 text-info {% if tab_filter == 'duplicate' %}active bg-info text-white fw-bold{% endif %}" href="{{ url_for('organizer.certificates', event_id=event.id, tab='duplicate') }}">
+                        <i class="bi bi-copy me-1"></i> Duplicate ({{ duplicate_count }})
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link btn-sm py-1 px-3 text-danger {% if tab_filter == 'invalid' %}active bg-danger text-white fw-bold{% endif %}" href="{{ url_for('organizer.certificates', event_id=event.id, tab='invalid') }}">
+                        <i class="bi bi-exclamation-triangle me-1"></i> Invalid ({{ invalid_count }})
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        {% if certificates %}
+            <div class="table-responsive">
+                <table class="table ff-table mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th>Certificate File</th>
+                            <th>Extracted Roll No</th>
+                            <th>Matched Student</th>
+                            <th>Status</th>
+                            <th>Uploaded</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for cert in certificates %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        {% if cert.is_pdf %}
+                                            <span class="badge bg-danger p-2"><i class="bi bi-file-earmark-pdf fs-6"></i></span>
+                                        {% else %}
+                                            <span class="badge bg-primary p-2"><i class="bi bi-file-earmark-image fs-6"></i></span>
+                                        {% endif %}
+                                        <div>
+                                            <div class="fw-bold text-dark text-truncate" style="max-width: 260px;" title="{{ cert.original_filename }}">
+                                                {{ cert.original_filename }}
+                                            </div>
+                                            <small class="text-muted font-monospace">{{ cert.certificate_code }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if cert.roll_number %}
+                                        <span class="badge bg-dark font-monospace fs-7 px-2 py-1">{{ cert.roll_number }}</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-muted border">Not Detected</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if cert.student %}
+                                        <div class="fw-semibold text-dark">{{ cert.student.name }}</div>
+                                        <small class="text-muted">{{ cert.student.email }}</small>
+                                        {% if cert.student.student_profile %}
+                                            <div class="small text-secondary">{{ cert.student.student_profile.department }} (Yr {{ cert.student.student_profile.year }})</div>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="text-muted italic small">&mdash; Unassigned &mdash;</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if cert.status == 'MATCHED' %}
+                                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Matched</span>
+                                    {% elif cert.status == 'MANUALLY_ASSIGNED' %}
+                                        <span class="badge bg-success bg-opacity-75"><i class="bi bi-person-check me-1"></i> Manually Assigned</span>
+                                    {% elif cert.status == 'UNMATCHED' %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-question-circle me-1"></i> Unmatched</span>
+                                    {% elif cert.status == 'DUPLICATE' %}
+                                        <span class="badge bg-info text-dark"><i class="bi bi-copy me-1"></i> Duplicate</span>
+                                    {% elif cert.status == 'INVALID' %}
+                                        <span class="badge bg-danger"><i class="bi bi-exclamation-triangle me-1"></i> Invalid</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ cert.created_at|dateformat }}</small>
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <!-- Preview Button (Triggers Modal) -->
+                                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#previewModal{{ cert.id }}" title="Preview Certificate & OCR Text">
+                                            <i class="bi bi-eye"></i> View
+                                        </button>
+
+                                        <!-- Download Button -->
+                                        <a href="{{ url_for('organizer.download_certificate', cert_id=cert.id) }}" class="btn btn-outline-secondary" title="Download Original File">
+                                            <i class="bi bi-download"></i>
+                                        </a>
+
+                                        <!-- Unmatched / Fix Action -->
+                                        {% if cert.status in ['UNMATCHED', 'INVALID'] %}
+                                            <button type="button" class="btn btn-warning text-dark fw-bold" data-bs-toggle="modal" data-bs-target="#assignModal{{ cert.id }}" title="Manually match to a registered student">
+                                                <i class="bi bi-wrench-adjustable me-1"></i> Fix
+                                            </button>
+                                        {% endif %}
+
+                                        <!-- Duplicate Action -->
+                                        {% if cert.status == 'DUPLICATE' %}
+                                            <button type="button" class="btn btn-info text-white fw-bold" data-bs-toggle="modal" data-bs-target="#duplicateModal{{ cert.id }}" title="Resolve Duplicate Conflict">
+                                                <i class="bi bi-shuffle me-1"></i> Review
+                                            </button>
+                                        {% endif %}
+
+                                        <!-- Delete Button -->
+                                        <form method="POST" action="{{ url_for('organizer.delete_certificate', event_id=event.id, cert_id=cert.id) }}" onsubmit="return confirm('Delete this certificate file?');" class="d-inline">
+                                            <button type="submit" class="btn btn-outline-danger" title="Delete Certificate">
+                                                <i class="bi bi-trash3"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+
+                                    <!-- PREVIEW MODAL -->
+                                    <div class="modal fade text-start" id="previewModal{{ cert.id }}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog modal-lg modal-dialog-centered">
+                                            <div class="modal-content">
+                                                <div class="modal-header bg-light">
+                                                    <h6 class="modal-title fw-bold">
+                                                        <i class="bi bi-file-earmark-text me-2"></i> {{ cert.original_filename }}
+                                                    </h6>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                </div>
+                                                <div class="modal-body p-3">
+                                                    <!-- Certificate Media Viewer -->
+                                                    <div class="text-center bg-dark p-2 rounded mb-3" style="max-height: 480px; overflow: auto;">
+                                                        {% if cert.is_pdf %}
+                                                            <iframe src="{{ url_for('organizer.preview_certificate', cert_id=cert.id) }}" width="100%" height="440px" style="border: none;"></iframe>
+                                                        {% else %}
+                                                            <img src="{{ url_for('organizer.preview_certificate', cert_id=cert.id) }}" class="img-fluid rounded" style="max-height: 440px;">
+                                                        {% endif %}
+                                                    </div>
+
+                                                    <!-- Extracted OCR text accordion -->
+                                                    <div class="p-3 bg-light rounded border">
+                                                        <h6 class="fw-bold small mb-2 text-primary"><i class="bi bi-search me-1"></i> Detected Certificate Text & Metadata</h6>
+                                                        <div class="row g-2 small mb-2">
+                                                            <div class="col-sm-6"><strong>Extracted Roll No:</strong> {{ cert.roll_number or 'None identified' }}</div>
+                                                            <div class="col-sm-6"><strong>Status:</strong> <span class="badge bg-secondary">{{ cert.status }}</span></div>
+                                                            <div class="col-sm-6"><strong>Student:</strong> {{ cert.student.name if cert.student else 'Unassigned' }}</div>
+                                                            <div class="col-sm-6"><strong>Verification ID:</strong> <code>{{ cert.certificate_code }}</code></div>
+                                                        </div>
+                                                        <details>
+                                                            <summary class="small text-muted cursor-pointer">View Raw Extracted Text</summary>
+                                                            <pre class="bg-white p-2 rounded border mt-2 small font-monospace" style="max-height: 140px; overflow-y: auto;">{{ cert.extracted_text or 'No raw text extracted.' }}</pre>
+                                                        </details>
+                                                    </div>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <a href="{{ url_for('organizer.download_certificate', cert_id=cert.id) }}" class="btn btn-primary btn-sm fw-bold">
+                                                        <i class="bi bi-download me-1"></i> Download File
+                                                    </a>
+                                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- MANUAL ASSIGNMENT MODAL -->
+                                    {% if cert.status in ['UNMATCHED', 'INVALID'] %}
+                                        <div class="modal fade text-start" id="assignModal{{ cert.id }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <div class="modal-content">
+                                                    <form method="POST" action="{{ url_for('organizer.assign_certificate', event_id=event.id, cert_id=cert.id) }}">
+                                                        <div class="modal-header bg-warning bg-opacity-25">
+                                                            <h6 class="modal-title fw-bold">
+                                                                <i class="bi bi-person-check-fill text-warning me-2"></i> Assign Certificate to Student
+                                                            </h6>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            <p class="small text-muted mb-3">
+                                                                Select the registered student who should receive <strong>{{ cert.original_filename }}</strong>.
+                                                            </p>
+
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-semibold small">Registered Student:</label>
+                                                                <select name="student_id" class="form-select form-select-sm" required>
+                                                                    <option value="">-- Choose Registered Student --</option>
+                                                                    {% for st in registered_students %}
+                                                                        <option value="{{ st.id }}">
+                                                                            {{ st.name }} ({{ st.student_profile.roll_number if st.student_profile else 'No Roll' }}) - {{ st.email }}
+                                                                        </option>
+                                                                    {% endfor %}
+                                                                </select>
+                                                            </div>
+
+                                                            <div class="mb-3">
+                                                                <label class="form-label fw-semibold small">Roll Number Override (Optional):</label>
+                                                                <input type="text" name="roll_number" class="form-control form-control-sm" placeholder="e.g. 23DS001" value="{{ cert.roll_number or '' }}">
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-success btn-sm fw-bold">
+                                                                <i class="bi bi-check2-circle me-1"></i> Assign Certificate
+                                                            </button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+
+                                    <!-- DUPLICATE RESOLUTION MODAL -->
+                                    {% if cert.status == 'DUPLICATE' %}
+                                        <div class="modal fade text-start" id="duplicateModal{{ cert.id }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog modal-dialog-centered">
+                                                <div class="modal-content">
+                                                    <form method="POST" action="{{ url_for('organizer.resolve_duplicate', event_id=event.id, cert_id=cert.id) }}">
+                                                        <div class="modal-header bg-info bg-opacity-25">
+                                                            <h6 class="modal-title fw-bold">
+                                                                <i class="bi bi-copy text-info me-2"></i> Resolve Duplicate Certificate
+                                                            </h6>
+                                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                        </div>
+                                                        <div class="modal-body">
+                                                            <div class="alert alert-info py-2 small mb-3">
+                                                                Duplicate certificate detected for <strong>{{ cert.student.name if cert.student else cert.roll_number }}</strong> (Roll No: {{ cert.roll_number }}).
+                                                            </div>
+                                                            <p class="small text-muted mb-3">Please choose how you would like to handle this certificate:</p>
+
+                                                            <div class="form-check mb-2">
+                                                                <input class="form-check-input" type="radio" name="action" id="dupReplace{{ cert.id }}" value="replace" checked>
+                                                                <label class="form-check-label small" for="dupReplace{{ cert.id }}">
+                                                                    <strong>Replace Existing:</strong> Delete old certificate file and use this new uploaded one.
+                                                                </label>
+                                                            </div>
+                                                            <div class="form-check mb-2">
+                                                                <input class="form-check-input" type="radio" name="action" id="dupKeepBoth{{ cert.id }}" value="keep_both">
+                                                                <label class="form-check-label small" for="dupKeepBoth{{ cert.id }}">
+                                                                    <strong>Keep Both:</strong> Retain both certificates in the student's portal.
+                                                                </label>
+                                                            </div>
+                                                            <div class="form-check mb-2">
+                                                                <input class="form-check-input" type="radio" name="action" id="dupDiscard{{ cert.id }}" value="discard">
+                                                                <label class="form-check-label small text-danger" for="dupDiscard{{ cert.id }}">
+                                                                    <strong>Discard Uploaded:</strong> Delete this duplicate file and keep the original.
+                                                                </label>
+                                                            </div>
+                                                        </div>
+                                                        <div class="modal-footer">
+                                                            <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                                            <button type="submit" class="btn btn-primary btn-sm fw-bold">Apply Resolution</button>
+                                                        </div>
+                                                    </form>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5 p-5">
+                <i class="bi bi-file-earmark-arrow-up text-muted fs-1 mb-3 d-block"></i>
+                <h5 class="fw-bold">No certificates uploaded yet</h5>
+                <p class="text-muted mb-3">Upload your completed certificate PDF/Image files above to automatically match and distribute them to registered students.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('certUploadForm');
+    const uploadBtn = document.getElementById('uploadBtn');
+    const progressBox = document.getElementById('uploadProgressBox');
+    
+    if (form) {
+        form.addEventListener('submit', function() {
+            if (uploadBtn) {
+                uploadBtn.disabled = true;
+                uploadBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing OCR...';
+            }
+            if (progressBox) {
+                progressBox.classList.remove('d-none');
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

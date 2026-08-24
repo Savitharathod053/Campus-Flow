@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Certificate Verification - FastFest{% endblock %}
+
+{% block content %}
+<div class="container py-5 my-auto">
+    <div class="row justify-content-center">
+        <div class="col-lg-7 col-md-9">
+            {% if is_valid and cert %}
+                <div class="ff-card shadow-lg p-4 p-sm-5 border-success border-opacity-50">
+                    <div class="text-center mb-4">
+                        <div class="d-inline-flex align-items-center justify-content-center bg-success text-white rounded-circle mb-3" style="width: 64px; height: 64px; font-size: 2rem;">
+                            <i class="bi bi-patch-check-fill"></i>
+                        </div>
+                        <h3 class="fw-bold text-success">Official Certificate Verified</h3>
+                        <p class="text-muted small">This credential was issued by FastFest Campus Event Platform and verified in the central registry.</p>
+                    </div>
+
+                    <div class="p-4 bg-light rounded-3 mb-4 border">
+                        <div class="row g-3">
+                            <div class="col-sm-6">
+                                <span class="small text-muted fw-bold d-block">RECIPIENT NAME</span>
+                                <strong class="fs-5 text-dark">{{ cert.student.name }}</strong>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="small text-muted fw-bold d-block">ROLL NUMBER</span>
+                                <strong class="fs-5 text-dark">{{ cert.student.student_profile.roll_number if cert.student.student_profile else 'N/A' }}</strong>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="small text-muted fw-bold d-block">DEPARTMENT / BRANCH</span>
+                                <span>{{ cert.student.student_profile.department if cert.student.student_profile else 'N/A' }}</span>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="small text-muted fw-bold d-block">EVENT TITLE</span>
+                                <span class="fw-semibold text-primary">{{ cert.event.title }}</span>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="small text-muted fw-bold d-block">EVENT TYPE & DATE</span>
+                                <span>{{ cert.event.event_type }} &bull; {{ cert.event.start_time|dateformat }}</span>
+                            </div>
+                            <div class="col-sm-6">
+                                <span class="small text-muted fw-bold d-block">ISSUED DATE</span>
+                                <span>{{ cert.issued_at|dateformat }}</span>
+                            </div>
+                            <div class="col-12 border-top pt-2 mt-2">
+                                <span class="small text-muted fw-bold d-block">CERTIFICATE VERIFICATION ID</span>
+                                <code class="fs-6 fw-bold text-dark">{{ cert.certificate_code }}</code>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="text-center">
+                        <a href="{{ url_for('static', filename=cert.certificate_image) }}" class="btn btn-outline-success fw-bold" download>
+                            <i class="bi bi-download me-1"></i> Download High-Resolution Copy
+                        </a>
+                    </div>
+                </div>
+            {% else %}
+                <div class="ff-card shadow-lg p-4 p-sm-5 text-center border-danger border-opacity-50">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-danger text-white rounded-circle mb-3" style="width: 64px; height: 64px; font-size: 2rem;">
+                        <i class="bi bi-shield-x"></i>
+                    </div>
+                    <h3 class="fw-bold text-danger">Invalid Certificate</h3>
+                    <p class="text-muted mb-3">No official college event certificate was found with identification code: <code>{{ certificate_code }}</code></p>
+                    <a href="{{ url_for('public.home') }}" class="btn btn-primary btn-sm">Return to Homepage</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}FastFest - Centralized College Event Management & Registration{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero-section text-center text-lg-start">
+    <div class="container position-relative" style="z-index: 2;">
+        <div class="row align-items-center g-5">
+            <div class="col-lg-7">
+                <div class="hero-badge">
+                    <i class="bi bi-stars text-warning"></i> Official Campus Events Hub
+                </div>
+                <h1 class="display-4 fw-extrabold text-white mb-3" style="letter-spacing: -1px; line-height: 1.15;">
+                    Discover, Register & Experience <span class="text-warning">Campus Life</span>
+                </h1>
+                <p class="lead text-light opacity-90 mb-4 fs-5" style="max-width: 580px;">
+                    No more scattered Google Forms or lost WhatsApp links. FastFest provides a unified platform for workshops, hackathons, seminars, cultural fests, and digital certification.
+                </p>
+                <div class="d-flex flex-wrap gap-3 justify-content-center justify-content-lg-start">
+                    <a href="{{ url_for('public.events') }}" class="btn btn-warning btn-lg px-4 py-3 fw-bold shadow">
+                        <i class="bi bi-search me-2"></i> Browse All Events
+                    </a>
+                    {% if not current_user %}
+                        <a href="{{ url_for('auth.register_student') }}" class="btn btn-outline-light btn-lg px-4 py-3 fw-semibold">
+                            <i class="bi bi-person-plus me-2"></i> Student Sign Up
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-lg-5">
+                <div class="row g-3">
+                    <div class="col-6">
+                        <div class="metric-card h-100 bg-white bg-opacity-10 border-light border-opacity-25 text-white">
+                            <div class="metric-icon-box bg-primary text-white">
+                                <i class="bi bi-calendar-check"></i>
+                            </div>
+                            <div>
+                                <div class="metric-number text-white">{{ total_events_count }}+</div>
+                                <div class="metric-label text-light opacity-75">Events Hosted</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="metric-card h-100 bg-white bg-opacity-10 border-light border-opacity-25 text-white">
+                            <div class="metric-icon-box bg-success text-white">
+                                <i class="bi bi-people"></i>
+                            </div>
+                            <div>
+                                <div class="metric-number text-white">{{ total_registrations_count }}+</div>
+                                <div class="metric-label text-light opacity-75">Registrations</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <div class="p-4 rounded-3 bg-white bg-opacity-10 border border-light border-opacity-25 text-white">
+                            <div class="d-flex align-items-center gap-3 mb-2">
+                                <i class="bi bi-qr-code-scan fs-3 text-warning"></i>
+                                <div>
+                                    <h6 class="fw-bold mb-0">Instant QR Attendance</h6>
+                                    <small class="text-light opacity-75">Unique digital ticket on phone, seamless venue check-in.</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Search & Quick Filters Bar -->
+<section class="py-4 bg-white border-bottom shadow-sm">
+    <div class="container">
+        <form action="{{ url_for('public.events') }}" method="GET" class="row g-2 align-items-center">
+            <div class="col-lg-5 col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text bg-white border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="q" class="form-control border-start-0 py-2" placeholder="Search hackathons, workshops, fests...">
+                </div>
+            </div>
+            <div class="col-lg-3 col-md-3 col-6">
+                <select name="type" class="form-select py-2">
+                    <option value="ALL">All Event Categories</option>
+                    {% for t in event_types %}
+                        <option value="{{ t }}">{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-2 col-md-3 col-6">
+                <select name="pricing" class="form-select py-2">
+                    <option value="">All Pricing</option>
+                    <option value="free">Free Only</option>
+                    <option value="paid">Paid Only</option>
+                </select>
+            </div>
+            <div class="col-lg-2 col-12">
+                <button type="submit" class="btn btn-primary w-100 py-2 fw-semibold">
+                    Find Events
+                </button>
+            </div>
+        </form>
+    </div>
+</section>
+
+<!-- Featured Upcoming Events Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-end justify-content-between mb-4">
+            <div>
+                <span class="text-primary fw-bold text-uppercase small tracking-wide">Handpicked For You</span>
+                <h2 class="fw-bold mb-0">Featured Upcoming Events</h2>
+            </div>
+            <a href="{{ url_for('public.events') }}" class="btn btn-link text-decoration-none fw-semibold p-0">
+                View all events <i class="bi bi-arrow-right"></i>
+            </a>
+        </div>
+
+        {% if featured_events %}
+            <div class="row g-4">
+                {% for event in featured_events %}
+                    <div class="col-lg-4 col-md-6">
+                        <div class="ff-card ff-card-interactive event-card">
+                            <div class="event-poster-wrapper">
+                                {% if event.poster_image %}
+                                    <img src="{{ url_for('static', filename=event.poster_image) }}" alt="{{ event.title }}" class="event-poster-img">
+                                {% else %}
+                                    <div class="d-flex flex-column align-items-center justify-content-center h-100 text-white p-3 text-center">
+                                        <i class="bi bi-calendar-event fs-1 mb-2 text-warning"></i>
+                                        <span class="fw-bold small">{{ event.department }}</span>
+                                    </div>
+                                {% endif %}
+                                <span class="event-type-badge">{{ event.event_type }}</span>
+                                <span class="event-fee-badge">
+                                    {% if event.is_free %}
+                                        <span class="text-success fw-bold">FREE</span>
+                                    {% else %}
+                                        ₹{{ "%.0f"|format(event.registration_fee) }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                            <div class="ff-card-body d-flex flex-column flex-grow-1">
+                                <div class="small text-muted mb-2 d-flex align-items-center gap-2">
+                                    <i class="bi bi-calendar3 text-primary"></i>
+                                    <span>{{ event.start_time|dateformat }} &bull; {{ event.start_time|timeformat }}</span>
+                                </div>
+                                <h5 class="fw-bold mb-2 text-dark">{{ event.title }}</h5>
+                                <p class="text-muted small mb-3 flex-grow-1">{{ event.description|truncate(90) }}</p>
+                                
+                                <div class="border-top pt-3 mt-auto">
+                                    <div class="d-flex justify-content-between align-items-center small text-muted mb-3">
+                                        <span><i class="bi bi-geo-alt me-1 text-danger"></i> {{ event.venue|truncate(20) }}</span>
+                                        <span class="badge {% if event.available_seats > 10 %}bg-light text-dark border{% else %}bg-danger text-white{% endif %}">
+                                            {{ event.available_seats }} seats left
+                                        </span>
+                                    </div>
+                                    <a href="{{ url_for('public.event_detail', slug=event.slug) }}" class="btn btn-outline-primary w-100 fw-semibold">
+                                        View Details & Register
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5 ff-card p-5">
+                <i class="bi bi-calendar-x text-muted fs-1 mb-3"></i>
+                <h5 class="fw-bold">No upcoming events yet</h5>
+                <p class="text-muted">Stay tuned! Exciting campus hackathons and workshops will be published soon.</p>
+            </div>
+        {% endif %}
+    </div>
+</section>
+
+<!-- How FastFest Works Section -->
+<section class="py-5 bg-white border-top border-bottom">
+    <div class="container">
+        <div class="text-center mb-5" style="max-width: 600px; margin: 0 auto;">
+            <span class="text-primary fw-bold text-uppercase small">Simple & Seamless</span>
+            <h2 class="fw-bold">How FastFest Works for Campus Events</h2>
+        </div>
+
+        <div class="row g-4 text-center">
+            <div class="col-md-3">
+                <div class="p-4 rounded-3 h-100 bg-light">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle mb-3" style="width: 56px; height: 56px; font-size: 1.5rem;">
+                        1
+                    </div>
+                    <h5 class="fw-bold mb-2">Explore & Filter</h5>
+                    <p class="text-muted small mb-0">Browse events tailored by department, year eligibility, and technical/cultural tracks.</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-4 rounded-3 h-100 bg-light">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle mb-3" style="width: 56px; height: 56px; font-size: 1.5rem;">
+                        2
+                    </div>
+                    <h5 class="fw-bold mb-2">1-Click Register</h5>
+                    <p class="text-muted small mb-0">Auto-filled student profile plus custom organizer questions with instant Razorpay checkout.</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-4 rounded-3 h-100 bg-light">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle mb-3" style="width: 56px; height: 56px; font-size: 1.5rem;">
+                        3
+                    </div>
+                    <h5 class="fw-bold mb-2">QR Ticket Check-In</h5>
+                    <p class="text-muted small mb-0">Receive a unique QR ticket code for instant venue scanner verification without long queues.</p>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="p-4 rounded-3 h-100 bg-light">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle mb-3" style="width: 56px; height: 56px; font-size: 1.5rem;">
+                        4
+                    </div>
+                    <h5 class="fw-bold mb-2">E-Certificates</h5>
+                    <p class="text-muted small mb-0">Verified attendees receive tamper-proof, downloadable digital certificates with verification IDs.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Call to Action Banner -->
+<section class="py-5" style="background: linear-gradient(135deg, #1e3a8a, #0f172a); color: white;">
+    <div class="container py-3 text-center">
+        <h2 class="fw-bold mb-3">Organizing a Club Activity or Technical Fest?</h2>
+        <p class="lead text-light opacity-90 mb-4" style="max-width: 650px; margin: 0 auto;">
+            Get approval from faculty, build custom registration forms, scan attendee QR codes, and export rosters with 1-click.
+        </p>
+        <a href="{{ url_for('auth.register_organizer') }}" class="btn btn-warning btn-lg px-4 py-2 fw-bold shadow">
+            Register as Event Organizer
+        </a>
+    </div>
+</section>
+{% endblock %}

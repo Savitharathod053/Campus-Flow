@@ -1,0 +1,200 @@
+{% extends "base.html" %}
+{% block title %}Organizer Dashboard - FastFest{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h2 class="fw-bold mb-1">Organizer Dashboard</h2>
+                <p class="text-light opacity-90 mb-0">
+                    <i class="bi bi-person-badge me-1"></i> {{ user.name }} &bull;
+                    <strong>{{ user.organizer_profile.organization_name if user.organizer_profile else 'College Event Club' }}</strong>
+                </p>
+            </div>
+            <a href="{{ url_for('organizer.create_event') }}" class="btn btn-warning fw-bold shadow-sm">
+                <i class="bi bi-plus-circle me-1"></i> Create New Event
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Stat Metrics Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-primary text-white">
+                    <i class="bi bi-calendar-event"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ total_events }}</div>
+                    <div class="metric-label">Total Events</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-success text-white">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ total_registrations }}</div>
+                    <div class="metric-label">Registrations</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-warning text-dark">
+                    <i class="bi bi-hourglass-split"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ pending_approval_events }}</div>
+                    <div class="metric-label">Pending Approvals</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-info text-white">
+                    <i class="bi bi-qr-code-scan"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ attended_count }}</div>
+                    <div class="metric-label">Attended Check-ins</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Events Management Section -->
+    <div class="ff-card p-4 mb-4 shadow-sm">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0"><i class="bi bi-list-check text-primary me-2"></i> My Managed Events</h5>
+            <a href="{{ url_for('organizer.create_event') }}" class="btn btn-primary btn-sm fw-bold">
+                <i class="bi bi-plus-lg me-1"></i> New Event
+            </a>
+        </div>
+
+        {% if events %}
+            <div class="table-responsive">
+                <table class="table ff-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Event Title & Type</th>
+                            <th>Date & Time</th>
+                            <th>Status</th>
+                            <th>Registrations</th>
+                            <th>Fee</th>
+                            <th class="text-end">Event Hub</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in events %}
+                            <tr>
+                                <td>
+                                    <a href="{{ url_for('organizer.manage_event', event_id=event.id) }}" class="fw-bold text-dark text-decoration-none">
+                                        {{ event.title }}
+                                    </a>
+                                    <div>
+                                        <span class="badge bg-light text-dark border small">{{ event.event_type }}</span>
+                                        <span class="small text-muted ms-1"><i class="bi bi-geo-alt"></i> {{ event.venue }}</span>
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="small fw-semibold">{{ event.start_time|dateformat }}</div>
+                                    <div class="small text-muted">{{ event.start_time|timeformat }}</div>
+                                </td>
+                                <td>
+                                    {% if event.status == 'APPROVED' %}
+                                        <span class="badge bg-success">Approved / Open</span>
+                                    {% elif event.status == 'PENDING_APPROVAL' %}
+                                        <span class="badge bg-warning text-dark">Pending Approval</span>
+                                    {% elif event.status == 'REJECTED' %}
+                                        <span class="badge bg-danger" title="{{ event.rejection_reason or '' }}">Rejected</span>
+                                    {% elif event.status == 'EVENT_COMPLETED' %}
+                                        <span class="badge bg-secondary">Completed</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark border">{{ event.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="small fw-bold">{{ event.confirmed_registrations_count }} / {{ event.max_participants }}</div>
+                                    <div class="progress mt-1" style="height: 4px; width: 80px;">
+                                        <div class="progress-bar bg-primary" style="width: {{ (event.confirmed_registrations_count / event.max_participants * 100)|round }}%;"></div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if event.is_free %}
+                                        <span class="badge bg-light text-success border">FREE</span>
+                                    {% else %}
+                                        <span class="fw-semibold">₹{{ "%.0f"|format(event.registration_fee) }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{{ url_for('organizer.manage_event', event_id=event.id) }}" class="btn btn-primary" title="Manage Event Hub">
+                                            <i class="bi bi-gear-fill me-1"></i> Manage
+                                        </a>
+                                        <a href="{{ url_for('organizer.attendance_scanner', event_id=event.id) }}" class="btn btn-outline-info" title="Open QR Scanner">
+                                            <i class="bi bi-qr-code-scan"></i>
+                                        </a>
+                                        <a href="{{ url_for('organizer.participants', event_id=event.id) }}" class="btn btn-outline-secondary" title="View Participants">
+                                            <i class="bi bi-people"></i>
+                                        </a>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="bi bi-calendar-plus fs-1 text-muted opacity-50 d-block mb-2"></i>
+                <h5>No events created yet</h5>
+                <p>Create your first campus workshop, seminar, or competition to begin collecting registrations.</p>
+                <a href="{{ url_for('organizer.create_event') }}" class="btn btn-primary">Create Event</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Recent Participant Registrations Table -->
+    {% if recent_registrations %}
+        <div class="ff-card p-4 shadow-sm">
+            <h5 class="fw-bold mb-3"><i class="bi bi-clock-history text-secondary me-2"></i> Recent Registrations</h5>
+            <div class="table-responsive">
+                <table class="table table-sm ff-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Roll Number</th>
+                            <th>Department</th>
+                            <th>Event</th>
+                            <th>Reg. Code</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in recent_registrations %}
+                            <tr>
+                                <td><strong>{{ r.student.name }}</strong></td>
+                                <td><span class="badge bg-light text-dark border">{{ r.student.student_profile.roll_number if r.student.student_profile else 'N/A' }}</span></td>
+                                <td>{{ r.student.student_profile.department if r.student.student_profile else 'N/A' }}</td>
+                                <td>{{ r.event.title|truncate(30) }}</td>
+                                <td><code>{{ r.registration_code }}</code></td>
+                                <td>
+                                    <span class="badge {% if r.is_confirmed %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                        {{ r.status }}
+                                    </span>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

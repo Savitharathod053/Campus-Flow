@@ -1,0 +1,384 @@
+/* FastFest - Modern College Event Management System Stylesheet */
+
+:root {
+  --ff-primary: #1e40af;
+  --ff-primary-hover: #1d4ed8;
+  --ff-primary-light: #eff6ff;
+  --ff-secondary: #0f172a;
+  --ff-accent: #f59e0b;
+  --ff-success: #10b981;
+  --ff-danger: #ef4444;
+  --ff-warning: #f59e0b;
+  --ff-info: #0ea5e9;
+  --ff-dark: #0f172a;
+  --ff-light: #f8fafc;
+  --ff-border: #e2e8f0;
+  --ff-card-bg: #ffffff;
+  --ff-text-main: #1e293b;
+  --ff-text-muted: #64748b;
+  --ff-radius: 0.75rem;
+  --ff-radius-sm: 0.5rem;
+  --ff-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --ff-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --ff-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  color: var(--ff-text-main);
+  background-color: var(--ff-light);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Navbar */
+.navbar-brand-custom {
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  font-size: 1.35rem;
+  color: var(--ff-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.navbar-brand-custom span {
+  color: var(--ff-accent);
+}
+
+.ff-navbar {
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--ff-border);
+  box-shadow: var(--ff-shadow-sm);
+}
+
+.nav-link {
+  font-weight: 500;
+  color: var(--ff-text-main);
+  padding: 0.5rem 0.85rem;
+  transition: all 0.2s ease;
+}
+
+.nav-link:hover, .nav-link.active {
+  color: var(--ff-primary);
+}
+
+/* Hero Section */
+.hero-section {
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+  color: #ffffff;
+  padding: 4.5rem 0 4rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.hero-section::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+  background-size: 24px 24px;
+  pointer-events: none;
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  padding: 0.35rem 0.9rem;
+  border-radius: 9999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+/* Custom Cards */
+.ff-card {
+  background: var(--ff-card-bg);
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius);
+  box-shadow: var(--ff-shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  overflow: hidden;
+}
+
+.ff-card:hover {
+  box-shadow: var(--ff-shadow);
+}
+
+.ff-card-interactive:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--ff-shadow-lg);
+}
+
+.ff-card-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--ff-border);
+  background-color: #ffffff;
+  font-weight: 600;
+}
+
+.ff-card-body {
+  padding: 1.5rem;
+}
+
+/* Event Card */
+.event-card {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.event-poster-wrapper {
+  height: 190px;
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #1e293b, #334155);
+}
+
+.event-poster-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.event-card:hover .event-poster-img {
+  transform: scale(1.05);
+}
+
+.event-type-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(4px);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+}
+
+.event-fee-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: #ffffff;
+  color: var(--ff-primary);
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  box-shadow: var(--ff-shadow-sm);
+}
+
+/* Metric / Stat Card */
+.metric-card {
+  display: flex;
+  align-items: center;
+  padding: 1.25rem;
+  background: #ffffff;
+  border: 1px solid var(--ff-border);
+  border-radius: var(--ff-radius);
+  box-shadow: var(--ff-shadow-sm);
+}
+
+.metric-icon-box {
+  width: 52px;
+  height: 52px;
+  border-radius: 0.65rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  margin-right: 1rem;
+  flex-shrink: 0;
+}
+
+.metric-number {
+  font-size: 1.75rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--ff-secondary);
+}
+
+.metric-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--ff-text-muted);
+  margin-top: 0.15rem;
+}
+
+/* Status Badges */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-approved, .status-registration-open, .status-confirmed, .status-success {
+  background-color: #dcfce7;
+  color: #15803d;
+}
+
+.status-pending-approval, .status-pending-payment, .status-pending {
+  background-color: #fef3c7;
+  color: #b45309;
+}
+
+.status-rejected, .status-cancelled, .status-failed {
+  background-color: #fee2e2;
+  color: #b91c1c;
+}
+
+.status-event-completed, .status-draft, .status-registration-closed {
+  background-color: #f1f5f9;
+  color: #475569;
+}
+
+/* Buttons */
+.btn-primary {
+  background-color: var(--ff-primary);
+  border-color: var(--ff-primary);
+  font-weight: 600;
+  border-radius: var(--ff-radius-sm);
+  padding: 0.55rem 1.25rem;
+  transition: all 0.2s ease;
+}
+
+.btn-primary:hover {
+  background-color: var(--ff-primary-hover);
+  border-color: var(--ff-primary-hover);
+}
+
+.btn-accent {
+  background-color: var(--ff-accent);
+  border-color: var(--ff-accent);
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.btn-accent:hover {
+  background-color: #d97706;
+  border-color: #d97706;
+  color: #ffffff;
+}
+
+/* Digital Ticket Styles */
+.ticket-container {
+  max-width: 680px;
+  margin: 2rem auto;
+  background: #ffffff;
+  border: 2px dashed var(--ff-border);
+  border-radius: 1rem;
+  box-shadow: var(--ff-shadow-lg);
+  overflow: hidden;
+  position: relative;
+}
+
+.ticket-header {
+  background: linear-gradient(135deg, #0f172a, #1e3a8a);
+  color: #ffffff;
+  padding: 1.75rem 2rem;
+}
+
+.ticket-body {
+  padding: 2rem;
+}
+
+.ticket-qr-box {
+  background: #ffffff;
+  padding: 0.75rem;
+  border: 1px solid var(--ff-border);
+  border-radius: 0.5rem;
+  display: inline-block;
+  box-shadow: var(--ff-shadow-sm);
+}
+
+/* Camera Scanner Container */
+.scanner-viewport {
+  width: 100%;
+  max-width: 480px;
+  min-height: 300px;
+  margin: 0 auto;
+  border-radius: var(--ff-radius);
+  overflow: hidden;
+  border: 2px solid var(--ff-primary);
+  background: #0f172a;
+}
+
+/* Custom Table */
+.ff-table th {
+  background-color: #f8fafc;
+  color: var(--ff-text-muted);
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-bottom: 2px solid var(--ff-border);
+  padding: 0.85rem 1rem;
+}
+
+.ff-table td {
+  padding: 0.9rem 1rem;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--ff-border);
+}
+
+/* Footer */
+.ff-footer {
+  margin-top: auto;
+  background-color: #0f172a;
+  color: #94a3b8;
+  padding: 3rem 0 1.5rem;
+  border-top: 1px solid #1e293b;
+}
+
+.ff-footer h5 {
+  color: #ffffff;
+  font-weight: 700;
+  margin-bottom: 1.25rem;
+}
+
+.ff-footer a {
+  color: #94a3b8;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.ff-footer a:hover {
+  color: #ffffff;
+}
+
+/* Print styles for tickets & certificates */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .printable-area, .printable-area * {
+    visibility: visible;
+  }
+  .printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Live QR Attendance Scanner - {{ event.title }}{% endblock %}
+
+{% block extra_css %}
+<style>
+#reader {
+    width: 100%;
+    max-width: 460px;
+    margin: 0 auto;
+    border-radius: var(--ff-radius);
+    overflow: hidden;
+    background: #0f172a;
+    min-height: 280px;
+}
+#reader video {
+    border-radius: var(--ff-radius);
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h2 class="fw-bold mb-1"><i class="bi bi-qr-code-scan me-2"></i> Attendance Check-In Portal</h2>
+                <p class="text-light opacity-90 mb-0">Event: <strong>{{ event.title }}</strong> &bull; Venue: <strong>{{ event.venue }}</strong></p>
+            </div>
+            <a href="{{ url_for('organizer.manage_event', event_id=event.id) }}" class="btn btn-light btn-sm fw-bold">
+                <i class="bi bi-arrow-left me-1"></i> Back to Event Hub
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="row g-4">
+        <!-- Left: Live Camera Scanner & Manual Entry -->
+        <div class="col-lg-6">
+            <div class="ff-card p-4 shadow-sm mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-camera-fill text-primary me-2"></i> Live Camera Scanner</h5>
+                    <span id="scanner-status" class="small text-muted">Ready</span>
+                </div>
+
+                <!-- Video Viewport -->
+                <div id="reader" class="mb-3"></div>
+
+                <!-- Camera Controls -->
+                <div class="d-flex gap-2 mb-4">
+                    <button id="btn-start-camera" class="btn btn-primary fw-bold flex-grow-1">
+                        <i class="bi bi-camera-video me-1"></i> Start Camera Scanner
+                    </button>
+                    <button id="btn-stop-camera" class="btn btn-danger fw-bold flex-grow-1 d-none">
+                        <i class="bi bi-stop-circle me-1"></i> Stop Camera
+                    </button>
+                </div>
+
+                <!-- Scan Results Container -->
+                <div id="scan-result-box"></div>
+
+                <!-- Manual Registration Code Input -->
+                <div class="border-top pt-3">
+                    <h6 class="fw-bold mb-2 text-secondary"><i class="bi bi-keyboard me-1"></i> Manual Ticket Code Entry</h6>
+                    <form id="manual-entry-form" class="row g-2">
+                        <div class="col-8">
+                            <input type="text" id="manual-ticket-code" class="form-control" placeholder="e.g. FF-E1-S1-ABC1234" required>
+                        </div>
+                        <div class="col-4">
+                            <button type="submit" class="btn btn-dark w-100 fw-bold">
+                                Verify & Mark
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Recent Check-in Activity Log -->
+        <div class="col-lg-6">
+            <div class="ff-card p-4 shadow-sm h-100">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-list-check text-success me-2"></i> Live Check-In Log</h5>
+                    <span class="badge bg-success" id="live-checkin-count">{{ recent_attendance|length }} Recorded</span>
+                </div>
+
+                <div class="table-responsive" style="max-height: 520px; overflow-y: auto;">
+                    <table class="table table-sm ff-table mb-0">
+                        <thead>
+                            <tr>
+                                <th>Student</th>
+                                <th>Roll No</th>
+                                <th>Dept / Year</th>
+                                <th>Time</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recent-attendance-tbody">
+                            {% if recent_attendance %}
+                                {% for att in recent_attendance %}
+                                    <tr>
+                                        <td><strong>{{ att.student.name }}</strong></td>
+                                        <td><span class="badge bg-light text-dark border">{{ att.student.student_profile.roll_number if att.student.student_profile else 'N/A' }}</span></td>
+                                        <td>
+                                            {% if att.student.student_profile %}
+                                                {{ att.student.student_profile.department }} ({{ att.student.student_profile.year }}-{{ att.student.student_profile.section }})
+                                            {% else %}
+                                                N/A
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ att.scanned_at|timeformat }}</td>
+                                        <td><span class="badge bg-success">Verified</span></td>
+                                    </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">No check-ins recorded yet. Start scanning to mark attendance.</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- HTML5 QR Code Library -->
+<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="{{ url_for('static', filename='js/qr_scanner.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    initAttendanceScanner({{ event.id }});
+});
+</script>
+{% endblock %}

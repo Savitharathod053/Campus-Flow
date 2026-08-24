@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Student Registration - FastFest{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <div class="ff-card shadow-lg p-4 p-sm-5">
+                <div class="text-center mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle mb-3" style="width: 56px; height: 56px; font-size: 1.5rem;">
+                        <i class="bi bi-mortarboard-fill"></i>
+                    </div>
+                    <h3 class="fw-bold">Student Account Registration</h3>
+                    <p class="text-muted small">Create your student profile to discover and register for campus events</p>
+                </div>
+
+                <form method="POST" action="{{ url_for('auth.register_student') }}">
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Full Name *</label>
+                            <input type="text" name="name" class="form-control" placeholder="e.g. Rahul Sharma" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">College Email *</label>
+                            <input type="email" name="email" class="form-control" placeholder="rahul.21cs@college.edu" required>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Roll Number / USN *</label>
+                            <input type="text" name="roll_number" class="form-control" placeholder="e.g. 1MS21CS045" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Phone Number</label>
+                            <input type="tel" name="phone" class="form-control" placeholder="+91 9876543210">
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Department / Branch *</label>
+                            <select name="department" class="form-select" required>
+                                <option value="" disabled selected>Select Branch</option>
+                                <option value="CSE">Computer Science (CSE)</option>
+                                <option value="IT">Information Technology (IT)</option>
+                                <option value="ECE">Electronics (ECE)</option>
+                                <option value="MECH">Mechanical (MECH)</option>
+                                <option value="CIVIL">Civil (CIVIL)</option>
+                                <option value="EEE">Electrical (EEE)</option>
+                                <option value="AI_DS">AI & Data Science (AI/DS)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Year of Study *</label>
+                            <select name="year" class="form-select" required>
+                                <option value="1">1st Year (Freshman)</option>
+                                <option value="2">2nd Year (Sophomore)</option>
+                                <option value="3" selected>3rd Year (Junior)</option>
+                                <option value="4">4th Year (Senior)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Section *</label>
+                            <input type="text" name="section" class="form-control" placeholder="e.g. A" required maxlength="5">
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Password *</label>
+                            <input type="password" name="password" class="form-control" placeholder="Minimum 6 characters" minlength="6" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Confirm Password *</label>
+                            <input type="password" name="confirm_password" class="form-control" placeholder="Repeat password" minlength="6" required>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow-sm">
+                        Complete Student Registration
+                    </button>
+                </form>
+
+                <div class="text-center mt-4 pt-3 border-top">
+                    <span class="small text-muted">Already registered?</span>
+                    <a href="{{ url_for('auth.login') }}" class="small fw-bold text-decoration-none ms-1">Log In here</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

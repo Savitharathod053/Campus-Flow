@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% block title %}Checkout & Payment - FastFest{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <h2 class="fw-bold mb-1"><i class="bi bi-credit-card me-2"></i> Event Fee Payment</h2>
+        <p class="text-light opacity-90 mb-0">Secure registration payment via Razorpay Payment Gateway</p>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-6">
+            <div class="ff-card p-4 p-sm-5 shadow-lg">
+                <div class="text-center mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle mb-3" style="width: 56px; height: 56px; font-size: 1.5rem;">
+                        <i class="bi bi-shield-lock-fill"></i>
+                    </div>
+                    <h3 class="fw-bold">Payment Checkout</h3>
+                    <p class="text-muted small">Complete your registration payment to confirm your seat</p>
+                </div>
+
+                <!-- Order Details Summary -->
+                <div class="p-3 bg-light rounded-3 mb-4 border">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small">Event Name:</span>
+                        <strong class="text-dark">{{ event.title }}</strong>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small">Participant:</span>
+                        <span>{{ user.name }} ({{ user.student_profile.roll_number if user.student_profile else '' }})</span>
+                    </div>
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-muted small">Registration Code:</span>
+                        <code>{{ registration.registration_code }}</code>
+                    </div>
+                    <div class="d-flex justify-content-between border-top pt-2 mt-2">
+                        <span class="fw-bold">Total Amount Payable:</span>
+                        <span class="fw-extrabold text-primary fs-5">₹{{ "%.2f"|format(order_data.amount) }}</span>
+                    </div>
+                </div>
+
+                <!-- Razorpay Checkout Submission Form -->
+                <form action="{{ url_for('payment.verify_payment') }}" method="POST" id="razorpay-form">
+                    <input type="hidden" name="registration_id" value="{{ registration.id }}">
+                    <input type="hidden" name="razorpay_order_id" id="razorpay_order_id" value="{{ order_data.order_id }}">
+                    <input type="hidden" name="razorpay_payment_id" id="razorpay_payment_id" value="">
+                    <input type="hidden" name="razorpay_signature" id="razorpay_signature" value="">
+
+                    <!-- Real Razorpay Checkout Action Button -->
+                    <button type="button" id="rzp-button" class="btn btn-primary w-100 py-3 fw-bold shadow-sm mb-3">
+                        <i class="bi bi-credit-card-2-front me-2"></i> Pay with Razorpay (₹{{ "%.2f"|format(order_data.amount) }})
+                    </button>
+                </form>
+
+                {% if config.RAZORPAY_SANDBOX_SIMULATION %}
+                <!-- Instant Test Simulation Option -->
+                <div class="border-top pt-3 mt-2 text-center">
+                    <p class="text-muted small mb-2"><i class="bi bi-info-circle me-1"></i> Sandbox Test Mode Active</p>
+                    <form action="{{ url_for('payment.simulate_payment', registration_id=registration.id) }}" method="POST">
+                        <button type="submit" class="btn btn-outline-success w-100 py-2 fw-semibold">
+                            <i class="bi bi-lightning-charge-fill me-1"></i> Simulate Successful Payment (Instant Test)
+                        </button>
+                    </form>
+                </div>
+                {% endif %}
+
+                <div class="text-center pt-3">
+                    <a href="{{ url_for('student.my_events') }}" class="small text-muted text-decoration-none">
+                        <i class="bi bi-arrow-left me-1"></i> Cancel and return to My Events
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Official Razorpay Checkout Script -->
+<script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const keyId = "{{ order_data.key_id }}";
+    const orderId = "{{ order_data.order_id }}";
+    
+    const rzpBtn = document.getElementById('rzp-button');
+    if (!rzpBtn) return;
+
+    rzpBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+
+        if (typeof Razorpay === 'undefined') {
+            alert('Razorpay Checkout SDK could not be loaded. Please check your internet connection or use the Sandbox Simulation button below.');
+            return;
+        }
+
+        const options = {
+            "key": keyId,
+            "amount": {{ (order_data.amount * 100)|int }},
+            "currency": "INR",
+            "name": "FastFest College Events",
+            "description": "{{ event.title }} - Registration Fee",
+            "order_id": orderId,
+            "handler": function (response) {
+                document.getElementById('razorpay_payment_id').value = response.razorpay_payment_id;
+                document.getElementById('razorpay_order_id').value = response.razorpay_order_id;
+                document.getElementById('razorpay_signature').value = response.razorpay_signature;
+                document.getElementById('razorpay-form').submit();
+            },
+            "prefill": {
+                "name": "{{ user.name }}",
+                "email": "{{ user.email }}",
+                "contact": "{{ user.phone or '' }}"
+            },
+            "theme": {
+                "color": "#1e40af"
+            },
+            "modal": {
+                "ondismiss": function() {
+                    console.log('Payment modal dismissed by user');
+                }
+            }
+        };
+
+        try {
+            const rzp = new Razorpay(options);
+            rzp.on('payment.failed', function (response){
+                alert('Payment Failed: ' + (response.error.description || 'Unknown error occurred.'));
+            });
+            rzp.open();
+        } catch (err) {
+            console.error('Razorpay invocation error:', err);
+            alert('Could not open Razorpay checkout: ' + err.message);
+        }
+    });
+});
+</script>
+{% endblock %}

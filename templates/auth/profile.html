@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}My Profile - FastFest{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="ff-card p-4 p-sm-5">
+                <div class="d-flex align-items-center justify-content-between mb-4 border-bottom pb-3">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold fs-3" style="width: 56px; height: 56px;">
+                            {{ user.name[:1].upper() }}
+                        </div>
+                        <div>
+                            <h3 class="fw-bold mb-0">{{ user.name }}</h3>
+                            <span class="badge bg-primary">{{ user.role }}</span>
+                        </div>
+                    </div>
+                    <span class="small text-muted">Member since {{ user.created_at|dateformat }}</span>
+                </div>
+
+                <form method="POST" action="{{ url_for('auth.profile') }}">
+                    <h5 class="fw-bold mb-3 text-secondary">Personal Information</h5>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Full Name</label>
+                            <input type="text" name="name" class="form-control" value="{{ user.name }}" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">College Email (Read-Only)</label>
+                            <input type="email" class="form-control bg-light" value="{{ user.email }}" readonly>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Phone Number</label>
+                            <input type="tel" name="phone" class="form-control" value="{{ user.phone or '' }}">
+                        </div>
+                    </div>
+
+                    {% if user.is_student and user.student_profile %}
+                        <h5 class="fw-bold mb-3 text-secondary border-top pt-3">Academic Details</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Roll Number (USN)</label>
+                                <input type="text" class="form-control bg-light" value="{{ user.student_profile.roll_number }}" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Department</label>
+                                <input type="text" name="department" class="form-control" value="{{ user.student_profile.department }}">
+                            </div>
+                            <div class="col-md-2 col-6">
+                                <label class="form-label small fw-bold">Year</label>
+                                <input type="number" name="year" class="form-control" value="{{ user.student_profile.year }}" min="1" max="5">
+                            </div>
+                            <div class="col-md-2 col-6">
+                                <label class="form-label small fw-bold">Section</label>
+                                <input type="text" name="section" class="form-control" value="{{ user.student_profile.section }}">
+                            </div>
+                        </div>
+                    {% elif user.is_organizer and user.organizer_profile %}
+                        <h5 class="fw-bold mb-3 text-secondary border-top pt-3">Organization Details</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Organization / Club Name</label>
+                                <input type="text" name="organization_name" class="form-control" value="{{ user.organizer_profile.organization_name }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Designation</label>
+                                <input type="text" name="designation" class="form-control" value="{{ user.organizer_profile.designation or '' }}">
+                            </div>
+                        </div>
+                    {% endif %}
+
+                    <h5 class="fw-bold mb-3 text-secondary border-top pt-3">Security & Password</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Change Password (leave blank to keep current)</label>
+                            <input type="password" name="new_password" class="form-control" placeholder="New password">
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary px-4 fw-bold">
+                        Save Profile Changes
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

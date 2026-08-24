@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}{{ event.title }} - FastFest{% endblock %}
+
+{% block content %}
+<!-- Event Header Banner -->
+<div class="bg-dark text-white py-5 position-relative" style="background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);">
+    <div class="container">
+        <div class="row align-items-center g-4">
+            <div class="col-lg-8">
+                <div class="d-flex flex-wrap gap-2 mb-3">
+                    <span class="badge bg-warning text-dark fw-bold px-3 py-2 fs-6">{{ event.event_type }}</span>
+                    <span class="badge bg-light text-dark fw-semibold px-3 py-2 fs-6">{{ event.department }}</span>
+                    {% if event.is_free %}
+                        <span class="badge bg-success px-3 py-2 fs-6 fw-bold">FREE EVENT</span>
+                    {% else %}
+                        <span class="badge bg-light text-primary px-3 py-2 fs-6 fw-bold">Fee: ₹{{ "%.2f"|format(event.registration_fee) }}</span>
+                    {% endif %}
+                </div>
+                <h1 class="display-5 fw-extrabold mb-3">{{ event.title }}</h1>
+                <div class="d-flex flex-wrap gap-4 text-light opacity-90 fs-6">
+                    <div><i class="bi bi-calendar3 text-warning me-2"></i> {{ event.start_time|datetimeformat }}</div>
+                    <div><i class="bi bi-geo-alt text-danger me-2"></i> {{ event.venue }}</div>
+                </div>
+            </div>
+            <div class="col-lg-4 text-lg-end">
+                <div class="p-3 rounded-3 bg-white bg-opacity-10 border border-light border-opacity-25 text-white d-inline-block text-start w-100">
+                    <div class="small text-light opacity-75 mb-1">Registration Deadline</div>
+                    <div class="fw-bold fs-5 mb-2"><i class="bi bi-clock-history text-warning me-2"></i> {{ event.registration_deadline|datetimeformat }}</div>
+                    <div class="d-flex justify-content-between small border-top border-light border-opacity-25 pt-2">
+                        <span>Total Capacity: <strong>{{ event.max_participants }}</strong></span>
+                        <span class="text-warning">Available: <strong>{{ event.available_seats }}</strong></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container py-5">
+    <div class="row g-4">
+        <!-- Main Event Content Left Column -->
+        <div class="col-lg-8">
+            <!-- Announcements if any -->
+            {% if announcements %}
+                <div class="mb-4">
+                    <h5 class="fw-bold mb-3"><i class="bi bi-megaphone-fill text-warning me-2"></i> Latest Event Announcements</h5>
+                    {% for a in announcements %}
+                        <div class="alert {% if a.is_pinned %}alert-warning border-warning{% else %}alert-info border-info{% endif %} shadow-sm mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <h6 class="alert-heading fw-bold mb-0">
+                                    {% if a.is_pinned %}<i class="bi bi-pin-angle-fill me-1"></i>{% endif %} {{ a.title }}
+                                </h6>
+                                <small class="text-muted">{{ a.created_at|datetimeformat }}</small>
+                            </div>
+                            <p class="mb-0 small">{{ a.message }}</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <!-- Description -->
+            <div class="ff-card p-4 mb-4">
+                <h4 class="fw-bold mb-3 border-bottom pb-2">About This Event</h4>
+                <div class="text-secondary leading-relaxed" style="white-space: pre-line; line-height: 1.7;">
+                    {{ event.description }}
+                </div>
+            </div>
+
+            <!-- Rules & Guidelines -->
+            {% if event.rules %}
+                <div class="ff-card p-4 mb-4">
+                    <h4 class="fw-bold mb-3 border-bottom pb-2"><i class="bi bi-card-checklist text-primary me-2"></i> Rules & Guidelines</h4>
+                    <div class="text-secondary" style="white-space: pre-line; line-height: 1.7;">
+                        {{ event.rules }}
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Eligibility -->
+            <div class="ff-card p-4 mb-4">
+                <h4 class="fw-bold mb-3 border-bottom pb-2"><i class="bi bi-shield-check text-success me-2"></i> Participant Eligibility</h4>
+                <div class="row g-3">
+                    <div class="col-sm-4">
+                        <div class="p-3 bg-light rounded-3 text-center">
+                            <div class="small text-muted fw-bold">ALLOWED DEPARTMENTS</div>
+                            <div class="fw-bold text-dark mt-1">{{ event.allowed_departments }}</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="p-3 bg-light rounded-3 text-center">
+                            <div class="small text-muted fw-bold">ALLOWED YEARS</div>
+                            <div class="fw-bold text-dark mt-1">{{ event.allowed_years }}</div>
+                        </div>
+                    </div>
+                    <div class="col-sm-4">
+                        <div class="p-3 bg-light rounded-3 text-center">
+                            <div class="small text-muted fw-bold">ALLOWED SECTIONS</div>
+                            <div class="fw-bold text-dark mt-1">{{ event.allowed_sections }}</div>
+                        </div>
+                    </div>
+                </div>
+                {% if event.eligibility_notes %}
+                    <p class="small text-muted mt-3 mb-0"><i class="bi bi-info-circle me-1"></i> {{ event.eligibility_notes }}</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Sidebar Right Column (Registration Box & Coordinators) -->
+        <div class="col-lg-4">
+            <!-- Registration Action Box -->
+            <div class="ff-card p-4 mb-4 sticky-top" style="top: 80px;">
+                <h5 class="fw-bold mb-3">Registration Status</h5>
+
+                <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-light rounded-3">
+                    <div>
+                        <div class="small text-muted">Registration Fee</div>
+                        <div class="fw-bold fs-4 text-primary">
+                            {% if event.is_free %}FREE{% else %}₹{{ "%.2f"|format(event.registration_fee) }}{% endif %}
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <div class="small text-muted">Seats Available</div>
+                        <div class="fw-bold fs-4 {% if event.available_seats <= 5 %}text-danger{% else %}text-success{% endif %}">
+                            {{ event.available_seats }} / {{ event.max_participants }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Registration Buttons Logic -->
+                {% if is_registered %}
+                    <div class="alert alert-success text-center mb-3">
+                        <i class="bi bi-check-circle-fill fs-3 d-block mb-1"></i>
+                        <strong>You are Registered!</strong>
+                        <div class="small text-muted mt-1">Ticket ID: {{ existing_registration.registration_code }}</div>
+                    </div>
+                    <a href="{{ url_for('student.ticket', code=existing_registration.registration_code) }}" class="btn btn-success btn-lg w-100 fw-bold shadow-sm">
+                        <i class="bi bi-qr-code me-2"></i> View Ticket & QR Code
+                    </a>
+                {% elif event.status not in ('APPROVED', 'REGISTRATION_OPEN') %}
+                    <div class="alert alert-warning text-center mb-0">
+                        <i class="bi bi-exclamation-triangle me-1"></i> Registrations are currently not active for this event (Status: {{ event.status }}).
+                    </div>
+                {% elif event.is_deadline_passed %}
+                    <div class="alert alert-danger text-center mb-0">
+                        <i class="bi bi-clock-history me-1"></i> Registration deadline has passed.
+                    </div>
+                {% elif event.is_full %}
+                    <div class="alert alert-danger text-center mb-0">
+                        <i class="bi bi-people-fill me-1"></i> Housefull! Maximum participants reached.
+                    </div>
+                {% elif not current_user %}
+                    <div class="alert alert-info small mb-3">
+                        Please log in with your student account to register for this event.
+                    </div>
+                    <a href="{{ url_for('auth.login', next=request.url) }}" class="btn btn-primary btn-lg w-100 fw-bold shadow">
+                        <i class="bi bi-box-arrow-in-right me-2"></i> Log In to Register
+                    </a>
+                {% elif not current_user.is_student %}
+                    <div class="alert alert-secondary small text-center mb-0">
+                        You are logged in as <strong>{{ current_user.role }}</strong>. Only students can register for events.
+                    </div>
+                {% elif not is_eligible %}
+                    <div class="alert alert-danger mb-0">
+                        <i class="bi bi-x-circle me-1"></i> <strong>Not Eligible:</strong> {{ eligibility_message }}
+                    </div>
+                {% else %}
+                    <a href="{{ url_for('student.register_event', event_id=event.id) }}" class="btn btn-primary btn-lg w-100 fw-bold shadow">
+                        <i class="bi bi-pencil-square me-2"></i> Register Now
+                    </a>
+                    <div class="text-center mt-2 small text-muted">
+                        <i class="bi bi-shield-check text-success"></i> Instant confirmation & QR code
+                    </div>
+                {% endif %}
+
+                <hr class="my-4">
+
+                <!-- Coordinators Info -->
+                <h6 class="fw-bold mb-3">Event Contacts</h6>
+                <div class="mb-3">
+                    <div class="small text-muted fw-bold">FACULTY COORDINATOR</div>
+                    <div class="fw-semibold">{{ event.faculty_coordinator }}</div>
+                    {% if event.faculty_coordinator_contact %}
+                        <div class="small text-muted"><i class="bi bi-envelope me-1"></i> {{ event.faculty_coordinator_contact }}</div>
+                    {% endif %}
+                </div>
+
+                <div class="mb-3">
+                    <div class="small text-muted fw-bold">ORGANIZER</div>
+                    <div class="fw-semibold">{{ event.organizer.name }}</div>
+                    {% if event.organizer.organizer_profile %}
+                        <div class="small text-primary">{{ event.organizer.organizer_profile.organization_name }}</div>
+                    {% endif %}
+                    {% if event.contact_info %}
+                        <div class="small text-muted mt-1"><i class="bi bi-telephone me-1"></i> {{ event.contact_info }}</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

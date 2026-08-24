@@ -1,0 +1,211 @@
+{% extends "base.html" %}
+{% block title %}Pending Approvals Queue - FastFest Admin{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h2 class="fw-bold mb-1"><i class="bi bi-clock-history me-2"></i> Administrative Approvals Queue</h2>
+                <p class="text-light opacity-90 mb-0">Review pending event proposals and organizer club registrations for your department.</p>
+            </div>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-light btn-sm fw-bold">
+                <i class="bi bi-arrow-left me-1"></i> Admin Portal
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Tabs for Events vs Organizers -->
+    <ul class="nav nav-pills mb-4 gap-2" id="approvalTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if active_tab == 'events' %}active{% endif %} fw-bold px-4 py-2" href="{{ url_for('admin.pending_approvals', tab='events') }}">
+                <i class="bi bi-calendar-event me-2"></i> Event Proposals <span class="badge bg-warning text-dark ms-2">{{ events|length }}</span>
+            </a>
+        </li>
+        <li class="nav-item" role="presentation">
+            <a class="nav-link {% if active_tab == 'organizers' %}active{% endif %} fw-bold px-4 py-2" href="{{ url_for('admin.pending_approvals', tab='organizers') }}">
+                <i class="bi bi-people me-2"></i> Organizer Registrations <span class="badge bg-danger ms-2">{{ organizers|length }}</span>
+            </a>
+        </li>
+    </ul>
+
+    {% if active_tab == 'organizers' %}
+        <!-- Organizer Registrations Approvals -->
+        {% if organizers %}
+            <div class="d-flex flex-column gap-4">
+                {% for org in organizers %}
+                    <div class="ff-card p-4 shadow-sm border-danger border-opacity-50">
+                        <div class="row g-4 align-items-center">
+                            <div class="col-lg-8">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <span class="badge bg-danger">Pending Organizer</span>
+                                    <span class="badge bg-light text-dark border">Dept: {{ org.department }}</span>
+                                    <span class="badge bg-light text-muted">Applied {{ org.user.created_at|dateformat }}</span>
+                                </div>
+                                <h4 class="fw-bold mb-1 text-dark">{{ org.organization_name }}</h4>
+                                <div class="text-secondary small mb-2">
+                                    <strong>Lead Organizer:</strong> {{ org.user.name }} &bull;
+                                    <strong>Designation:</strong> {{ org.designation or 'Organizer' }}
+                                </div>
+                                <div class="row g-2 small text-muted border-top pt-2">
+                                    <div class="col-sm-6"><i class="bi bi-envelope me-1 text-primary"></i> {{ org.user.email }}</div>
+                                    <div class="col-sm-6"><i class="bi bi-telephone me-1 text-success"></i> {{ org.user.phone or 'N/A' }}</div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-4 border-start-lg">
+                                <div class="p-3 bg-light rounded-3 mb-3 small">
+                                    <div class="text-muted mb-1">Status: <strong class="text-warning">Awaiting Faculty Approval</strong></div>
+                                    <div class="text-muted">Target Dept: <strong>{{ org.department }}</strong></div>
+                                </div>
+                                <div class="d-flex gap-2">
+                                    <form method="POST" action="{{ url_for('admin.organizer_action', organizer_profile_id=org.id) }}" class="flex-grow-1">
+                                        <input type="hidden" name="action" value="approve">
+                                        <button type="submit" class="btn btn-success w-100 fw-bold shadow-sm">
+                                            <i class="bi bi-check-circle me-1"></i> Approve Organizer
+                                        </button>
+                                    </form>
+                                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalRejectOrg{{ org.id }}">
+                                        <i class="bi bi-x-circle me-1"></i> Reject
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rejection Modal for Organizer -->
+                    <div class="modal fade" id="modalRejectOrg{{ org.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="POST" action="{{ url_for('admin.organizer_action', organizer_profile_id=org.id) }}">
+                                    <input type="hidden" name="action" value="reject">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title fw-bold text-danger">Reject Organizer: {{ org.organization_name }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p class="small text-muted mb-2">Please state the reason for rejecting <strong>{{ org.user.name }}</strong>'s application for <strong>{{ org.organization_name }}</strong>:</p>
+                                        <textarea name="rejection_reason" class="form-control" rows="3" placeholder="Provide feedback or missing verification details..." required></textarea>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                        <button type="submit" class="btn btn-danger btn-sm fw-bold">Confirm Rejection</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5 ff-card p-5">
+                <i class="bi bi-person-check-fill text-success fs-1 mb-3"></i>
+                <h4 class="fw-bold">No Pending Organizer Registrations</h4>
+                <p class="text-muted">All organizer and club accounts for your department have been reviewed.</p>
+            </div>
+        {% endif %}
+
+    {% else %}
+        <!-- Events Approvals Tab -->
+        {% if events %}
+            <div class="d-flex flex-column gap-4">
+                {% for event in events %}
+                    <div class="ff-card p-4 shadow-sm border-warning border-opacity-50">
+                        <div class="row g-4">
+                            <div class="col-lg-8">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <span class="badge bg-warning text-dark">{{ event.event_type }}</span>
+                                    <span class="badge bg-light text-dark border">{{ event.department }}</span>
+                                    <span class="badge bg-light text-muted">Submitted {{ event.created_at|dateformat }}</span>
+                                </div>
+                                <h4 class="fw-bold mb-2 text-dark">{{ event.title }}</h4>
+                                <p class="text-secondary small mb-3" style="white-space: pre-line;">{{ event.description }}</p>
+
+                                <div class="row g-2 small text-muted border-top pt-2">
+                                    <div class="col-sm-6">
+                                        <i class="bi bi-calendar3 text-primary me-1"></i> <strong>Time:</strong> {{ event.start_time|datetimeformat }}
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <i class="bi bi-geo-alt text-danger me-1"></i> <strong>Venue:</strong> {{ event.venue }}
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <i class="bi bi-person text-secondary me-1"></i> <strong>Organizer:</strong> {{ event.organizer.name }} ({{ event.organizer.email }})
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <i class="bi bi-person-check text-success me-1"></i> <strong>Faculty Coord:</strong> {{ event.faculty_coordinator }} ({{ event.faculty_coordinator_contact or 'N/A' }})
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-4 border-start-lg d-flex flex-column justify-content-between">
+                                <div class="p-3 bg-light rounded-3 mb-3">
+                                    <div class="d-flex justify-content-between mb-1 small">
+                                        <span>Pricing:</span>
+                                        <strong class="text-primary">{% if event.is_free %}FREE{% else %}₹{{ "%.0f"|format(event.registration_fee) }}{% endif %}</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1 small">
+                                        <span>Max Seats:</span>
+                                        <strong>{{ event.max_participants }}</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-1 small">
+                                        <span>Deadline:</span>
+                                        <span>{{ event.registration_deadline|datetimeformat }}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between small">
+                                        <span>Eligibility:</span>
+                                        <span>Dept: {{ event.allowed_departments }} | Yr: {{ event.allowed_years }}</span>
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2">
+                                    <form method="POST" action="{{ url_for('admin.event_action', event_id=event.id) }}" class="flex-grow-1">
+                                        <input type="hidden" name="action" value="approve">
+                                        <button type="submit" class="btn btn-success w-100 fw-bold shadow-sm">
+                                            <i class="bi bi-check-circle me-1"></i> Approve Event
+                                        </button>
+                                    </form>
+                                    <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#modalRejectEvent{{ event.id }}">
+                                        <i class="bi bi-x-circle me-1"></i> Reject
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Rejection Modal for Event -->
+                    <div class="modal fade" id="modalRejectEvent{{ event.id }}" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <form method="POST" action="{{ url_for('admin.event_action', event_id=event.id) }}">
+                                    <input type="hidden" name="action" value="reject">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title fw-bold text-danger">Reject Proposal: {{ event.title }}</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <p class="small text-muted mb-2">Please state the rejection reason or required corrections:</p>
+                                        <textarea name="rejection_reason" class="form-control" rows="3" placeholder="Provide feedback to organizer..." required></textarea>
+                                    </div>
+                                    <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                        <button type="submit" class="btn btn-danger btn-sm fw-bold">Reject Proposal</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5 ff-card p-5">
+                <i class="bi bi-check-all text-success fs-1 mb-3"></i>
+                <h4 class="fw-bold">No Pending Event Approvals</h4>
+                <p class="text-muted">All submitted campus events have been reviewed.</p>
+                <a href="{{ url_for('admin.events_list') }}" class="btn btn-primary btn-sm">View All Events Directory</a>
+            </div>
+        {% endif %}
+    {% endif %}
+</div>
+{% endblock %}

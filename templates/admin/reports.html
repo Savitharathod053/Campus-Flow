@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Participation Analytics & Reports - FastFest Admin{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h2 class="fw-bold mb-1"><i class="bi bi-bar-chart-line me-2"></i> Campus Participation Analytics & Reports</h2>
+                <p class="text-light opacity-90 mb-0">Department-wise participation, year breakdowns, event attendance, and financial summaries.</p>
+            </div>
+            <a href="{{ url_for('admin.dashboard') }}" class="btn btn-light btn-sm fw-bold">
+                <i class="bi bi-arrow-left me-1"></i> Admin Portal
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Summary KPI Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-4">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-success text-white">
+                    <i class="bi bi-ticket-perforated-fill"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ total_confirmed }}</div>
+                    <div class="metric-label">Total Confirmed Registrations</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-4">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-info text-white">
+                    <i class="bi bi-person-check-fill"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ total_attended }}</div>
+                    <div class="metric-label">Total Verified Attendance</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-4">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-primary text-white">
+                    <i class="bi bi-cash-stack"></i>
+                </div>
+                <div>
+                    <div class="metric-number">₹{{ "%.0f"|format(total_revenue) }}</div>
+                    <div class="metric-label">Total Event Revenue Collected</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Department-wise and Year-wise Breakdowns -->
+    <div class="row g-4 mb-4">
+        <!-- Department Distribution -->
+        <div class="col-lg-6">
+            <div class="ff-card p-4 h-100 shadow-sm">
+                <h5 class="fw-bold mb-3"><i class="bi bi-diagram-3-fill text-primary me-2"></i> Department-Wise Participation</h5>
+                {% if dept_stats %}
+                    <div class="d-flex flex-column gap-3">
+                        {% for dept, count in dept_stats %}
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-semibold text-dark">{{ dept }}</span>
+                                    <span class="badge bg-primary">{{ count }} Registrations</span>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-primary" style="width: {{ (count / total_confirmed * 100)|round if total_confirmed > 0 else 0 }}%;"></div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted small">No participation records yet.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Year Distribution -->
+        <div class="col-lg-6">
+            <div class="ff-card p-4 h-100 shadow-sm">
+                <h5 class="fw-bold mb-3"><i class="bi bi-mortarboard-fill text-success me-2"></i> Year-Wise Student Breakdown</h5>
+                {% if year_stats %}
+                    <div class="d-flex flex-column gap-3">
+                        {% for yr, count in year_stats %}
+                            <div>
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-semibold text-dark">Year {{ yr }} Students</span>
+                                    <span class="badge bg-success">{{ count }} Registrations</span>
+                                </div>
+                                <div class="progress" style="height: 8px;">
+                                    <div class="progress-bar bg-success" style="width: {{ (count / total_confirmed * 100)|round if total_confirmed > 0 else 0 }}%;"></div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted small">No year data recorded yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Event-Wise Comprehensive Metrics Table -->
+    <div class="ff-card p-4 shadow-sm">
+        <h5 class="fw-bold mb-3"><i class="bi bi-table text-secondary me-2"></i> Event Performance & Financial Report</h5>
+        {% if event_metrics %}
+            <div class="table-responsive">
+                <table class="table ff-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Event Title</th>
+                            <th>Department</th>
+                            <th>Date</th>
+                            <th>Registrations</th>
+                            <th>Attendance</th>
+                            <th>Turnout %</th>
+                            <th>Revenue</th>
+                            <th class="text-end">Roster</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for m in event_metrics %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-dark">{{ m.event.title }}</div>
+                                    <span class="badge bg-light text-dark border small">{{ m.event.event_type }}</span>
+                                </td>
+                                <td>{{ m.event.department }}</td>
+                                <td>{{ m.event.start_time|dateformat }}</td>
+                                <td>
+                                    <span class="fw-bold">{{ m.confirmed_reg }}</span> / {{ m.event.max_participants }}
+                                </td>
+                                <td>
+                                    <span class="badge bg-info text-white">{{ m.attended_reg }}</span>
+                                </td>
+                                <td>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span>{{ m.attendance_pct }}%</span>
+                                        <div class="progress flex-grow-1" style="height: 5px; width: 60px;">
+                                            <div class="progress-bar bg-success" style="width: {{ m.attendance_pct }}%;"></div>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>
+                                    {% if m.event.is_free %}
+                                        <span class="badge bg-light text-success border">FREE</span>
+                                    {% else %}
+                                        <span class="fw-bold text-primary">₹{{ "%.0f"|format(m.revenue) }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('organizer.export_excel', event_id=m.event.id) }}" class="btn btn-outline-success btn-sm" title="Download Excel Roster">
+                                        <i class="bi bi-file-earmark-excel"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-4 text-muted">No events recorded.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

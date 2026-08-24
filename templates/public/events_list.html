@@ -1,0 +1,156 @@
+{% extends "base.html" %}
+{% block title %}Explore College Events - FastFest{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <h2 class="fw-bold mb-1"><i class="bi bi-compass me-2"></i> Explore Campus Events</h2>
+        <p class="text-light opacity-90 mb-0">Discover and register for upcoming technical seminars, coding challenges, workshops, and club activities.</p>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="row g-4">
+        <!-- Sidebar Filters -->
+        <div class="col-lg-3">
+            <div class="ff-card p-4 sticky-top" style="top: 80px;">
+                <h5 class="fw-bold mb-3 d-flex align-items-center justify-content-between">
+                    <span><i class="bi bi-funnel text-primary me-2"></i> Filters</span>
+                    <a href="{{ url_for('public.events') }}" class="small text-muted text-decoration-none fw-normal">Reset</a>
+                </h5>
+                <form action="{{ url_for('public.events') }}" method="GET">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">SEARCH</label>
+                        <div class="input-group">
+                            <input type="text" name="q" class="form-control form-control-sm" placeholder="Title, venue, dept..." value="{{ search_query }}">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">CATEGORY</label>
+                        <select name="type" class="form-select form-select-sm">
+                            <option value="ALL">All Categories</option>
+                            {% for t in event_types %}
+                                <option value="{{ t }}" {% if selected_type == t %}selected{% endif %}>{{ t }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">DEPARTMENT</label>
+                        <select name="department" class="form-select form-select-sm">
+                            <option value="ALL">All Departments</option>
+                            {% for d in departments %}
+                                <option value="{{ d }}" {% if selected_dept == d %}selected{% endif %}>{{ d }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">TARGET YEAR</label>
+                        <select name="year" class="form-select form-select-sm">
+                            <option value="ALL">All Years</option>
+                            <option value="1" {% if selected_year == '1' %}selected{% endif %}>1st Year</option>
+                            <option value="2" {% if selected_year == '2' %}selected{% endif %}>2nd Year</option>
+                            <option value="3" {% if selected_year == '3' %}selected{% endif %}>3rd Year</option>
+                            <option value="4" {% if selected_year == '4' %}selected{% endif %}>4th Year</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold text-muted">PRICING</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="pricing" id="priceAll" value="" {% if not pricing_filter %}checked{% endif %}>
+                            <label class="form-check-label small" for="priceAll">All Events</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="pricing" id="priceFree" value="free" {% if pricing_filter == 'free' %}checked{% endif %}>
+                            <label class="form-check-label small" for="priceFree">Free Events</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="pricing" id="pricePaid" value="paid" {% if pricing_filter == 'paid' %}checked{% endif %}>
+                            <label class="form-check-label small" for="pricePaid">Paid Events</label>
+                        </div>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label small fw-bold text-muted">TIMELINE</label>
+                        <select name="status" class="form-select form-select-sm">
+                            <option value="upcoming" {% if status_filter == 'upcoming' %}selected{% endif %}>Upcoming Only</option>
+                            <option value="past" {% if status_filter == 'past' %}selected{% endif %}>Past Events</option>
+                            <option value="all" {% if status_filter == 'all' %}selected{% endif %}>All Time</option>
+                        </select>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">
+                        Apply Filters
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Events Grid -->
+        <div class="col-lg-9">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <span class="text-muted small">Showing <strong>{{ events|length }}</strong> events</span>
+            </div>
+
+            {% if events %}
+                <div class="row g-4">
+                    {% for event in events %}
+                        <div class="col-md-6">
+                            <div class="ff-card ff-card-interactive event-card">
+                                <div class="event-poster-wrapper">
+                                    {% if event.poster_image %}
+                                        <img src="{{ url_for('static', filename=event.poster_image) }}" alt="{{ event.title }}" class="event-poster-img">
+                                    {% else %}
+                                        <div class="d-flex flex-column align-items-center justify-content-center h-100 text-white p-3 text-center">
+                                            <i class="bi bi-calendar-event fs-1 mb-2 text-warning"></i>
+                                            <span class="fw-bold small">{{ event.department }}</span>
+                                        </div>
+                                    {% endif %}
+                                    <span class="event-type-badge">{{ event.event_type }}</span>
+                                    <span class="event-fee-badge">
+                                        {% if event.is_free %}
+                                            <span class="text-success fw-bold">FREE</span>
+                                        {% else %}
+                                            ₹{{ "%.0f"|format(event.registration_fee) }}
+                                        {% endif %}
+                                    </span>
+                                </div>
+                                <div class="ff-card-body d-flex flex-column flex-grow-1">
+                                    <div class="small text-muted mb-2 d-flex align-items-center gap-2">
+                                        <i class="bi bi-calendar3 text-primary"></i>
+                                        <span>{{ event.start_time|dateformat }} &bull; {{ event.start_time|timeformat }}</span>
+                                    </div>
+                                    <h5 class="fw-bold mb-2 text-dark">{{ event.title }}</h5>
+                                    <p class="text-muted small mb-3 flex-grow-1">{{ event.description|truncate(100) }}</p>
+                                    
+                                    <div class="border-top pt-3 mt-auto">
+                                        <div class="d-flex justify-content-between align-items-center small text-muted mb-3">
+                                            <span><i class="bi bi-geo-alt me-1 text-danger"></i> {{ event.venue|truncate(20) }}</span>
+                                            <span class="badge {% if event.available_seats > 10 %}bg-light text-dark border{% else %}bg-danger text-white{% endif %}">
+                                                {{ event.available_seats }} seats left
+                                            </span>
+                                        </div>
+                                        <a href="{{ url_for('public.event_detail', slug=event.slug) }}" class="btn btn-outline-primary w-100 fw-semibold">
+                                            View Details & Register
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-5 ff-card p-5">
+                    <i class="bi bi-search text-muted fs-1 mb-3"></i>
+                    <h5 class="fw-bold">No events matched your criteria</h5>
+                    <p class="text-muted">Try removing some filters or search keywords to view other campus events.</p>
+                    <a href="{{ url_for('public.events') }}" class="btn btn-outline-primary btn-sm">Clear All Filters</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

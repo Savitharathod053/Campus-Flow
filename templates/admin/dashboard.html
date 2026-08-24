@@ -1,0 +1,227 @@
+{% extends "base.html" %}
+{% block title %}Faculty & Admin Portal - FastFest{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h2 class="fw-bold mb-1"><i class="bi bi-shield-check me-2"></i> Faculty & Administrative Portal</h2>
+                <p class="text-light opacity-90 mb-0">
+                    Department: <strong>{{ user.faculty_profile.department if user.faculty_profile else 'Central' }}</strong> &bull;
+                    Designation: {{ user.faculty_profile.designation if user.faculty_profile else 'Admin' }}
+                </p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('admin.pending_approvals', tab='events') }}" class="btn btn-warning fw-bold shadow-sm">
+                    <i class="bi bi-calendar-check me-1"></i> Events Pending ({{ pending_events }})
+                </a>
+                <a href="{{ url_for('admin.pending_approvals', tab='organizers') }}" class="btn btn-danger fw-bold shadow-sm">
+                    <i class="bi bi-person-check me-1"></i> Organizers Pending ({{ pending_organizers }})
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Stat Metrics Grid -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-primary text-white">
+                    <i class="bi bi-mortarboard"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ total_students }}</div>
+                    <div class="metric-label">Registered Students</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-danger text-white">
+                    <i class="bi bi-people-fill"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ pending_organizers }}</div>
+                    <div class="metric-label">Pending Organizers</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-warning text-dark">
+                    <i class="bi bi-hourglass-top"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ pending_events }}</div>
+                    <div class="metric-label">Pending Events</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-success text-white">
+                    <i class="bi bi-currency-rupee"></i>
+                </div>
+                <div>
+                    <div class="metric-number">₹{{ "%.0f"|format(total_revenue) }}</div>
+                    <div class="metric-label">Event Collections</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Quick Navigation Hub -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <a href="{{ url_for('admin.pending_approvals', tab='events') }}" class="ff-card p-3 d-flex align-items-center gap-3 text-decoration-none text-dark h-100 ff-card-interactive border-warning">
+                <div class="bg-warning bg-opacity-25 text-warning p-3 rounded-circle fs-4"><i class="bi bi-calendar-check"></i></div>
+                <div>
+                    <h6 class="fw-bold mb-0">Event Proposals</h6>
+                    <small class="text-muted">{{ pending_events }} proposals pending</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{{ url_for('admin.pending_approvals', tab='organizers') }}" class="ff-card p-3 d-flex align-items-center gap-3 text-decoration-none text-dark h-100 ff-card-interactive border-danger">
+                <div class="bg-danger bg-opacity-25 text-danger p-3 rounded-circle fs-4"><i class="bi bi-person-badge"></i></div>
+                <div>
+                    <h6 class="fw-bold mb-0">Organizer Approvals</h6>
+                    <small class="text-muted">{{ pending_organizers }} clubs pending review</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{{ url_for('admin.users_list') }}" class="ff-card p-3 d-flex align-items-center gap-3 text-decoration-none text-dark h-100 ff-card-interactive">
+                <div class="bg-success bg-opacity-25 text-success p-3 rounded-circle fs-4"><i class="bi bi-people"></i></div>
+                <div>
+                    <h6 class="fw-bold mb-0">User Governance</h6>
+                    <small class="text-muted">Students, Organizers & Staff</small>
+                </div>
+            </a>
+        </div>
+        <div class="col-md-3">
+            <a href="{{ url_for('admin.reports') }}" class="ff-card p-3 d-flex align-items-center gap-3 text-decoration-none text-dark h-100 ff-card-interactive">
+                <div class="bg-info bg-opacity-25 text-info p-3 rounded-circle fs-4"><i class="bi bi-bar-chart-fill"></i></div>
+                <div>
+                    <h6 class="fw-bold mb-0">Participation Reports</h6>
+                    <small class="text-muted">Branch & year insights</small>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <!-- Pending Organizer Registrations Quick Section if any -->
+    {% if pending_organizers_list %}
+        <div class="ff-card p-4 mb-4 shadow-sm border-danger border-opacity-25">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="fw-bold mb-0 text-danger"><i class="bi bi-person-lines-fill me-2"></i> Organizer Registrations Awaiting Verification</h5>
+                <a href="{{ url_for('admin.pending_approvals', tab='organizers') }}" class="btn btn-outline-danger btn-sm">View All Pending Organizers</a>
+            </div>
+            <div class="table-responsive">
+                <table class="table table-sm ff-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Club / Organization</th>
+                            <th>Lead Organizer</th>
+                            <th>Department</th>
+                            <th>Email & Contact</th>
+                            <th class="text-end">Quick Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for org in pending_organizers_list %}
+                            <tr>
+                                <td><strong class="text-dark">{{ org.organization_name }}</strong></td>
+                                <td>{{ org.user.name }} ({{ org.designation or 'Lead' }})</td>
+                                <td><span class="badge bg-light text-dark border">{{ org.department }}</span></td>
+                                <td>{{ org.user.email }} &bull; {{ org.user.phone or 'N/A' }}</td>
+                                <td class="text-end">
+                                    <form method="POST" action="{{ url_for('admin.organizer_action', organizer_profile_id=org.id) }}" class="d-inline">
+                                        <input type="hidden" name="action" value="approve">
+                                        <button type="submit" class="btn btn-sm btn-success fw-bold">
+                                            <i class="bi bi-check-lg"></i> Approve
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Pending Approvals Queue -->
+    <div class="ff-card p-4 mb-4 shadow-sm">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0"><i class="bi bi-clock-history text-warning me-2"></i> Event Proposals Awaiting Approval</h5>
+            <a href="{{ url_for('admin.pending_approvals', tab='events') }}" class="btn btn-outline-primary btn-sm">View All Pending Events</a>
+        </div>
+
+        {% if pending_events_list %}
+            <div class="table-responsive">
+                <table class="table ff-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Event Details</th>
+                            <th>Organizer</th>
+                            <th>Faculty Coordinator</th>
+                            <th>Date & Time</th>
+                            <th>Fee</th>
+                            <th class="text-end">Moderation Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for event in pending_events_list %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-dark">{{ event.title }}</div>
+                                    <span class="badge bg-light text-dark border small">{{ event.event_type }}</span>
+                                    <span class="small text-muted ms-1">{{ event.department }}</span>
+                                </td>
+                                <td>
+                                    <div class="small fw-semibold">{{ event.organizer.name }}</div>
+                                    <div class="small text-muted">{{ event.organizer.organizer_profile.organization_name if event.organizer.organizer_profile else '' }}</div>
+                                </td>
+                                <td>
+                                    <div class="small fw-semibold">{{ event.faculty_coordinator }}</div>
+                                    <div class="small text-muted">{{ event.faculty_coordinator_contact or '' }}</div>
+                                </td>
+                                <td>
+                                    <div class="small">{{ event.start_time|dateformat }}</div>
+                                </td>
+                                <td>
+                                    {% if event.is_free %}
+                                        <span class="badge bg-light text-success border">FREE</span>
+                                    {% else %}
+                                        <span class="fw-bold">₹{{ "%.0f"|format(event.registration_fee) }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <div class="btn-group btn-group-sm">
+                                        <form method="POST" action="{{ url_for('admin.event_action', event_id=event.id) }}" class="d-inline">
+                                            <input type="hidden" name="action" value="approve">
+                                            <button type="submit" class="btn btn-success fw-bold">
+                                                <i class="bi bi-check-lg"></i> Approve
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-check2-circle fs-1 text-success d-block mb-1"></i>
+                <h6 class="fw-bold text-dark">All Caught Up!</h6>
+                <p class="small mb-0">There are currently no event proposals awaiting review.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

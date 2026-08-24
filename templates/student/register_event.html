@@ -1,0 +1,135 @@
+{% extends "base.html" %}
+{% block title %}Register for {{ event.title }} - FastFest{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <h2 class="fw-bold mb-1"><i class="bi bi-pencil-square me-2"></i> Event Registration</h2>
+        <p class="text-light opacity-90 mb-0">{{ event.title }} &bull; {{ event.event_type }} ({{ event.department }})</p>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="ff-card p-4 p-sm-5 shadow-sm">
+                <!-- Event Summary Header -->
+                <div class="d-flex justify-content-between align-items-center p-3 bg-light rounded-3 mb-4 border">
+                    <div>
+                        <span class="badge bg-primary mb-1">{{ event.event_type }}</span>
+                        <h5 class="fw-bold mb-0 text-dark">{{ event.title }}</h5>
+                        <div class="small text-muted mt-1">
+                            <i class="bi bi-calendar3 me-1"></i> {{ event.start_time|datetimeformat }} &bull; 
+                            <i class="bi bi-geo-alt me-1 text-danger"></i> {{ event.venue }}
+                        </div>
+                    </div>
+                    <div class="text-end">
+                        <div class="small text-muted">Fee</div>
+                        <div class="fw-bold fs-4 text-primary">
+                            {% if event.is_free %}FREE{% else %}₹{{ "%.2f"|format(event.registration_fee) }}{% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <form method="POST" action="{{ url_for('student.register_event', event_id=event.id) }}">
+                    <!-- Auto-filled Student Academic Details -->
+                    <h5 class="fw-bold mb-3 text-secondary"><i class="bi bi-person-badge me-2"></i> Participant Profile (Auto-Loaded)</h5>
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted">Full Name</label>
+                            <input type="text" class="form-control bg-light" value="{{ user.name }}" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted">College Email</label>
+                            <input type="email" class="form-control bg-light" value="{{ user.email }}" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted">Roll Number</label>
+                            <input type="text" class="form-control bg-light" value="{{ user.student_profile.roll_number if user.student_profile else 'N/A' }}" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted">Department</label>
+                            <input type="text" class="form-control bg-light" value="{{ user.student_profile.department if user.student_profile else 'N/A' }}" readonly>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold text-muted">Year & Section</label>
+                            <input type="text" class="form-control bg-light" value="Year {{ user.student_profile.year }} (Sec {{ user.student_profile.section }})" readonly>
+                        </div>
+                    </div>
+
+                    <!-- Custom Organizer Questions -->
+                    {% if custom_fields %}
+                        <h5 class="fw-bold mb-3 text-secondary border-top pt-4">
+                            <i class="bi bi-ui-checks me-2"></i> Additional Information Required by Organizer
+                        </h5>
+                        
+                        <div class="d-flex flex-column gap-3 mb-4">
+                            {% for field in custom_fields %}
+                                <div>
+                                    <label class="form-label small fw-bold">
+                                        {{ field.field_label }}
+                                        {% if field.is_required %}<span class="text-danger">*</span>{% else %}<span class="text-muted fw-normal">(Optional)</span>{% endif %}
+                                    </label>
+
+                                    {% if field.field_type == 'text' or field.field_type == 'url' %}
+                                        <input type="{{ 'url' if field.field_type == 'url' else 'text' }}" 
+                                               name="custom_field_{{ field.id }}" 
+                                               class="form-control" 
+                                               placeholder="Enter {{ field.field_label }}"
+                                               {% if field.is_required %}required{% endif %}>
+
+                                    {% elif field.field_type == 'number' %}
+                                        <input type="number" 
+                                               name="custom_field_{{ field.id }}" 
+                                               class="form-control" 
+                                               placeholder="Enter number"
+                                               {% if field.is_required %}required{% endif %}>
+
+                                    {% elif field.field_type == 'textarea' %}
+                                        <textarea name="custom_field_{{ field.id }}" 
+                                                  class="form-control" 
+                                                  rows="3" 
+                                                  placeholder="Enter details..."
+                                                  {% if field.is_required %}required{% endif %}></textarea>
+
+                                    {% elif field.field_type == 'select' %}
+                                        <select name="custom_field_{{ field.id }}" 
+                                                class="form-select" 
+                                                {% if field.is_required %}required{% endif %}>
+                                            <option value="" disabled selected>Select an option</option>
+                                            {% for opt in field.get_options_list() %}
+                                                <option value="{{ opt }}">{{ opt }}</option>
+                                            {% endfor %}
+                                        </select>
+
+                                    {% elif field.field_type == 'checkbox' %}
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="custom_field_{{ field.id }}" value="Yes" id="cb_{{ field.id }}" {% if field.is_required %}required{% endif %}>
+                                            <label class="form-check-label small" for="cb_{{ field.id }}">
+                                                Confirm / Agree to {{ field.field_label }}
+                                            </label>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <!-- Submit Button -->
+                    <div class="border-top pt-4">
+                        {% if event.is_free %}
+                            <button type="submit" class="btn btn-success btn-lg w-100 fw-bold shadow-sm">
+                                <i class="bi bi-check-circle me-2"></i> Confirm Free Registration
+                            </button>
+                        {% else %}
+                            <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold shadow-sm">
+                                <i class="bi bi-credit-card me-2"></i> Proceed to Pay ₹{{ "%.2f"|format(event.registration_fee) }}
+                            </button>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

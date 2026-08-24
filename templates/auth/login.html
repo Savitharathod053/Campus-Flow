@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Log In - FastFest{% endblock %}
+
+{% block content %}
+<div class="container py-5 my-auto">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="ff-card shadow-lg p-4 p-sm-5">
+                <div class="text-center mb-4">
+                    <div class="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle mb-3" style="width: 56px; height: 56px; font-size: 1.5rem;">
+                        <i class="bi bi-person-lock"></i>
+                    </div>
+                    <h3 class="fw-bold">Sign In to FastFest</h3>
+                    <p class="text-muted small">Enter your college credentials to access your dashboard</p>
+                </div>
+
+                <form method="POST" action="{{ url_for('auth.login', next=request.args.get('next')) }}">
+                    <div class="mb-3">
+                        <label for="email" class="form-label small fw-bold">College Email / ID</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-envelope text-muted"></i></span>
+                            <input type="email" class="form-control" id="email" name="email" required placeholder="name@college.edu">
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label small fw-bold">Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light"><i class="bi bi-key text-muted"></i></span>
+                            <input type="password" class="form-control" id="password" name="password" required placeholder="••••••••">
+                        </div>
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox" id="remember" name="remember" checked>
+                            <label class="form-check-label small" for="remember">Remember me</label>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 py-2 fw-bold shadow-sm">
+                        Log In to Account
+                    </button>
+                </form>
+
+                <!-- Demo Account Fast Fillers -->
+                <div class="mt-4 pt-3 border-top">
+                    <div class="text-center small text-muted mb-2 fw-bold">1-Click Demo Logins:</div>
+                    <div class="d-flex flex-column gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-primary text-start" onclick="fillCredentials('student1@college.edu', 'Pass@123')">
+                            <i class="bi bi-mortarboard me-1"></i> Student: <code>student1@college.edu</code>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-success text-start" onclick="fillCredentials('organizer@college.edu', 'Pass@123')">
+                            <i class="bi bi-people me-1"></i> Organizer: <code>organizer@college.edu</code>
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-dark text-start" onclick="fillCredentials('admin@college.edu', 'Pass@123')">
+                            <i class="bi bi-shield-check me-1"></i> Faculty Admin: <code>admin@college.edu</code>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="text-center mt-4 pt-2 border-top">
+                    <span class="small text-muted">Don't have an account yet?</span>
+                    <div class="mt-1">
+                        <a href="{{ url_for('auth.register_student') }}" class="small fw-bold text-decoration-none">Register as Student</a>
+                        <span class="text-muted mx-1">&bull;</span>
+                        <a href="{{ url_for('auth.register_organizer') }}" class="small fw-bold text-decoration-none">Register as Organizer</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function fillCredentials(email, password) {
+    document.getElementById('email').value = email;
+    document.getElementById('password').value = password;
+}
+</script>
+{% endblock %}

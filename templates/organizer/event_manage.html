@@ -1,0 +1,207 @@
+{% extends "base.html" %}
+{% block title %}Manage {{ event.title }} - FastFest{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge bg-warning text-dark">{{ event.event_type }}</span>
+                    <span class="badge bg-light text-dark">{{ event.status }}</span>
+                </div>
+                <h2 class="fw-bold mb-1">{{ event.title }}</h2>
+                <p class="text-light opacity-90 mb-0">
+                    <i class="bi bi-calendar3 me-1"></i> {{ event.start_time|datetimeformat }} &bull;
+                    <i class="bi bi-geo-alt me-1"></i> {{ event.venue }}
+                </p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('public.event_detail', slug=event.slug) }}" class="btn btn-outline-light btn-sm" target="_blank">
+                    <i class="bi bi-eye me-1"></i> Student View
+                </a>
+                <a href="{{ url_for('organizer.edit_event', event_id=event.id) }}" class="btn btn-light btn-sm fw-bold">
+                    <i class="bi bi-pencil me-1"></i> Edit Event
+                </a>
+                <form method="POST" action="{{ url_for('organizer.delete_event', event_id=event.id) }}" onsubmit="return confirm('Are you sure you want to permanently delete this event? This will remove all registrations and attendance records.');" class="d-inline">
+                    <button type="submit" class="btn btn-outline-danger btn-sm bg-white text-danger fw-bold">
+                        <i class="bi bi-trash3 me-1"></i> Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Rejection notice alert if rejected -->
+    {% if event.status == 'REJECTED' %}
+        <div class="alert alert-danger shadow-sm mb-4">
+            <h5 class="alert-heading fw-bold"><i class="bi bi-x-circle-fill me-2"></i> Event Proposal Rejected by Faculty Admin</h5>
+            <p class="mb-0"><strong>Reason:</strong> {{ event.rejection_reason or 'Guidelines not met.' }}</p>
+        </div>
+    {% elif event.status == 'PENDING_APPROVAL' %}
+        <div class="alert alert-warning shadow-sm mb-4">
+            <h5 class="alert-heading fw-bold"><i class="bi bi-clock-history me-2"></i> Pending Faculty/Admin Approval</h5>
+            <p class="mb-0">This event has been submitted and is awaiting administrative approval before students can register.</p>
+        </div>
+    {% endif %}
+
+    <!-- Key Metrics -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-primary text-white">
+                    <i class="bi bi-people"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ confirmed_count }} / {{ event.max_participants }}</div>
+                    <div class="metric-label">Confirmed Seats</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-success text-white">
+                    <i class="bi bi-currency-rupee"></i>
+                </div>
+                <div>
+                    <div class="metric-number">₹{{ "%.0f"|format(total_revenue) }}</div>
+                    <div class="metric-label">Revenue Collected</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-info text-white">
+                    <i class="bi bi-qr-code-scan"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ attended_count }}</div>
+                    <div class="metric-label">Verified Attendance</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-warning text-dark">
+                    <i class="bi bi-award"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ event.certificates|length }}</div>
+                    <div class="metric-label">Certificates Issued</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Organizer Action Cards Grid -->
+    <div class="row g-4 mb-4">
+        <!-- Participants & Roster -->
+        <div class="col-md-6 col-lg-4">
+            <div class="ff-card p-4 h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2 text-primary">
+                        <i class="bi bi-people-fill fs-3"></i>
+                        <h5 class="fw-bold mb-0">Participant Roster</h5>
+                    </div>
+                    <p class="small text-muted mb-3">View registered students, filter by branch/year/payment, and export data.</p>
+                </div>
+                <div class="d-flex flex-column gap-2">
+                    <a href="{{ url_for('organizer.participants', event_id=event.id) }}" class="btn btn-outline-primary btn-sm fw-bold">
+                        <i class="bi bi-eye me-1"></i> View Participant List
+                    </a>
+                    <div class="d-flex gap-2">
+                        <a href="{{ url_for('organizer.export_excel', event_id=event.id) }}" class="btn btn-outline-success btn-sm flex-grow-1">
+                            <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                        </a>
+                        <a href="{{ url_for('organizer.export_csv', event_id=event.id) }}" class="btn btn-outline-secondary btn-sm flex-grow-1">
+                            <i class="bi bi-filetype-csv me-1"></i> CSV
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Live QR Code Attendance Scanner -->
+        <div class="col-md-6 col-lg-4">
+            <div class="ff-card p-4 h-100 d-flex flex-column justify-content-between border-primary border-opacity-50">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2 text-primary">
+                        <i class="bi bi-qr-code-scan fs-3"></i>
+                        <h5 class="fw-bold mb-0">Live QR Scanner</h5>
+                    </div>
+                    <p class="small text-muted mb-3">Use your camera to scan student ticket QR passes at the venue door with duplicate prevention.</p>
+                </div>
+                <a href="{{ url_for('organizer.attendance_scanner', event_id=event.id) }}" class="btn btn-primary btn-sm fw-bold shadow-sm">
+                    <i class="bi bi-camera me-1"></i> Launch Attendance Scanner
+                </a>
+            </div>
+        </div>
+
+        <!-- Custom Registration Questions -->
+        <div class="col-md-6 col-lg-4">
+            <div class="ff-card p-4 h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2 text-secondary">
+                        <i class="bi bi-ui-checks fs-3"></i>
+                        <h5 class="fw-bold mb-0">Custom Questions</h5>
+                    </div>
+                    <p class="small text-muted mb-3">Add questions like Team Name, GitHub URL, T-Shirt Size, and preferences.</p>
+                </div>
+                <a href="{{ url_for('organizer.custom_fields', event_id=event.id) }}" class="btn btn-outline-secondary btn-sm fw-bold">
+                    <i class="bi bi-plus-circle me-1"></i> Manage Custom Fields ({{ event.custom_fields|length }})
+                </a>
+            </div>
+        </div>
+
+        <!-- Event Announcements -->
+        <div class="col-md-6 col-lg-4">
+            <div class="ff-card p-4 h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2 text-warning">
+                        <i class="bi bi-megaphone-fill fs-3 text-warning"></i>
+                        <h5 class="fw-bold mb-0 text-dark">Announcements</h5>
+                    </div>
+                    <p class="small text-muted mb-3">Broadcast venue changes, schedule updates, or guidelines to participants.</p>
+                </div>
+                <a href="{{ url_for('organizer.announcements', event_id=event.id) }}" class="btn btn-outline-warning text-dark btn-sm fw-bold">
+                    <i class="bi bi-send me-1"></i> Broadcast Updates ({{ event.announcements|length }})
+                </a>
+            </div>
+        </div>
+
+        <!-- Certificates Distribution -->
+        <div class="col-md-6 col-lg-4">
+            <div class="ff-card p-4 h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2 text-success">
+                        <i class="bi bi-award-fill fs-3"></i>
+                        <h5 class="fw-bold mb-0 text-dark">Certificates</h5>
+                    </div>
+                    <p class="small text-muted mb-3">Upload pre-created PDF/Image certificates or bulk ZIP. Auto-match roll numbers and distribute.</p>
+                </div>
+                <a href="{{ url_for('organizer.certificates', event_id=event.id) }}" class="btn btn-outline-success btn-sm fw-bold">
+                    <i class="bi bi-cloud-arrow-up me-1"></i> Manage Certificates ({{ event.certificates|length }} uploaded)
+                </a>
+            </div>
+        </div>
+
+        <!-- Event Info Summary -->
+        <div class="col-md-6 col-lg-4">
+            <div class="ff-card p-4 h-100 d-flex flex-column justify-content-between bg-light">
+                <div>
+                    <h6 class="fw-bold mb-2">Event Parameters</h6>
+                    <div class="small text-muted mb-1">Fee: <strong>{% if event.is_free %}FREE{% else %}₹{{ event.registration_fee }}{% endif %}</strong></div>
+                    <div class="small text-muted mb-1">Target Dept: <strong>{{ event.allowed_departments }}</strong></div>
+                    <div class="small text-muted mb-1">Target Years: <strong>{{ event.allowed_years }}</strong></div>
+                    <div class="small text-muted mb-1">Deadline: <strong>{{ event.registration_deadline|datetimeformat }}</strong></div>
+                </div>
+                <a href="{{ url_for('organizer.edit_event', event_id=event.id) }}" class="btn btn-outline-dark btn-sm">
+                    <i class="bi bi-sliders me-1"></i> Modify Settings
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

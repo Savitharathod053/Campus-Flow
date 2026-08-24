@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+{% block title %}Student Dashboard - FastFest{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h2 class="fw-bold mb-1">Welcome, {{ user.name }}!</h2>
+                <p class="text-light opacity-90 mb-0">
+                    <i class="bi bi-mortarboard me-1"></i> Roll No: <strong>{{ user.student_profile.roll_number if user.student_profile else 'N/A' }}</strong> &bull;
+                    Dept: <strong>{{ user.student_profile.department if user.student_profile else 'N/A' }}</strong> &bull;
+                    Year: <strong>{{ user.student_profile.year if user.student_profile else 'N/A' }}</strong> (Sec {{ user.student_profile.section if user.student_profile else 'N/A' }})
+                </p>
+            </div>
+            <a href="{{ url_for('public.events') }}" class="btn btn-warning fw-bold shadow-sm">
+                <i class="bi bi-plus-circle me-1"></i> Browse & Register Events
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Stat Metrics -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-primary text-white">
+                    <i class="bi bi-ticket-detailed"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ upcoming_registrations|length }}</div>
+                    <div class="metric-label">Upcoming Events</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-success text-white">
+                    <i class="bi bi-calendar2-check"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ registrations|length }}</div>
+                    <div class="metric-label">Total Registrations</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-warning text-dark">
+                    <i class="bi bi-award-fill"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ certificates|length }}</div>
+                    <div class="metric-label">Certificates Earned</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-info text-white">
+                    <i class="bi bi-qr-code"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ registrations|selectattr("is_attended")|list|length }}</div>
+                    <div class="metric-label">Events Attended</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Announcements from Registered Events -->
+    {% if recent_announcements %}
+        <div class="mb-4">
+            <h5 class="fw-bold mb-3"><i class="bi bi-megaphone-fill text-warning me-2"></i> Event Broadcasts & Updates</h5>
+            <div class="row g-3">
+                {% for a in recent_announcements %}
+                    <div class="col-md-6">
+                        <div class="alert {% if a.is_pinned %}alert-warning border-warning{% else %}alert-light border{% endif %} shadow-sm mb-0 h-100">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <span class="badge bg-primary small">{{ a.event.title|truncate(30) }}</span>
+                                <small class="text-muted">{{ a.created_at|datetimeformat }}</small>
+                            </div>
+                            <h6 class="fw-bold mb-1">{{ a.title }}</h6>
+                            <p class="small text-secondary mb-0">{{ a.message }}</p>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <!-- Upcoming Events / Passes Left Column -->
+        <div class="col-lg-8">
+            <div class="ff-card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0"><i class="bi bi-calendar-event text-primary me-2"></i> Your Upcoming Events & Passes</h5>
+                    <a href="{{ url_for('student.my_events') }}" class="small text-decoration-none">View all</a>
+                </div>
+
+                {% if upcoming_registrations %}
+                    <div class="d-flex flex-column gap-3">
+                        {% for reg in upcoming_registrations %}
+                            <div class="p-3 border rounded-3 bg-light d-flex flex-wrap align-items-center justify-content-between gap-3">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="badge bg-primary small">{{ reg.event.event_type }}</span>
+                                        <span class="small text-muted"><i class="bi bi-clock"></i> {{ reg.event.start_time|datetimeformat }}</span>
+                                    </div>
+                                    <h6 class="fw-bold mb-1 text-dark">{{ reg.event.title }}</h6>
+                                    <div class="small text-muted"><i class="bi bi-geo-alt me-1 text-danger"></i> {{ reg.event.venue }}</div>
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <a href="{{ url_for('student.ticket', code=reg.registration_code) }}" class="btn btn-outline-primary btn-sm fw-bold">
+                                        <i class="bi bi-qr-code me-1"></i> Open Ticket
+                                    </a>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-ticket-perforated fs-1 text-muted opacity-50 d-block mb-2"></i>
+                        <p class="mb-2">You don't have any upcoming registered events.</p>
+                        <a href="{{ url_for('public.events') }}" class="btn btn-sm btn-primary">Find Events</a>
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- Recommended Events -->
+            <div class="ff-card p-4">
+                <h5 class="fw-bold mb-3"><i class="bi bi-stars text-warning me-2"></i> Recommended For You</h5>
+                <div class="row g-3">
+                    {% for ev in recommended_events %}
+                        <div class="col-md-6">
+                            <div class="p-3 border rounded-3 h-100 d-flex flex-column justify-content-between">
+                                <div>
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="badge bg-light text-dark border small">{{ ev.event_type }}</span>
+                                        <span class="small fw-bold text-primary">{% if ev.is_free %}FREE{% else %}₹{{ "%.0f"|format(ev.registration_fee) }}{% endif %}</span>
+                                    </div>
+                                    <h6 class="fw-bold mb-1 text-dark">{{ ev.title }}</h6>
+                                    <p class="small text-muted mb-2">{{ ev.description|truncate(60) }}</p>
+                                </div>
+                                <a href="{{ url_for('public.event_detail', slug=ev.slug) }}" class="btn btn-outline-secondary btn-sm w-100">
+                                    Learn More
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Side: Quick Links & Certificates Summary -->
+        <div class="col-lg-4">
+            <div class="ff-card p-4 mb-4">
+                <h6 class="fw-bold mb-3">Quick Navigation</h6>
+                <div class="list-group list-group-flush small">
+                    <a href="{{ url_for('student.my_events') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
+                        <span><i class="bi bi-ticket-detailed me-2 text-primary"></i> My Event Registrations</span>
+                        <span class="badge bg-primary rounded-pill">{{ registrations|length }}</span>
+                    </a>
+                    <a href="{{ url_for('student.certificates') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
+                        <span><i class="bi bi-award me-2 text-warning"></i> My Certificates</span>
+                        <span class="badge bg-warning text-dark rounded-pill">{{ certificates|length }}</span>
+                    </a>
+                    <a href="{{ url_for('auth.profile') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
+                        <span><i class="bi bi-person-gear me-2 text-secondary"></i> Update Profile / Academic Info</span>
+                        <i class="bi bi-chevron-right text-muted"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Recent Certificate Badge Box -->
+            <div class="ff-card p-4 text-center">
+                <i class="bi bi-patch-check-fill text-warning fs-1 mb-2 d-block"></i>
+                <h6 class="fw-bold mb-1">E-Certificates</h6>
+                <p class="small text-muted mb-3">Attend college workshops and hackathons to receive verified participation certificates automatically.</p>
+                <a href="{{ url_for('student.certificates') }}" class="btn btn-outline-warning text-dark btn-sm fw-bold w-100">
+                    View Earned Certificates
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

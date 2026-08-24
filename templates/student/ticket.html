@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Event Pass - {{ registration.registration_code }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-3 no-print">
+        <a href="{{ url_for('student.my_events') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Back to My Events
+        </a>
+        <button onclick="window.print()" class="btn btn-primary btn-sm fw-bold">
+            <i class="bi bi-printer me-1"></i> Print / Save Ticket PDF
+        </button>
+    </div>
+
+    <!-- Digital Ticket Card (Printable Area) -->
+    <div class="ticket-container printable-area">
+        <!-- Ticket Header -->
+        <div class="ticket-header">
+            <div class="d-flex justify-content-between align-items-start">
+                <div>
+                    <span class="badge bg-warning text-dark fw-bold mb-2">{{ registration.event.event_type }}</span>
+                    <h3 class="fw-bold mb-1 text-white">{{ registration.event.title }}</h3>
+                    <p class="small text-light opacity-75 mb-0">FASTFEST CAMPUS EVENT ENTRY PASS</p>
+                </div>
+                <div class="text-end">
+                    <span class="badge bg-success px-3 py-2 fw-bold">CONFIRMED</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Ticket Body -->
+        <div class="ticket-body">
+            <div class="row align-items-center g-4">
+                <!-- Left Details Column -->
+                <div class="col-sm-7">
+                    <div class="mb-3">
+                        <div class="small text-muted fw-bold">ATTENDEE NAME</div>
+                        <div class="fs-5 fw-bold text-dark">{{ registration.student.name }}</div>
+                        <div class="small text-muted">
+                            Roll No: <strong>{{ registration.student.student_profile.roll_number if registration.student.student_profile else 'N/A' }}</strong> &bull;
+                            Dept: {{ registration.student.student_profile.department if registration.student.student_profile else 'N/A' }}
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <div class="small text-muted fw-bold">EVENT DATE</div>
+                            <div class="fw-semibold text-dark">{{ registration.event.start_time|dateformat }}</div>
+                            <div class="small text-muted">{{ registration.event.start_time|timeformat }}</div>
+                        </div>
+                        <div class="col-6">
+                            <div class="small text-muted fw-bold">VENUE</div>
+                            <div class="fw-semibold text-dark">{{ registration.event.venue }}</div>
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <div class="small text-muted fw-bold">PAYMENT</div>
+                            <div class="fw-semibold text-success">
+                                {% if registration.event.is_free %}FREE{% else %}₹{{ "%.2f"|format(registration.event.registration_fee) }} (PAID){% endif %}
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <div class="small text-muted fw-bold">ATTENDANCE</div>
+                            <div class="fw-semibold">
+                                {% if registration.attendance %}
+                                    <span class="text-success"><i class="bi bi-check-circle-fill"></i> MARKED PRESENT</span>
+                                {% else %}
+                                    <span class="text-secondary">Scan QR at Venue</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if registration.custom_responses %}
+                        <div class="border-top pt-2 mt-2">
+                            <div class="small text-muted fw-bold mb-1">REGISTRATION DETAILS</div>
+                            {% for resp in registration.custom_responses %}
+                                <div class="small text-secondary">
+                                    <strong>{{ resp.field.field_label }}:</strong> {{ resp.field_value }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- Right QR Code Column -->
+                <div class="col-sm-5 text-center">
+                    <div class="ticket-qr-box mb-2">
+                        {% if registration.qr_code_image %}
+                            <img src="{{ url_for('static', filename=registration.qr_code_image) }}" alt="QR Code Ticket" class="img-fluid" style="max-width: 180px;">
+                        {% endif %}
+                    </div>
+                    <div class="small fw-bold text-dark font-monospace">{{ registration.registration_code }}</div>
+                    <div class="small text-muted" style="font-size: 0.75rem;">Show this QR code to the event coordinator at the venue entrance.</div>
+                </div>
+            </div>
+
+            <!-- Footer instructions -->
+            <div class="border-top pt-3 mt-4 small text-muted d-flex justify-content-between align-items-center">
+                <span>FastFest Verified Ticket &bull; Registered on {{ registration.created_at|dateformat }}</span>
+                <span>Carry valid College ID</span>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

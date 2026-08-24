@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block title %}Announcements: {{ event.title }} - FastFest{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h2 class="fw-bold mb-1"><i class="bi bi-megaphone me-2"></i> Event Broadcasts & Announcements</h2>
+                <p class="text-light opacity-90 mb-0">Publish real-time updates and schedule alerts to registered participants.</p>
+            </div>
+            <a href="{{ url_for('organizer.manage_event', event_id=event.id) }}" class="btn btn-light btn-sm fw-bold">
+                <i class="bi bi-arrow-left me-1"></i> Back to Event Hub
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="row g-4">
+        <!-- Left: Broadcast New Message -->
+        <div class="col-lg-5">
+            <div class="ff-card p-4 shadow-sm">
+                <h5 class="fw-bold mb-3"><i class="bi bi-send-plus text-primary me-2"></i> New Broadcast</h5>
+                <form method="POST" action="{{ url_for('organizer.announcements', event_id=event.id) }}">
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Announcement Title *</label>
+                        <input type="text" name="title" class="form-control" placeholder="e.g. Venue changed to Lab 4, Round 1 Results" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Message Content *</label>
+                        <textarea name="message" class="form-control" rows="4" placeholder="Write announcement details for students..." required></textarea>
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" name="is_pinned" id="is_pinned">
+                        <label class="form-check-label small fw-semibold" for="is_pinned">
+                            Pin announcement to top of event page
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100 fw-bold shadow-sm">
+                        <i class="bi bi-broadcast me-1"></i> Broadcast Announcement
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right: Past Announcements Feed -->
+        <div class="col-lg-7">
+            <div class="ff-card p-4 shadow-sm">
+                <h5 class="fw-bold mb-3"><i class="bi bi-clock-history text-secondary me-2"></i> Published Announcements</h5>
+
+                {% if announcements %}
+                    <div class="d-flex flex-column gap-3">
+                        {% for a in announcements %}
+                            <div class="p-3 border rounded-3 {% if a.is_pinned %}bg-warning bg-opacity-10 border-warning{% else %}bg-light{% endif %}">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <h6 class="fw-bold mb-0 text-dark">
+                                        {% if a.is_pinned %}<i class="bi bi-pin-angle-fill text-warning me-1"></i>{% endif %}
+                                        {{ a.title }}
+                                    </h6>
+                                    <small class="text-muted">{{ a.created_at|datetimeformat }}</small>
+                                </div>
+                                <p class="small text-secondary mb-0 mt-2" style="white-space: pre-line;">{{ a.message }}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-megaphone text-muted fs-1 opacity-50 d-block mb-2"></i>
+                        <p class="mb-0">No announcements published yet. Keep your participants informed by posting updates!</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Custom Registration Fields - {{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h2 class="fw-bold mb-1"><i class="bi bi-ui-checks me-2"></i> Custom Registration Fields</h2>
+                <p class="text-light opacity-90 mb-0">Define extra questions for participants (e.g. Team Name, GitHub URL, T-Shirt size, Food preferences).</p>
+            </div>
+            <a href="{{ url_for('organizer.manage_event', event_id=event.id) }}" class="btn btn-light btn-sm fw-bold">
+                <i class="bi bi-arrow-left me-1"></i> Back to Event Hub
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="row g-4">
+        <!-- Left: Current Custom Fields List -->
+        <div class="col-lg-7">
+            <div class="ff-card p-4 shadow-sm">
+                <h5 class="fw-bold mb-3"><i class="bi bi-list-stars text-primary me-2"></i> Active Custom Questions</h5>
+
+                {% if fields %}
+                    <div class="d-flex flex-column gap-3">
+                        {% for f in fields %}
+                            <div class="p-3 border rounded-3 bg-light d-flex align-items-center justify-content-between">
+                                <div>
+                                    <div class="d-flex align-items-center gap-2 mb-1">
+                                        <span class="badge bg-secondary small">{{ f.field_type }}</span>
+                                        {% if f.is_required %}
+                                            <span class="badge bg-danger small">Required</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-muted border small">Optional</span>
+                                        {% endif %}
+                                    </div>
+                                    <h6 class="fw-bold mb-1 text-dark">{{ f.field_label }}</h6>
+                                    {% if f.options_csv %}
+                                        <div class="small text-muted">Options: <code>{{ f.options_csv }}</code></div>
+                                    {% endif %}
+                                </div>
+                                <form method="POST" action="{{ url_for('organizer.custom_fields', event_id=event.id) }}" onsubmit="return confirm('Delete this custom question?');">
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="field_id" value="{{ f.id }}">
+                                    <button type="submit" class="btn btn-outline-danger btn-sm" title="Remove Field">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted border rounded-3 bg-light">
+                        <i class="bi bi-question-circle fs-2 text-muted d-block mb-2"></i>
+                        <p class="mb-0">No custom questions added yet. The standard student profile (Name, Email, Roll, Dept, Year, Phone) will be automatically collected.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Right: Add New Field Form -->
+        <div class="col-lg-5">
+            <div class="ff-card p-4 shadow-sm">
+                <h5 class="fw-bold mb-3"><i class="bi bi-plus-circle text-success me-2"></i> Add Custom Question</h5>
+                <form method="POST" action="{{ url_for('organizer.custom_fields', event_id=event.id) }}">
+                    <input type="hidden" name="action" value="add">
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Question / Field Label *</label>
+                        <input type="text" name="field_label" class="form-control" placeholder="e.g. Team Name, GitHub Profile, T-Shirt Size" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Field Type *</label>
+                        <select name="field_type" id="field_type_select" class="form-select" onchange="toggleSelectOptions(this.value)">
+                            <option value="text">Text (Single Line)</option>
+                            <option value="textarea">Textarea (Multi-line paragraph)</option>
+                            <option value="number">Number</option>
+                            <option value="url">Web URL / GitHub Link</option>
+                            <option value="select">Dropdown Select Menu</option>
+                            <option value="checkbox">Checkbox Agreement</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3" id="options_container" style="display: none;">
+                        <label class="form-label small fw-bold">Dropdown Options (Comma-separated)</label>
+                        <input type="text" name="options_csv" class="form-control" placeholder="e.g. Small, Medium, Large, XL">
+                    </div>
+
+                    <div class="form-check mb-4">
+                        <input class="form-check-input" type="checkbox" name="is_required" id="is_required">
+                        <label class="form-check-label small fw-semibold" for="is_required">
+                            Mandatory field (Student must fill to register)
+                        </label>
+                    </div>
+
+                    <button type="submit" class="btn btn-success w-100 fw-bold shadow-sm">
+                        <i class="bi bi-plus-lg me-1"></i> Add Question to Registration Form
+                    </button>
+                </form>
+
+                <!-- Quick Presets -->
+                <div class="mt-4 pt-3 border-top">
+                    <div class="small fw-bold text-muted mb-2">Common Presets (Click to fill):</div>
+                    <div class="d-flex flex-wrap gap-1">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="fillPreset('Team Name', 'text', true)">Team Name</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="fillPreset('GitHub / Portfolio URL', 'url', false)">GitHub URL</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="fillPreset('T-Shirt Size', 'select', true, 'S, M, L, XL, XXL')">T-Shirt Size</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="fillPreset('Dietary Preference', 'select', false, 'Veg, Non-Veg, Jain')">Food Preference</button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary" onclick="fillPreset('Laptop Required Confirmation', 'checkbox', true)">Laptop Agreement</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleSelectOptions(val) {
+    const optBox = document.getElementById('options_container');
+    if (val === 'select') {
+        optBox.style.display = 'block';
+    } else {
+        optBox.style.display = 'none';
+    }
+}
+
+function fillPreset(label, type, required, options = '') {
+    document.querySelector('input[name="field_label"]').value = label;
+    document.getElementById('field_type_select').value = type;
+    document.getElementById('is_required').checked = required;
+    toggleSelectOptions(type);
+    if (options) {
+        document.querySelector('input[name="options_csv"]').value = options;
+    }
+}
+</script>
+{% endblock %}

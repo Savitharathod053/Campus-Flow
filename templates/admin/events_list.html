@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block title %}All Events Directory - FastFest Admin{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h2 class="fw-bold mb-1"><i class="bi bi-calendar-week me-2"></i> College Events Directory</h2>
+                <p class="text-light opacity-90 mb-0">Full oversight and moderation of all campus activities.</p>
+            </div>
+            <div class="d-flex gap-2">
+                <form method="POST" action="{{ url_for('admin.delete_expired') }}" onsubmit="return confirm('Are you sure you want to permanently delete all events that have exceeded their end date?');">
+                    <button type="submit" class="btn btn-danger btn-sm fw-bold">
+                        <i class="bi bi-trash3 me-1"></i> Delete Expired Events
+                    </button>
+                </form>
+                <a href="{{ url_for('admin.dashboard') }}" class="btn btn-light btn-sm fw-bold">
+                    <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Filter bar -->
+    <div class="ff-card p-3 mb-4 shadow-sm">
+        <form method="GET" action="{{ url_for('admin.events_list') }}" class="row g-2 align-items-center">
+            <div class="col-md-5">
+                <input type="text" name="q" class="form-control form-control-sm" placeholder="Search event title or department..." value="{{ search }}">
+            </div>
+            <div class="col-md-4">
+                <select name="status" class="form-select form-select-sm">
+                    <option value="ALL">All Event Lifecycle Statuses</option>
+                    {% for st in event_statuses %}
+                        <option value="{{ st }}" {% if status_filter == st %}selected{% endif %}>{{ st }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">
+                    <i class="bi bi-filter me-1"></i> Apply Filters
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Events Table -->
+    {% if events %}
+        <div class="ff-card shadow-sm overflow-hidden">
+            <div class="table-responsive">
+                <table class="table ff-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Title & Dept</th>
+                            <th>Organizer</th>
+                            <th>Faculty Coordinator</th>
+                            <th>Date</th>
+                            <th>Status</th>
+                            <th>Seats</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ev in events %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-dark">{{ ev.title }}</div>
+                                    <span class="badge bg-light text-dark border small">{{ ev.event_type }}</span>
+                                    <span class="small text-muted ms-1">{{ ev.department }}</span>
+                                </td>
+                                <td>
+                                    <div class="small fw-semibold">{{ ev.organizer.name }}</div>
+                                    <div class="small text-muted">{{ ev.organizer.email }}</div>
+                                </td>
+                                <td>
+                                    <div class="small">{{ ev.faculty_coordinator }}</div>
+                                </td>
+                                <td>
+                                    <div class="small">{{ ev.start_time|dateformat }}</div>
+                                </td>
+                                <td>
+                                    {% if ev.status == 'APPROVED' or ev.status == 'REGISTRATION_OPEN' %}
+                                        <span class="badge bg-success">Approved / Open</span>
+                                    {% elif ev.status == 'PENDING_APPROVAL' %}
+                                        <span class="badge bg-warning text-dark">Pending</span>
+                                    {% elif ev.status == 'REJECTED' %}
+                                        <span class="badge bg-danger">Rejected</span>
+                                    {% elif ev.status == 'EVENT_COMPLETED' %}
+                                        <span class="badge bg-secondary">Completed</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-dark border">{{ ev.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <span class="small fw-bold">{{ ev.confirmed_registrations_count }} / {{ ev.max_participants }}</span>
+                                </td>
+                                <td class="text-end">
+                                    <div class="dropdown">
+                                        <button class="btn btn-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                                            Actions
+                                        </button>
+                                        <ul class="dropdown-menu dropdown-menu-end shadow border-0">
+                                            <li><a class="dropdown-item" href="{{ url_for('public.event_detail', slug=ev.slug) }}" target="_blank"><i class="bi bi-eye me-2"></i> View Page</a></li>
+                                            <li><a class="dropdown-item" href="{{ url_for('organizer.participants', event_id=ev.id) }}"><i class="bi bi-people me-2"></i> Participants</a></li>
+                                            <li><hr class="dropdown-divider"></li>
+                                            {% if ev.status == 'PENDING_APPROVAL' %}
+                                                <li>
+                                                    <form method="POST" action="{{ url_for('admin.event_action', event_id=ev.id) }}">
+                                                        <input type="hidden" name="action" value="approve">
+                                                        <input type="hidden" name="redirect_to" value="all_events">
+                                                        <button type="submit" class="dropdown-item text-success fw-bold"><i class="bi bi-check-circle me-2"></i> Approve Event</button>
+                                                    </form>
+                                                </li>
+                                            {% endif %}
+                                            <li>
+                                                <form method="POST" action="{{ url_for('admin.event_action', event_id=ev.id) }}">
+                                                    <input type="hidden" name="action" value="cancel">
+                                                    <input type="hidden" name="redirect_to" value="all_events">
+                                                    <button type="submit" class="dropdown-item text-warning" onclick="return confirm('Cancel this event?');"><i class="bi bi-x-circle me-2"></i> Cancel Event</button>
+                                                </form>
+                                            </li>
+                                            <li>
+                                                <form method="POST" action="{{ url_for('admin.delete_event', event_id=ev.id) }}">
+                                                    <button type="submit" class="dropdown-item text-danger" onclick="return confirm('Permanently delete this event and all associated registrations? This cannot be undone.');"><i class="bi bi-trash3 me-2"></i> Delete Event</button>
+                                                </form>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="text-center py-5 ff-card p-5">
+            <i class="bi bi-calendar-x text-muted fs-1 mb-3"></i>
+            <h5 class="fw-bold">No events found</h5>
+            <p class="text-muted">No campus events match your selected filters.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
