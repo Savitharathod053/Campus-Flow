@@ -8,13 +8,18 @@ load_dotenv(BASE_DIR / '.env')
 def get_database_uri():
     """
     Retrieve and normalize the relational database connection URI.
-    Supports Microsoft SQL Server (SSMS / MSSQL), MySQL, PostgreSQL, and SQLite.
+    Supports Microsoft SQL Server (SSMS / MSSQL), PostgreSQL, MySQL, and SQLite.
     Automatically handles driver and connection parameters for SQL Server / SSMS.
     """
     uri = os.environ.get('DATABASE_URL')
     if not uri:
-        # Default local Microsoft SQL Server (SSMS) connection with Windows Authentication
-        return 'mssql+pyodbc://@localhost/fastfest?driver=ODBC+Driver+18+for+SQL+Server&trusted_connection=yes&TrustServerCertificate=yes'
+        # If running on Windows with local SQL Server:
+        if os.name == 'nt':
+            return 'mssql+pyodbc://@localhost/fastfest?driver=ODBC+Driver+18+for+SQL+Server&trusted_connection=yes&TrustServerCertificate=yes'
+        # On Linux / Cloud (e.g. Render, Heroku, Container) fallback to SQLite instance database
+        db_path = BASE_DIR / 'instance' / 'fastfest.db'
+        db_path.parent.mkdir(parents=True, exist_ok=True)
+        return f'sqlite:///{db_path}'
     
     # Normalize mysql:// dialect scheme to mysql+pymysql://
     if uri.startswith("mysql://"):

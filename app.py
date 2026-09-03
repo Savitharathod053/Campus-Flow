@@ -84,12 +84,70 @@ def create_app(config_class=Config):
     @app.errorhandler(500)
     def internal_error(error):
         db.session.rollback()
+        app.logger.error(f"Internal Server Error 500: {error}", exc_info=True)
         return render_template('partials/500.html'), 500
 
     # Auto create tables on initial startup if not using raw migration scripts
     with app.app_context():
         try:
             db.create_all()
+            from models import User, UserRole, StudentProfile, FacultyProfile, OrganizerProfile
+            if User.query.count() == 0:
+                admin_user = User(
+                    name="Faculty Admin",
+                    email="faculty.demo@college.edu",
+                    phone="9840112233",
+                    role=UserRole.FACULTY_ADMIN,
+                    is_active=True
+                )
+                admin_user.set_password("Pass@123")
+                db.session.add(admin_user)
+                db.session.flush()
+                db.session.add(FacultyProfile(
+                    user_id=admin_user.id,
+                    employee_id="FAC-DEMO-001",
+                    department="CSE",
+                    designation="Head & Faculty Admin"
+                ))
+
+                student_user = User(
+                    name="Demo Student",
+                    email="student.demo@college.edu",
+                    phone="9876543210",
+                    role=UserRole.STUDENT,
+                    is_active=True
+                )
+                student_user.set_password("Pass@123")
+                db.session.add(student_user)
+                db.session.flush()
+                db.session.add(StudentProfile(
+                    user_id=student_user.id,
+                    roll_number="23DEMO01",
+                    department="CSE",
+                    year=2,
+                    section="A"
+                ))
+
+                org_user = User(
+                    name="Demo Organizer",
+                    email="organizer.demo@college.edu",
+                    phone="9876543211",
+                    role=UserRole.ORGANIZER,
+                    is_active=True
+                )
+                org_user.set_password("Pass@123")
+                db.session.add(org_user)
+                db.session.flush()
+                db.session.add(OrganizerProfile(
+                    user_id=org_user.id,
+                    organization_name="Campus Tech Club",
+                    department="CSE",
+                    designation="Lead Coordinator",
+                    is_verified=True,
+                    status='APPROVED'
+                ))
+                db.session.commit()
+                app.logger.info("Auto-seeded default demo accounts for initial deployment.")
         except Exception as e:
             app.logger.warning(f"Note: db.create_all() encountered: {e}")
 
