@@ -35,6 +35,11 @@ def create_app(config_class=Config):
     app.register_blueprint(payment_bp)
     app.register_blueprint(cert_bp)
 
+    @app.route('/faculty/dashboard')
+    def faculty_dashboard():
+        from flask import redirect, url_for
+        return redirect(url_for('admin.dashboard'))
+
     # Global Context Processor
     @app.context_processor
     def inject_global_vars():

@@ -310,6 +310,10 @@ def profile():
             user.organizer_profile.department = request.form.get('department', user.organizer_profile.department)
             user.organizer_profile.designation = request.form.get('designation', user.organizer_profile.designation)
 
+        elif user.is_admin and user.faculty_profile:
+            user.faculty_profile.department = request.form.get('department', user.faculty_profile.department)
+            user.faculty_profile.designation = request.form.get('designation', user.faculty_profile.designation)
+
         db.session.commit()
         session['user_name'] = user.name
         flash('Profile updated successfully!', 'success')

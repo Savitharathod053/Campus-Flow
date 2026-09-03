@@ -5,6 +5,8 @@ from .payment import Payment, PaymentStatus
 from .attendance import AttendanceRecord, VerificationMethod
 from .announcement import Announcement
 from .certificate import Certificate, CertificateStatus
+from .team import Team, TeamMember, TeamInvitation
+from .attendance import AttendanceRecord, VerificationMethod, AttendanceSession
 
 __all__ = [
     'db',
@@ -24,7 +26,12 @@ __all__ = [
     'PaymentStatus',
     'AttendanceRecord',
     'VerificationMethod',
+    'AttendanceSession',
     'Announcement',
     'Certificate',
     'CertificateStatus',
+    'Team',
+    'TeamMember',
+    'TeamInvitation',
 ]
+

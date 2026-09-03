@@ -23,13 +23,13 @@ def dashboard():
         student_id=user.id
     ).order_by(EventRegistration.created_at.desc()).all()
 
-    # Confirmed upcoming registered events
+    # Confirmed upcoming registered events (excluding completed events)
     upcoming_registrations = [
         r for r in registrations 
-        if r.is_confirmed and r.event.end_time >= now
+        if r.is_confirmed and r.event.end_time >= now and r.event.status != EventStatus.EVENT_COMPLETED
     ]
 
-    # Completed events
+    # Completed events (either ended by time or marked completed)
     completed_registrations = [
         r for r in registrations 
         if r.is_confirmed and (r.event.end_time < now or r.event.status == EventStatus.EVENT_COMPLETED)
@@ -38,18 +38,22 @@ def dashboard():
     # Certificates count
     certificates = Certificate.query.filter_by(student_id=user.id).all()
 
-    # Recommended events
+    # Recommended events (active and not completed)
     recommended_events = Event.query.filter(
         Event.status.in_([EventStatus.APPROVED, EventStatus.REGISTRATION_OPEN]),
-        Event.end_time >= now
+        Event.end_time >= now,
+        Event.status != EventStatus.EVENT_COMPLETED
     ).order_by(Event.start_time.asc()).limit(4).all()
 
-    # Registered event announcements
-    registered_event_ids = [r.event_id for r in registrations if r.is_confirmed]
+    # Active registered event announcements (exclude completed events from active broadcast)
+    active_registered_event_ids = [
+        r.event_id for r in registrations 
+        if r.is_confirmed and r.event.status != EventStatus.EVENT_COMPLETED and r.event.end_time >= now
+    ]
     recent_announcements = []
-    if registered_event_ids:
+    if active_registered_event_ids:
         recent_announcements = Announcement.query.filter(
-            Announcement.event_id.in_(registered_event_ids)
+            Announcement.event_id.in_(active_registered_event_ids)
         ).order_by(Announcement.is_pinned.desc(), Announcement.created_at.desc()).limit(5).all()
 
     return render_template(

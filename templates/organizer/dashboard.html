@@ -68,10 +68,10 @@
         </div>
     </div>
 
-    <!-- Events Management Section -->
+    <!-- Active Events Management Section -->
     <div class="ff-card p-4 mb-4 shadow-sm">
         <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="fw-bold mb-0"><i class="bi bi-list-check text-primary me-2"></i> My Managed Events</h5>
+            <h5 class="fw-bold mb-0"><i class="bi bi-list-check text-primary me-2"></i> Active & Upcoming Events ({{ events|length }})</h5>
             <a href="{{ url_for('organizer.create_event') }}" class="btn btn-primary btn-sm fw-bold">
                 <i class="bi bi-plus-lg me-1"></i> New Event
             </a>
@@ -113,8 +113,6 @@
                                         <span class="badge bg-warning text-dark">Pending Approval</span>
                                     {% elif event.status == 'REJECTED' %}
                                         <span class="badge bg-danger" title="{{ event.rejection_reason or '' }}">Rejected</span>
-                                    {% elif event.status == 'EVENT_COMPLETED' %}
-                                        <span class="badge bg-secondary">Completed</span>
                                     {% else %}
                                         <span class="badge bg-light text-dark border">{{ event.status }}</span>
                                     {% endif %}
@@ -151,14 +149,70 @@
                 </table>
             </div>
         {% else %}
-            <div class="text-center py-5 text-muted">
-                <i class="bi bi-calendar-plus fs-1 text-muted opacity-50 d-block mb-2"></i>
-                <h5>No events created yet</h5>
-                <p>Create your first campus workshop, seminar, or competition to begin collecting registrations.</p>
-                <a href="{{ url_for('organizer.create_event') }}" class="btn btn-primary">Create Event</a>
+            <div class="text-center py-4 text-muted">
+                <i class="bi bi-calendar-plus fs-2 text-muted opacity-50 d-block mb-2"></i>
+                <p class="mb-2">No active events currently running.</p>
+                <a href="{{ url_for('organizer.create_event') }}" class="btn btn-sm btn-primary">Create Event</a>
             </div>
         {% endif %}
     </div>
+
+    <!-- Completed / Concluded Events Section -->
+    {% if completed_events %}
+    <div class="ff-card p-4 mb-4 shadow-sm border-secondary border-opacity-25">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold mb-0 text-secondary"><i class="bi bi-archive-fill me-2"></i> Completed Events ({{ completed_events|length }})</h5>
+            <span class="badge bg-secondary">Archived History Preserved</span>
+        </div>
+        <div class="table-responsive">
+            <table class="table ff-table mb-0">
+                <thead>
+                    <tr>
+                        <th>Event Title</th>
+                        <th>Concluded On</th>
+                        <th>Total Attendees</th>
+                        <th>Certificates Distributed</th>
+                        <th class="text-end">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cev in completed_events %}
+                    <tr>
+                        <td>
+                            <a href="{{ url_for('organizer.manage_event', event_id=cev.id) }}" class="fw-bold text-dark text-decoration-none">
+                                {{ cev.title }}
+                            </a>
+                            <div class="small text-muted">{{ cev.event_type }} &bull; {{ cev.venue }}</div>
+                        </td>
+                        <td>
+                            <div class="small fw-semibold">{{ cev.end_time|dateformat }}</div>
+                        </td>
+                        <td>
+                            <span class="badge bg-success">{{ cev.attendance_records|length }} Attended</span>
+                        </td>
+                        <td>
+                            <span class="badge bg-warning text-dark">{{ cev.certificates|length }} Certificates</span>
+                        </td>
+                        <td class="text-end">
+                            <div class="btn-group btn-group-sm">
+                                <a href="{{ url_for('organizer.manage_event', event_id=cev.id) }}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-gear-fill me-1"></i> Records
+                                </a>
+                                <a href="{{ url_for('organizer.participants', event_id=cev.id) }}" class="btn btn-outline-secondary">
+                                    <i class="bi bi-people me-1"></i> Roster
+                                </a>
+                                <a href="{{ url_for('organizer.certificates', event_id=cev.id) }}" class="btn btn-outline-warning text-dark">
+                                    <i class="bi bi-award me-1"></i> Certs
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% endif %}
 
     <!-- Recent Participant Registrations Table -->
     {% if recent_registrations %}

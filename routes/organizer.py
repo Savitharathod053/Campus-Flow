@@ -1,4 +1,5 @@
 from datetime import datetime
+import io
 import os
 from pathlib import Path
 from werkzeug.utils import secure_filename
@@ -40,6 +41,11 @@ def dashboard():
     total_events = len(events)
     active_events = len([e for e in events if e.status in (EventStatus.APPROVED, EventStatus.REGISTRATION_OPEN)])
     pending_approval_events = len([e for e in events if e.status == EventStatus.PENDING_APPROVAL])
+    completed_events_count = len([e for e in events if e.status == EventStatus.EVENT_COMPLETED])
+
+    # Separate active vs completed events for clean dashboard display
+    active_events_list = [e for e in events if e.status != EventStatus.EVENT_COMPLETED]
+    completed_events_list = [e for e in events if e.status == EventStatus.EVENT_COMPLETED]
 
     # Registrations across all organizer events
     if event_ids:
@@ -63,10 +69,12 @@ def dashboard():
     return render_template(
         'organizer/dashboard.html',
         user=user,
-        events=events,
+        events=active_events_list,
+        completed_events=completed_events_list,
         total_events=total_events,
         active_events=active_events,
         pending_approval_events=pending_approval_events,
+        completed_events_count=completed_events_count,
         total_registrations=total_registrations,
         paid_registrations=paid_registrations,
         confirmed_registrations=confirmed_registrations,
@@ -755,5 +763,21 @@ def delete_event(event_id):
     db.session.commit()
     flash(f"Event '{title}' has been successfully deleted.", 'success')
     return redirect(url_for('organizer.dashboard'))
+
+
+@organizer_bp.route('/events/<int:event_id>/complete', methods=['POST'])
+@organizer_required
+def complete_event(event_id):
+    user = get_current_user()
+    event = Event.query.get_or_404(event_id)
+
+    if event.organizer_id != user.id and not user.is_admin:
+        abort(403)
+
+    event.status = EventStatus.EVENT_COMPLETED
+    db.session.commit()
+    flash(f"Event '{event.title}' has been marked as Completed. Active passes and registrations are archived, while all certificates and attendance records are safely preserved.", 'success')
+    return redirect(url_for('organizer.manage_event', event_id=event.id))
+
 
 

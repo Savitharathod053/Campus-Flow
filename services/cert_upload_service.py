@@ -241,6 +241,19 @@ def manual_assign_certificate(cert_id, student_id, roll_number=None, assigned_by
     return cert
 
 
+def _delete_cert_file(relative_path):
+    """Safely removes a certificate file from static uploads directory."""
+    if not relative_path:
+        return
+    try:
+        base_dir = Path(__file__).resolve().parent.parent / 'static'
+        target = base_dir / relative_path
+        if target.exists() and target.is_file():
+            target.unlink(missing_ok=True)
+    except Exception:
+        pass
+
+
 def resolve_duplicate_certificate(cert_id, action, current_user=None):
     """
     Handles duplicate certificate resolution:
@@ -286,15 +299,3 @@ def delete_single_certificate(cert_id):
     db.session.delete(cert)
     db.session.commit()
 
-
-def _delete_cert_file(relative_path):
-    """Safely removes a certificate file from static uploads directory."""
-    if not relative_path:
-        return
-    try:
-        base_dir = Path(__file__).resolve().parent.parent / 'static'
-        target = base_dir / relative_path
-        if target.exists() and target.is_file():
-            target.unlink(missing_ok=True)
-    except Exception:
-        pass

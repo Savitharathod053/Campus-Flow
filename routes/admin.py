@@ -1,5 +1,5 @@
 from datetime import datetime
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, abort, send_file
 from sqlalchemy import func
 from models import (
     db, User, UserRole, StudentProfile, OrganizerProfile, FacultyProfile,
@@ -8,6 +8,7 @@ from models import (
 )
 from routes.auth import admin_required, get_current_user
 from services.event_service import delete_expired_events, delete_event_with_cleanup
+from services.excel_import_service import import_students_excel, import_faculty_excel, generate_import_template
 
 admin_bp = Blueprint('admin', __name__, url_prefix='/admin')
 
@@ -290,3 +291,157 @@ def reports():
         total_attended=total_attended,
         total_revenue=total_revenue
     )
+
+
+@admin_bp.route('/students')
+@admin_required
+def students_list():
+    user = get_current_user()
+    search = request.args.get('q', '').strip()
+    dept_filter = request.args.get('department', '').strip()
+    year_filter = request.args.get('year', '').strip()
+
+    query = StudentProfile.query.join(User, StudentProfile.user_id == User.id)
+
+    if search:
+        query = query.filter(
+            (User.name.ilike(f'%{search}%')) |
+            (User.email.ilike(f'%{search}%')) |
+            (StudentProfile.roll_number.ilike(f'%{search}%')) |
+            (StudentProfile.department.ilike(f'%{search}%'))
+        )
+
+    if dept_filter and dept_filter != 'ALL':
+        query = query.filter(StudentProfile.department == dept_filter)
+
+    if year_filter and year_filter != 'ALL':
+        try:
+            query = query.filter(StudentProfile.year == int(year_filter))
+        except ValueError:
+            pass
+
+    students = query.order_by(StudentProfile.roll_number.asc()).all()
+    departments = ['CSE', 'ECE', 'MECH', 'IT', 'CIVIL', 'EEE', 'General']
+
+    return render_template(
+        'admin/students_list.html',
+        user=user,
+        students=students,
+        search=search,
+        dept_filter=dept_filter,
+        year_filter=year_filter,
+        departments=departments
+    )
+
+
+@admin_bp.route('/faculty')
+@admin_required
+def faculty_list():
+    user = get_current_user()
+    search = request.args.get('q', '').strip()
+    dept_filter = request.args.get('department', '').strip()
+
+    query = FacultyProfile.query.join(User, FacultyProfile.user_id == User.id)
+
+    if search:
+        query = query.filter(
+            (User.name.ilike(f'%{search}%')) |
+            (User.email.ilike(f'%{search}%')) |
+            (FacultyProfile.employee_id.ilike(f'%{search}%')) |
+            (FacultyProfile.department.ilike(f'%{search}%')) |
+            (FacultyProfile.designation.ilike(f'%{search}%'))
+        )
+
+    if dept_filter and dept_filter != 'ALL':
+        query = query.filter(FacultyProfile.department == dept_filter)
+
+    faculty_members = query.order_by(FacultyProfile.employee_id.asc()).all()
+    departments = ['CSE', 'ECE', 'MECH', 'IT', 'CIVIL', 'EEE', 'General']
+
+    return render_template(
+        'admin/faculty_list.html',
+        user=user,
+        faculty_members=faculty_members,
+        search=search,
+        dept_filter=dept_filter,
+        departments=departments
+    )
+
+
+@admin_bp.route('/organizers')
+@admin_required
+def organizers_list():
+    return redirect(url_for('admin.pending_approvals', tab='organizers'))
+
+
+@admin_bp.route('/faculty-dashboard')
+@admin_required
+def faculty_dashboard():
+    return redirect(url_for('admin.dashboard'))
+
+
+@admin_bp.route('/import/students', methods=['POST'])
+@admin_required
+def import_students():
+    file = request.files.get('file')
+    if not file or not file.filename:
+        flash('Please select an Excel (.xlsx/.xls) or CSV file to import.', 'danger')
+        return redirect(url_for('admin.students_list'))
+
+    result = import_students_excel(file)
+    created = result['created']
+    updated = result['updated']
+    errors = result['errors']
+
+    if created > 0 or updated > 0:
+        msg = f"Student import completed: {created} student account(s) created, {updated} updated."
+        if errors:
+            msg += f" {len(errors)} row(s) had warnings or issues."
+        flash(msg, 'success')
+    elif errors:
+        flash(f"Import finished with errors: {errors[0]}", 'danger')
+    else:
+        flash("No valid student rows were found in the uploaded file.", 'info')
+
+    return redirect(url_for('admin.students_list'))
+
+
+@admin_bp.route('/import/faculty', methods=['POST'])
+@admin_required
+def import_faculty():
+    file = request.files.get('file')
+    if not file or not file.filename:
+        flash('Please select an Excel (.xlsx/.xls) or CSV file to import.', 'danger')
+        return redirect(url_for('admin.faculty_list'))
+
+    result = import_faculty_excel(file)
+    created = result['created']
+    updated = result['updated']
+    errors = result['errors']
+
+    if created > 0 or updated > 0:
+        msg = f"Faculty import completed: {created} faculty account(s) created, {updated} updated."
+        if errors:
+            msg += f" {len(errors)} row(s) had warnings or issues."
+        flash(msg, 'success')
+    elif errors:
+        flash(f"Import finished with errors: {errors[0]}", 'danger')
+    else:
+        flash("No valid faculty rows were found in the uploaded file.", 'info')
+
+    return redirect(url_for('admin.faculty_list'))
+
+
+@admin_bp.route('/import/template/<target_type>')
+@admin_required
+def download_import_template(target_type):
+    target = 'faculty' if target_type == 'faculty' else 'student'
+    stream = generate_import_template(target)
+    filename = f"{target}_import_template.xlsx"
+    return send_file(
+        stream,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=filename
+    )
+

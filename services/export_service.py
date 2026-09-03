@@ -1,5 +1,6 @@
 import io
 import csv
+from datetime import datetime
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 
@@ -29,7 +30,7 @@ def export_participants_excel(event, registrations):
     ws.append([f"FastFest Participant Report: {event.title}"])
     ws.cell(row=1, column=1).font = title_font
     
-    ws.append([f"Event Date: {event.start_time.strftime('%b %d, %Y')} | Venue: {event.venue} | Generated on: {openpyxl.utils.datetime.datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"])
+    ws.append([f"Event Date: {event.start_time.strftime('%b %d, %Y')} | Venue: {event.venue} | Generated on: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"])
     ws.cell(row=2, column=1).font = meta_font
     ws.append([]) # blank line
 

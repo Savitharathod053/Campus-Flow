@@ -71,6 +71,22 @@
                                 <input type="text" name="designation" class="form-control" value="{{ user.organizer_profile.designation or '' }}">
                             </div>
                         </div>
+                    {% elif user.is_admin and user.faculty_profile %}
+                        <h5 class="fw-bold mb-3 text-secondary border-top pt-3">Faculty / Academic Administration</h5>
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Employee ID (Read-Only)</label>
+                                <input type="text" class="form-control bg-light" value="{{ user.faculty_profile.employee_id }}" readonly>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Department</label>
+                                <input type="text" name="department" class="form-control" value="{{ user.faculty_profile.department }}" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Designation</label>
+                                <input type="text" name="designation" class="form-control" value="{{ user.faculty_profile.designation }}" required>
+                            </div>
+                        </div>
                     {% endif %}
 
                     <h5 class="fw-bold mb-3 text-secondary border-top pt-3">Security & Password</h5>

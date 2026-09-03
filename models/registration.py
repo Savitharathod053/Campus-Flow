@@ -20,6 +20,7 @@ class EventRegistration(db.Model):
     qr_code_image = db.Column(db.String(255), nullable=True)
     status = db.Column(db.String(30), default=RegistrationStatus.PENDING_PAYMENT, nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    team_id = db.Column(db.Integer, db.ForeignKey('teams.id', ondelete='SET NULL'), nullable=True)
 
     # Unique constraint: student cannot register more than once for same event
     __table_args__ = (

@@ -23,7 +23,11 @@
                     <p class="small text-light opacity-75 mb-0">FASTFEST CAMPUS EVENT ENTRY PASS</p>
                 </div>
                 <div class="text-end">
-                    <span class="badge bg-success px-3 py-2 fw-bold">CONFIRMED</span>
+                    {% if registration.event.status == 'EVENT_COMPLETED' or registration.event.end_time < now %}
+                        <span class="badge bg-secondary px-3 py-2 fw-bold"><i class="bi bi-archive-fill me-1"></i> CONCLUDED</span>
+                    {% else %}
+                        <span class="badge bg-success px-3 py-2 fw-bold">CONFIRMED</span>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -93,7 +97,13 @@
                         {% endif %}
                     </div>
                     <div class="small fw-bold text-dark font-monospace">{{ registration.registration_code }}</div>
-                    <div class="small text-muted" style="font-size: 0.75rem;">Show this QR code to the event coordinator at the venue entrance.</div>
+                    {% if registration.event.status == 'EVENT_COMPLETED' or registration.event.end_time < now %}
+                        <div class="alert alert-secondary py-1 px-2 small mt-2 mb-0 text-dark" style="font-size: 0.75rem;">
+                            <i class="bi bi-info-circle me-1"></i> Event has concluded. Pass is archived for your verification records.
+                        </div>
+                    {% else %}
+                        <div class="small text-muted mt-1" style="font-size: 0.75rem;">Show this QR code to the event coordinator at the venue entrance.</div>
+                    {% endif %}
                 </div>
             </div>
 

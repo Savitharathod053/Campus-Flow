@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Manage Faculty - FastFest Admin{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h2 class="fw-bold mb-1"><i class="bi bi-person-workspace me-2"></i> Faculty Directory & Import</h2>
+                <p class="text-light opacity-90 mb-0">Total Faculty Administrators: <strong>{{ faculty_members|length }}</strong></p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('admin.download_import_template', target_type='faculty') }}" class="btn btn-outline-light btn-sm fw-bold">
+                    <i class="bi bi-download me-1"></i> Excel Template
+                </a>
+                <button type="button" class="btn btn-warning btn-sm fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#importFacultyModal">
+                    <i class="bi bi-file-earmark-excel-fill me-1"></i> Import Excel / CSV
+                </button>
+                <a href="{{ url_for('admin.dashboard') }}" class="btn btn-light btn-sm fw-bold">
+                    <i class="bi bi-arrow-left me-1"></i> Admin Hub
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Filter & Search Bar -->
+    <div class="ff-card p-3 mb-4 shadow-sm">
+        <form method="GET" action="{{ url_for('admin.faculty_list') }}" class="row g-2 align-items-center">
+            <div class="col-md-7">
+                <input type="text" name="q" class="form-control form-control-sm" placeholder="Search by faculty name, employee ID, designation, email..." value="{{ search }}">
+            </div>
+            <div class="col-md-3">
+                <select name="department" class="form-select form-select-sm">
+                    <option value="ALL">All Departments</option>
+                    {% for d in departments %}
+                        <option value="{{ d }}" {% if dept_filter == d %}selected{% endif %}>{{ d }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">
+                    <i class="bi bi-filter me-1"></i> Filter
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Faculty Table -->
+    {% if faculty_members %}
+        <div class="ff-card shadow-sm overflow-hidden">
+            <div class="table-responsive">
+                <table class="table ff-table mb-0">
+                    <thead>
+                        <tr>
+                            <th>Faculty Name</th>
+                            <th>Employee ID</th>
+                            <th>Email & Phone</th>
+                            <th>Department</th>
+                            <th>Designation</th>
+                            <th>Status</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for fp in faculty_members %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-dark">{{ fp.user.name }}</div>
+                                    <small class="text-muted">Joined {{ fp.user.created_at|dateformat }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border font-monospace">{{ fp.employee_id }}</span>
+                                </td>
+                                <td>
+                                    <div>{{ fp.user.email }}</div>
+                                    <small class="text-muted">{{ fp.user.phone or 'No phone' }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-primary">{{ fp.department }}</span>
+                                </td>
+                                <td>
+                                    <div class="small fw-semibold text-dark">{{ fp.designation }}</div>
+                                </td>
+                                <td>
+                                    {% if fp.user.is_active %}
+                                        <span class="badge bg-success">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-danger">Deactivated</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    {% if fp.user.id != current_user.id %}
+                                        <form method="POST" action="{{ url_for('admin.toggle_user_status', user_id=fp.user.id) }}" class="d-inline" onsubmit="return confirm('Toggle status for faculty {{ fp.user.name }}?');">
+                                            <button type="submit" class="btn btn-outline-secondary btn-sm">
+                                                {% if fp.user.is_active %}
+                                                    <i class="bi bi-person-x text-danger"></i> Deactivate
+                                                {% else %}
+                                                    <i class="bi bi-person-check text-success"></i> Activate
+                                                {% endif %}
+                                            </button>
+                                        </form>
+                                    {% else %}
+                                        <span class="badge bg-light text-muted border">Current User</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="text-center py-5 ff-card p-5">
+            <i class="bi bi-person-workspace text-muted fs-1 mb-3"></i>
+            <h5 class="fw-bold">No faculty records found</h5>
+            <p class="text-muted">No faculty matched your search. You can import new faculty members via Excel.</p>
+            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#importFacultyModal">
+                <i class="bi bi-file-earmark-excel me-1"></i> Import Faculty Excel
+            </button>
+        </div>
+    {% endif %}
+</div>
+
+<!-- Modal: Import Faculty Excel -->
+<div class="modal fade" id="importFacultyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('admin.import_faculty') }}" enctype="multipart/form-data">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold"><i class="bi bi-file-earmark-excel-fill me-2"></i> Bulk Import Faculty</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <p class="small text-muted mb-3">
+                        Upload an Excel (<code>.xlsx</code>, <code>.xls</code>) or <code>.csv</code> spreadsheet containing faculty coordinator records.
+                        Required columns: <strong>Faculty Name</strong>, <strong>Email</strong>, <strong>Employee ID</strong>, <strong>Department</strong>.
+                    </p>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small">Select Spreadsheet File</label>
+                        <input type="file" name="file" class="form-control" accept=".xlsx,.xls,.csv" required>
+                    </div>
+                    <div class="alert alert-info py-2 small mb-0">
+                        <i class="bi bi-info-circle me-1"></i> Need a formatted template? 
+                        <a href="{{ url_for('admin.download_import_template', target_type='faculty') }}" class="fw-bold text-decoration-none">Download Template</a>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm fw-bold">
+                        <i class="bi bi-upload me-1"></i> Upload & Import
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

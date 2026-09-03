@@ -69,6 +69,17 @@ class Event(db.Model):
     registration_fee = db.Column(db.Float, default=0.0, nullable=False)
     is_free = db.Column(db.Boolean, default=True, nullable=False)
     
+    # Team Registration Settings (matching database schema)
+    registration_type = db.Column(db.String(20), default='INDIVIDUAL', nullable=False)  # 'INDIVIDUAL' or 'TEAM'
+    min_team_size = db.Column(db.Integer, default=2, nullable=False)
+    max_team_size = db.Column(db.Integer, default=4, nullable=False)
+    team_payment_type = db.Column(db.String(20), default='FREE', nullable=False)        # 'FREE' or 'PER_TEAM' or 'PER_MEMBER'
+    require_full_team = db.Column(db.Boolean, default=False, nullable=False)
+
+    # Attendance Settings (matching database schema)
+    enable_attendance = db.Column(db.Boolean, default=True, nullable=False)
+    min_attendance_percentage = db.Column(db.Float, default=0.0, nullable=False)
+
     # Lifecycle Status
     status = db.Column(db.String(30), default=EventStatus.PENDING_APPROVAL, nullable=False, index=True)
     rejection_reason = db.Column(db.Text, nullable=True)

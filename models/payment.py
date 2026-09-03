@@ -25,6 +25,7 @@ class Payment(db.Model):
     status = db.Column(db.String(20), default=PaymentStatus.PENDING, nullable=False, index=True)
     payment_method = db.Column(db.String(50), nullable=True)  # UPI, CARD, NETBANKING, SANDBOX_SIMULATED
     notes = db.Column(db.Text, nullable=True)
+    team_id = db.Column(db.Integer, nullable=True)
     
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
