@@ -20,7 +20,7 @@
                 <div>
                     <span class="badge bg-warning text-dark fw-bold mb-2">{{ registration.event.event_type }}</span>
                     <h3 class="fw-bold mb-1 text-white">{{ registration.event.title }}</h3>
-                    <p class="small text-light opacity-75 mb-0">FASTFEST CAMPUS EVENT ENTRY PASS</p>
+                    <p class="small text-light opacity-75 mb-0">CAMPUS FLOW CAMPUS EVENT ENTRY PASS</p>
                 </div>
                 <div class="text-end">
                     {% if registration.event.status == 'EVENT_COMPLETED' or registration.event.end_time < now %}
@@ -46,6 +46,21 @@
                         </div>
                     </div>
 
+                    {% if registration.team %}
+                        <div class="p-2 bg-light rounded border mb-3">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <div>
+                                    <div class="small text-muted fw-bold">TEAM NAME</div>
+                                    <div class="fw-bold text-primary">{{ registration.team.team_name }}</div>
+                                </div>
+                                <div class="text-end">
+                                    <div class="small text-muted fw-bold">TEAM ID</div>
+                                    <span class="badge bg-secondary font-monospace">#TEAM-{{ registration.team.id }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    {% endif %}
+
                     <div class="row g-2 mb-3">
                         <div class="col-6">
                             <div class="small text-muted fw-bold">EVENT DATE</div>
@@ -66,12 +81,14 @@
                             </div>
                         </div>
                         <div class="col-6">
-                            <div class="small text-muted fw-bold">ATTENDANCE</div>
+                            <div class="small text-muted fw-bold">ATTENDANCE CHECKPOINTS</div>
                             <div class="fw-semibold">
-                                {% if registration.attendance %}
-                                    <span class="text-success"><i class="bi bi-check-circle-fill"></i> MARKED PRESENT</span>
+                                {% if not registration.event.enable_attendance %}
+                                    <span class="text-muted">Not Required</span>
+                                {% elif registration.attended_sessions_count > 0 %}
+                                    <span class="text-success"><i class="bi bi-check-circle-fill"></i> {{ registration.attended_sessions_count }}/{{ registration.event.total_sessions_count }} ({{ "%.0f"|format(registration.attendance_percentage) }}%)</span>
                                 {% else %}
-                                    <span class="text-secondary">Scan QR at Venue</span>
+                                    <span class="text-secondary">Scan QR at each session</span>
                                 {% endif %}
                             </div>
                         </div>
@@ -109,7 +126,7 @@
 
             <!-- Footer instructions -->
             <div class="border-top pt-3 mt-4 small text-muted d-flex justify-content-between align-items-center">
-                <span>FastFest Verified Ticket &bull; Registered on {{ registration.created_at|dateformat }}</span>
+                <span>Campus Flow Verified Ticket &bull; Registered on {{ registration.created_at|dateformat }}</span>
                 <span>Carry valid College ID</span>
             </div>
         </div>

@@ -1,10 +1,18 @@
+import os
 from datetime import datetime
-from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, abort
-from models import db, EventRegistration, RegistrationStatus, Payment, PaymentStatus, UserRole
+from pathlib import Path
+from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, current_app, abort, send_file
+from models import db, EventRegistration, RegistrationStatus, Payment, PaymentStatus, FraudRisk, UserRole
 from routes.auth import login_required, get_current_user
-from services.razorpay_service import create_razorpay_order, verify_razorpay_signature
+from services.payment_verification_service import verify_payment_submission
 
 payment_bp = Blueprint('payment', __name__, url_prefix='/payment')
+
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
 
 @payment_bp.route('/checkout/<int:registration_id>')
 @login_required
@@ -12,165 +20,151 @@ def checkout(registration_id):
     user = get_current_user()
     registration = EventRegistration.query.get_or_404(registration_id)
 
-    if registration.student_id != user.id:
+    if registration.student_id != user.id and not user.is_admin:
         abort(403)
 
     if registration.is_confirmed:
-        flash('This registration is already confirmed and paid.', 'info')
+        flash('This registration is already confirmed.', 'info')
         return redirect(url_for('student.ticket', code=registration.registration_code))
 
     event = registration.event
-    amount = event.registration_fee
 
-    if amount <= 0:
+    # Free event check
+    if event.is_free or (event.registration_fee or 0) <= 0:
         registration.status = RegistrationStatus.CONFIRMED
+        from services.qr_service import generate_ticket_qr
+        if not registration.qr_code_image:
+            registration.qr_code_image = generate_ticket_qr(registration.registration_code)
         db.session.commit()
         flash('Event is free. Registration confirmed!', 'success')
         return redirect(url_for('student.ticket', code=registration.registration_code))
 
-    # Create official Razorpay Order
-    order_data = create_razorpay_order(
-        amount_in_rupees=amount,
-        receipt_id=f"rec_{registration.id}",
-        notes={
-            'event_id': str(event.id),
-            'student_id': str(user.id),
-            'registration_code': registration.registration_code
-        }
-    )
+    # Event active check
+    if not event.is_active or event.is_completed:
+        flash('This event is completed or no longer accepting payments.', 'danger')
+        return redirect(url_for('student.my_events'))
 
-    # Upsert Payment record with pending status
+    # Existing payment record if already submitted
     payment = Payment.query.filter_by(registration_id=registration.id).first()
-    if not payment:
-        payment = Payment(
-            registration_id=registration.id,
-            amount=amount,
-            currency='INR',
-            razorpay_order_id=order_data['order_id'],
-            status=PaymentStatus.PENDING
-        )
-        db.session.add(payment)
-    else:
-        payment.razorpay_order_id = order_data['order_id']
-        payment.amount = amount
-    db.session.commit()
 
     return render_template(
         'student/checkout.html',
         registration=registration,
         event=event,
         user=user,
-        order_data=order_data
+        payment=payment,
+        amount=event.registration_fee
     )
 
 
-@payment_bp.route('/simulate/<int:registration_id>', methods=['POST'])
+@payment_bp.route('/submit-proof/<int:registration_id>', methods=['POST'])
 @login_required
-def simulate_payment(registration_id):
-    """
-    Instant test payment simulation for sandbox evaluation without real credit cards.
-    """
+def submit_proof(registration_id):
     user = get_current_user()
     registration = EventRegistration.query.get_or_404(registration_id)
 
-    if registration.student_id != user.id:
+    if registration.student_id != user.id and not user.is_admin:
         abort(403)
 
     if registration.is_confirmed:
-        flash('This registration is already confirmed and paid.', 'info')
+        flash('This registration is already confirmed.', 'info')
         return redirect(url_for('student.ticket', code=registration.registration_code))
 
-    import uuid
-    sim_order_id = f"order_sim_{registration.id}_{uuid.uuid4().hex[:6]}"
-    sim_pay_id = f"pay_sim_{uuid.uuid4().hex[:10]}"
+    event = registration.event
 
-    payment = Payment.query.filter_by(registration_id=registration.id).first()
-    if not payment:
-        payment = Payment(
-            registration_id=registration.id,
-            amount=registration.event.registration_fee,
-            currency='INR',
-            razorpay_order_id=sim_order_id
-        )
-        db.session.add(payment)
-
-    payment.razorpay_order_id = sim_order_id
-    payment.razorpay_payment_id = sim_pay_id
-    payment.razorpay_signature = 'SIMULATED_TEST_SIGNATURE'
-    payment.status = PaymentStatus.SUCCESS
-    payment.payment_method = 'SANDBOX_SIMULATED'
-
-    # Generate ticket QR code upon confirmed payment
-    from services.qr_service import generate_ticket_qr
-    if not registration.qr_code_image:
-        registration.qr_code_image = generate_ticket_qr(registration.registration_code)
-
-    registration.status = RegistrationStatus.CONFIRMED
-    db.session.commit()
-
-    flash('Payment completed successfully! Your event ticket and QR pass have been generated.', 'success')
-    return redirect(url_for('student.ticket', code=registration.registration_code))
-
-
-@payment_bp.route('/verify', methods=['POST'])
-@login_required
-def verify_payment():
-    user = get_current_user()
-    
-    razorpay_order_id = request.form.get('razorpay_order_id', '').strip()
-    razorpay_payment_id = request.form.get('razorpay_payment_id', '').strip()
-    razorpay_signature = request.form.get('razorpay_signature', '').strip()
-    registration_id = request.form.get('registration_id')
-
-    if not registration_id:
-        flash('Invalid payment response. Missing registration identifier.', 'danger')
+    # 1. Event Validation
+    if not event.is_active or event.is_completed:
+        flash('Cannot submit payment. This event is completed or no longer active.', 'danger')
         return redirect(url_for('student.my_events'))
 
-    registration = EventRegistration.query.get_or_404(int(registration_id))
+    # 2. Extract and sanitize inputs (DO NOT trust amount from form)
+    transaction_id = request.form.get('transaction_id', '').strip()
+    if not transaction_id:
+        flash('Transaction/Reference ID is required. Please enter the UTR or reference number.', 'danger')
+        return redirect(url_for('payment.checkout', registration_id=registration.id))
 
-    if registration.student_id != user.id:
-        abort(403)
+    if 'payment_screenshot' not in request.files:
+        flash('Please upload your payment screenshot proof.', 'danger')
+        return redirect(url_for('payment.checkout', registration_id=registration.id))
 
-    # Check if sandbox simulation bypass was submitted
-    is_simulation = (
-        current_app.config.get('RAZORPAY_SANDBOX_SIMULATION', False) and
-        (razorpay_signature == 'SIMULATED_TEST_SIGNATURE' or 
-         razorpay_payment_id.startswith('pay_sim_') or 
-         razorpay_order_id.startswith('order_sim_') or
-         razorpay_order_id.startswith('order_dev_'))
+    file = request.files['payment_screenshot']
+    if not file or not file.filename:
+        flash('No payment screenshot selected. Please choose an image file.', 'danger')
+        return redirect(url_for('payment.checkout', registration_id=registration.id))
+
+    if not allowed_file(file.filename):
+        flash('Invalid image format! Only PNG, JPG, JPEG, and WEBP files are allowed.', 'danger')
+        return redirect(url_for('payment.checkout', registration_id=registration.id))
+
+    # Check file size (10 MB limit)
+    file.seek(0, os.SEEK_END)
+    size_bytes = file.tell()
+    file.seek(0)
+    max_size = current_app.config.get('MAX_PAYMENT_PROOF_SIZE', 10 * 1024 * 1024)
+    if size_bytes > max_size:
+        flash(f'File size exceeds {max_size // (1024 * 1024)}MB limit. Please upload a smaller image.', 'danger')
+        return redirect(url_for('payment.checkout', registration_id=registration.id))
+
+    # 3. Run verification pipeline: duplicate check, OCR, amount match, fraud analysis
+    payment, result = verify_payment_submission(
+        registration=registration,
+        entered_transaction_id=transaction_id,
+        uploaded_file=file
     )
 
-    if not is_simulation:
-        # Verify signature using Razorpay HMAC-SHA256 signature
-        is_valid = verify_razorpay_signature(razorpay_order_id, razorpay_payment_id, razorpay_signature)
-        if not is_valid:
-            flash('Payment verification failed! Invalid or tampered payment signature.', 'danger')
-            return redirect(url_for('payment.checkout', registration_id=registration.id))
-
-    # Update payment record to SUCCESS
-    payment = Payment.query.filter_by(registration_id=registration.id).first()
     if not payment:
-        payment = Payment(
-            registration_id=registration.id,
-            amount=registration.event.registration_fee,
-            currency='INR',
-            razorpay_order_id=razorpay_order_id
-        )
-        db.session.add(payment)
+        flash(result.get('message', 'Failed to process payment submission.'), 'danger')
+        return redirect(url_for('payment.checkout', registration_id=registration.id))
 
-    payment.razorpay_payment_id = razorpay_payment_id
-    payment.razorpay_signature = razorpay_signature
-    payment.status = PaymentStatus.SUCCESS
-    payment.payment_method = 'SANDBOX_SIMULATED' if is_simulation else 'RAZORPAY_CHECKOUT'
-    
-    # Generate ticket QR code upon confirmed payment
-    from services.qr_service import generate_ticket_qr
-    if not registration.qr_code_image:
-        registration.qr_code_image = generate_ticket_qr(registration.registration_code)
+    # 4. Handle Status
+    # IMPORTANT: Ticket is NEVER generated here. Ticket is ONLY generated upon organizer VERIFIED.
+    status = payment.status
+    if status == PaymentStatus.REJECTED:
+        flash(f"Payment verification failed: {payment.verification_reason}", 'danger')
+        return redirect(url_for('payment.checkout', registration_id=registration.id))
+    elif status == PaymentStatus.MANUAL_REVIEW:
+        flash("Payment proof submitted! Your submission has been flagged for manual verification by the organizer.", 'warning')
+        return redirect(url_for('student.my_events'))
+    else:
+        # PENDING
+        flash("Payment proof submitted successfully! Verification is pending organizer approval. Your ticket will be available once verified.", 'info')
+        return redirect(url_for('student.my_events'))
 
-    # Confirm registration and seat
-    registration.status = RegistrationStatus.CONFIRMED
-    db.session.commit()
 
-    flash('Payment verified successfully! Your event ticket and QR pass have been generated.', 'success')
-    return redirect(url_for('student.ticket', code=registration.registration_code))
+@payment_bp.route('/proof/<int:payment_id>')
+@login_required
+def view_proof(payment_id):
+    """
+    Securely serves the payment screenshot proof.
+    Authorization: Only the student who submitted it, the organizer of the event, or an admin can access.
+    """
+    user = get_current_user()
+    payment = Payment.query.get_or_404(payment_id)
+
+    # Authorization check
+    is_owner_student = (payment.student_id == user.id) or (payment.registration and payment.registration.student_id == user.id)
+    is_event_organizer = (payment.organizer_id == user.id) or (payment.event and payment.event.organizer_id == user.id)
+    is_authorized = is_owner_student or is_event_organizer or user.is_admin
+
+    if not is_authorized:
+        abort(403)
+
+    if not payment.payment_screenshot:
+        abort(404)
+
+    full_path = Path(current_app.root_path) / 'static' / payment.payment_screenshot
+    if not full_path.exists():
+        # Check relative to base folder
+        full_path = Path(current_app.config.get('PAYMENT_PROOF_FOLDER', '')) / Path(payment.payment_screenshot).name
+        if not full_path.exists():
+            abort(404)
+
+    ext = full_path.suffix.lower()
+    mimetype = 'image/png'
+    if ext in ('.jpg', '.jpeg'):
+        mimetype = 'image/jpeg'
+    elif ext == '.webp':
+        mimetype = 'image/webp'
+
+    return send_file(str(full_path), mimetype=mimetype, as_attachment=False)
+

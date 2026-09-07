@@ -66,7 +66,7 @@ class CertificateModuleTests(unittest.TestCase):
 
     def test_01_text_extraction_and_roll_number_matching(self):
         """Test PDF text extraction and configurable roll number parsing."""
-        sample_pdf_bytes = create_sample_text_pdf("FastFest Certificate - Presented to Rahul. Roll No: 23DS001 for Workshop.")
+        sample_pdf_bytes = create_sample_text_pdf("Campus Flow Certificate - Presented to Rahul. Roll No: 23DS001 for Workshop.")
         temp_pdf = Path("test_sample_cert.pdf")
         temp_pdf.write_bytes(sample_pdf_bytes)
 

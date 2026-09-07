@@ -1,0 +1,115 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Organizer Requests - Super Admin{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between pb-3 mb-4 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-1">
+            <i class="bi bi-person-check-fill text-primary me-2"></i> Student Organizer Role Requests
+        </h3>
+        <p class="text-muted small mb-0">University-wide monitoring of student organizer applications and HOD approval decisions.</p>
+    </div>
+    <div>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Filters & Search -->
+<div class="card border-0 shadow-sm rounded-3 mb-4 p-3 bg-white">
+    <form method="GET" action="{{ url_for('admin.organizer_requests_list') }}" class="row g-2 align-items-center">
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                <input type="text" name="q" value="{{ search }}" class="form-control bg-light border-start-0" placeholder="Search student name, email...">
+            </div>
+        </div>
+        <div class="col-md-3">
+            <select name="department" class="form-select bg-light">
+                <option value="">All Departments</option>
+                {% for d in departments %}
+                    <option value="{{ d.id }}" {% if dept_filter == d.id|string %}selected{% endif %}>{{ d.name }} ({{ d.code }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="status" class="form-select bg-light">
+                <option value="">All Statuses</option>
+                {% for st in statuses %}
+                    <option value="{{ st }}" {% if status_filter == st %}selected{% endif %}>{{ st.replace('_', ' ').title() }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-filter me-1"></i> Filter</button>
+            <a href="{{ url_for('admin.organizer_requests_list') }}" class="btn btn-outline-secondary">Reset</a>
+        </div>
+    </form>
+</div>
+
+<!-- Table of Requests -->
+<div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <h5 class="fw-bold text-dark mb-0">Applications ({{ requests|length }})</h5>
+        <small class="text-muted">Reviewed by Department HODs</small>
+    </div>
+    <div class="card-body p-0">
+        {% if requests %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small text-uppercase">
+                        <tr>
+                            <th class="ps-3">Student Applicant</th>
+                            <th>Department</th>
+                            <th>Submitted On</th>
+                            <th>Reason / Purpose</th>
+                            <th>HOD Reviewer</th>
+                            <th>Decision Date</th>
+                            <th class="text-end pe-3">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in requests %}
+                            <tr>
+                                <td class="ps-3">
+                                    <div class="fw-bold text-dark">{{ r.student.name if r.student else 'N/A' }}</div>
+                                    <small class="text-muted">{{ r.student.email if r.student else '' }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary-subtle text-dark border">{{ r.department.code if r.department else 'N/A' }}</span>
+                                    <div class="small text-muted">{{ r.department.name if r.department else '' }}</div>
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ r.created_at.strftime('%b %d, %Y') if r.created_at else '' }}</small>
+                                </td>
+                                <td>
+                                    <p class="small text-dark mb-0" style="max-width: 250px;">{{ r.reason }}</p>
+                                </td>
+                                <td>
+                                    <div class="small fw-semibold">{{ r.reviewed_by_hod.name if r.reviewed_by_hod else 'Pending HOD' }}</div>
+                                </td>
+                                <td>
+                                    <small class="text-muted">{{ r.decision_at.strftime('%b %d, %Y') if r.decision_at else '&mdash;' }}</small>
+                                </td>
+                                <td class="text-end pe-3">
+                                    {% if r.status.value == 'approved' %}
+                                        <span class="badge bg-success"><i class="bi bi-check-lg"></i> Approved</span>
+                                    {% elif r.status.value == 'rejected' %}
+                                        <span class="badge bg-danger" title="{{ r.rejection_reason or '' }}"><i class="bi bi-x-lg"></i> Declined</span>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Pending HOD</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="p-5 text-center text-muted">No organizer requests match the selected filters.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

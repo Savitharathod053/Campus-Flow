@@ -1,0 +1,271 @@
+﻿{% extends "base.html" %}
+{% block title %}Attendance Matrix & Analytics - {{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <span class="badge bg-warning text-dark mb-1">{{ event.event_type }} &bull; Attendance Analytics</span>
+                <h2 class="fw-bold mb-1"><i class="bi bi-grid-3x3 me-2"></i> Attendance Matrix & Analytics</h2>
+                <p class="text-light opacity-90 mb-0">{{ event.title }} &bull; Total Sessions: <strong>{{ sessions|length }}</strong> &bull; Participants: <strong>{{ total_participants }}</strong></p>
+            </div>
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{{ url_for('organizer.attendance_scanner', event_id=event.id) }}" class="btn btn-warning btn-sm fw-bold shadow-sm">
+                    <i class="bi bi-qr-code-scan me-1"></i> Open QR Scanner
+                </a>
+                <a href="{{ url_for('organizer.export_attendance_excel', event_id=event.id) }}" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-file-earmark-excel me-1"></i> Excel
+                </a>
+                <a href="{{ url_for('organizer.export_attendance_csv', event_id=event.id) }}" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-filetype-csv me-1"></i> CSV
+                </a>
+                <a href="{{ url_for('organizer.manage_event', event_id=event.id) }}" class="btn btn-light btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i> Event Hub
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Key Metric Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-primary text-white">
+                    <i class="bi bi-people"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ total_participants }}</div>
+                    <div class="metric-label">Confirmed Participants</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-info text-white">
+                    <i class="bi bi-calendar3-range"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ sessions|length }}</div>
+                    <div class="metric-label">Total Checkpoint Sessions</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-success text-white">
+                    <i class="bi bi-percent"></i>
+                </div>
+                <div>
+                    {% set total_pct = [] %}
+                    {% for row in matrix %}
+                        {% set _ = total_pct.append(row.percentage) %}
+                    {% endfor %}
+                    <div class="metric-number">
+                        {{ "%.1f"|format(total_pct|sum / total_pct|length) if total_pct|length > 0 else 0 }}%
+                    </div>
+                    <div class="metric-label">Average Attendance</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box {% if min_attendance_percentage > 0 %}bg-warning text-dark{% else %}bg-secondary text-white{% endif %}">
+                    <i class="bi bi-award-fill"></i>
+                </div>
+                <div>
+                    <div class="metric-number">
+                        {% if min_attendance_percentage > 0 %}
+                            {{ min_attendance_percentage }}%
+                        {% else %}
+                            None
+                        {% endif %}
+                    </div>
+                    <div class="metric-label">Minimum Requirement</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sessions Overview Pills -->
+    <div class="ff-card p-3 mb-4 shadow-sm">
+        <h6 class="fw-bold mb-2 text-dark"><i class="bi bi-diagram-3-fill text-primary me-2"></i> Event Attendance Checkpoints</h6>
+        <div class="d-flex gap-2 flex-wrap">
+            {% for s in sessions %}
+                <div class="p-2 px-3 bg-light rounded border d-flex align-items-center gap-2">
+                    <div>
+                        <strong>#{{ s.session_number }}: {{ s.session_name }}</strong>
+                        <div class="small text-muted">
+                            {% if s.start_time %}{{ s.start_time|timeformat }} - {{ s.end_time|timeformat }}{% else %}Full Day{% endif %}
+                            &bull; Present: <span class="fw-bold text-success">{{ s.present_count }}</span>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Attendance Matrix Table -->
+    {% if matrix %}
+        <div class="ff-card shadow-sm overflow-hidden mb-4">
+            <div class="p-3 bg-light border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-table text-primary me-2"></i> Student Attendance Matrix</h5>
+                <div class="small text-muted">
+                    Click any student status to perform manual attendance correction.
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table ff-table align-middle mb-0">
+                    <thead>
+                        <tr>
+                            <th>Student</th>
+                            <th>Roll No</th>
+                            <th>Branch</th>
+                            {% if event.allows_team_registration %}<th>Team</th>{% endif %}
+                            {% for s in sessions %}
+                                <th class="text-center" style="min-width: 110px;">
+                                    <div>{{ s.session_name }}</div>
+                                    <small class="text-muted fw-normal">#{{ s.session_number }}</small>
+                                </th>
+                            {% endfor %}
+                            <th class="text-center">Attended</th>
+                            <th class="text-center">Score</th>
+                            <th class="text-center">Requirement</th>
+                            <th class="text-end">Manual Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in matrix %}
+                            <tr>
+                                <td>
+                                    <div class="fw-bold text-dark">{{ row.student.name }}</div>
+                                    <div class="small text-muted">{{ row.student.email }}</div>
+                                </td>
+                                <td>
+                                    <span class="badge bg-light text-dark border">
+                                        {{ row.profile.roll_number if row.profile else 'N/A' }}
+                                    </span>
+                                </td>
+                                <td class="small">{{ row.profile.department if row.profile else 'N/A' }}</td>
+                                {% if event.allows_team_registration %}
+                                    <td>
+                                        {% if row.team %}
+                                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                                                {{ row.team.team_name }}
+                                            </span>
+                                        {% else %}
+                                            <span class="small text-muted">Solo</span>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
+
+                                <!-- Session by Session Checkboxes -->
+                                {% for s_stat in row.session_statuses %}
+                                    <td class="text-center">
+                                        {% if s_stat.is_present %}
+                                            <span class="badge bg-success" title="Verified at {{ s_stat.scanned_at|timeformat if s_stat.scanned_at else '' }} via {{ s_stat.method }}">
+                                                <i class="bi bi-check2-circle me-1"></i> Present
+                                            </span>
+                                            {% if s_stat.scanned_at %}
+                                                <div class="text-muted" style="font-size: 0.72rem;">{{ s_stat.scanned_at|timeformat }}</div>
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="badge bg-light text-muted border">
+                                                <i class="bi bi-x-circle me-1"></i> Absent
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                {% endfor %}
+
+                                <!-- Progress Count -->
+                                <td class="text-center fw-bold">
+                                    {{ row.attended_count }} / {{ row.total_sessions }}
+                                </td>
+
+                                <!-- Attendance Percentage Score -->
+                                <td class="text-center">
+                                    <div class="fw-bold {% if row.percentage >= 75 %}text-success{% elif row.percentage >= 50 %}text-primary{% else %}text-danger{% endif %}">
+                                        {{ row.percentage }}%
+                                    </div>
+                                    <div class="progress mt-1" style="height: 4px; width: 60px; margin: 0 auto;">
+                                        <div class="progress-bar {% if row.percentage >= 75 %}bg-success{% elif row.percentage >= 50 %}bg-primary{% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ row.percentage }}%;"></div>
+                                    </div>
+                                </td>
+
+                                <!-- Requirement Satisfaction -->
+                                <td class="text-center">
+                                    {% if row.is_satisfied %}
+                                        <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Satisfied</span>
+                                    {% else %}
+                                        <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i> Unmet</span>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Manual Override Action Button -->
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#overrideModal_{{ row.student.id }}" title="Manual Attendance Correction">
+                                        <i class="bi bi-pencil-square"></i>
+                                    </button>
+
+                                    <!-- Override Modal for this student -->
+                                    <div class="modal fade text-start" id="overrideModal_{{ row.student.id }}" tabindex="-1" aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <form method="POST" action="{{ url_for('organizer.manual_attendance', event_id=event.id) }}">
+                                                    <input type="hidden" name="student_id" value="{{ row.student.id }}">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title fw-bold"><i class="bi bi-person-check text-primary me-2"></i> Attendance Correction</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <p class="small text-muted mb-3">Manually update session attendance record for <strong>{{ row.student.name }}</strong> ({{ row.profile.roll_number if row.profile else row.student.email }}).</p>
+                                                        
+                                                        <div class="mb-3">
+                                                            <label class="form-label small fw-bold">Select Session *</label>
+                                                            <select name="session_id" class="form-select" required>
+                                                                {% for s in sessions %}
+                                                                    <option value="{{ s.id }}">#{{ s.session_number }}: {{ s.session_name }}</option>
+                                                                {% endfor %}
+                                                            </select>
+                                                        </div>
+
+                                                        <div class="mb-3">
+                                                            <label class="form-label small fw-bold">Attendance Status *</label>
+                                                            <select name="status" class="form-select" required>
+                                                                <option value="PRESENT">PRESENT</option>
+                                                                <option value="ABSENT">ABSENT</option>
+                                                            </select>
+                                                        </div>
+
+                                                        <div class="mb-3">
+                                                            <label class="form-label small fw-bold">Correction Reason / Remarks</label>
+                                                            <input type="text" name="remarks" class="form-control" placeholder="e.g. Phone malfunction, verified physically by organizer">
+                                                        </div>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                                        <button type="submit" class="btn btn-primary btn-sm fw-bold">Save Attendance Record</button>
+                                                    </div>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="text-center py-5 ff-card shadow-sm">
+            <i class="bi bi-people text-muted opacity-50 fs-1 d-block mb-3"></i>
+            <h5 class="fw-bold text-secondary mb-1">No Participants Registered Yet</h5>
+            <p class="text-muted small mb-0">Once students register for this event, the session attendance matrix will populate here.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

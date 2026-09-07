@@ -198,6 +198,15 @@ def process_certificate_uploads(event_id, files_list=None, zip_file=None, custom
 
     db.session.commit()
 
+    # Dispatch certificate ready notifications for successfully matched students
+    try:
+        from services.email_service import send_certificate_ready_email
+        for c in created_certs:
+            if c.status == CertificateStatus.MATCHED and c.student:
+                send_certificate_ready_email(c, c.student, event)
+    except Exception as exc:
+        current_app.logger.warning(f"Could not dispatch certificate ready emails: {exc}")
+
     # Calculate statistics
     matched_count = len([c for c in created_certs if c.status == CertificateStatus.MATCHED])
     unmatched_count = len([c for c in created_certs if c.status == CertificateStatus.UNMATCHED])
@@ -238,6 +247,16 @@ def manual_assign_certificate(cert_id, student_id, roll_number=None, assigned_by
     cert.assigned_by_id = assigned_by_user.id if assigned_by_user else None
 
     db.session.commit()
+
+    # Dispatch certificate ready notification
+    try:
+        from services.email_service import send_certificate_ready_email
+        event = Event.query.get(cert.event_id)
+        if event and student:
+            send_certificate_ready_email(cert, student, event)
+    except Exception as exc:
+        current_app.logger.warning(f"Could not dispatch certificate ready email: {exc}")
+
     return cert
 
 

@@ -1,0 +1,142 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Event Proposals & Clearances - Super Admin{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between pb-3 mb-4 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-1">
+            <i class="bi bi-shield-check text-primary me-2"></i> University Event Proposals & Dual Approval Pipeline
+        </h3>
+        <p class="text-muted small mb-0">System-wide visibility across all department HOD endorsements and Dean clearances.</p>
+    </div>
+    <div>
+        <a href="{{ url_for('admin.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Filters & Search -->
+<div class="card border-0 shadow-sm rounded-3 mb-4 p-3 bg-white">
+    <form method="GET" action="{{ url_for('admin.event_requests_list') }}" class="row g-2 align-items-center">
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                <input type="text" name="q" value="{{ search }}" class="form-control bg-light border-start-0" placeholder="Search event title, venue, organizer...">
+            </div>
+        </div>
+        <div class="col-md-3">
+            <select name="department" class="form-select bg-light">
+                <option value="">All Departments</option>
+                {% for d in departments %}
+                    <option value="{{ d.id }}" {% if dept_filter == d.id|string %}selected{% endif %}>{{ d.name }} ({{ d.code }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <select name="status" class="form-select bg-light">
+                <option value="">All Statuses</option>
+                {% for st in statuses %}
+                    <option value="{{ st }}" {% if status_filter == st %}selected{% endif %}>{{ st.replace('_', ' ').title() }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2 d-flex gap-2">
+            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-filter me-1"></i> Filter</button>
+            <a href="{{ url_for('admin.event_requests_list') }}" class="btn btn-outline-secondary">Reset</a>
+        </div>
+    </form>
+</div>
+
+<!-- Table of Event Proposals -->
+<div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+        <h5 class="fw-bold text-dark mb-0">Event Proposals ({{ requests|length }})</h5>
+        <small class="text-muted">Two-Stage Institutional Governance</small>
+    </div>
+    <div class="card-body p-0">
+        {% if requests %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small text-uppercase">
+                        <tr>
+                            <th class="ps-3">Event Proposal</th>
+                            <th>Department</th>
+                            <th>Organizer</th>
+                            <th>HOD Endorsement</th>
+                            <th>Dean Clearance</th>
+                            <th>Overall Pipeline Status</th>
+                            <th class="text-end pe-3">Live Event</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for r in requests %}
+                            <tr>
+                                <td class="ps-3">
+                                    <div class="fw-bold text-dark">{{ r.event_name }}</div>
+                                    <small class="text-muted">{{ r.category }} &bull; {{ r.venue or 'Campus' }}</small>
+                                </td>
+                                <td>
+                                    <span class="badge bg-secondary-subtle text-dark border">{{ r.department.code if r.department else 'N/A' }}</span>
+                                    <div class="small text-muted">{{ r.department.name if r.department else '' }}</div>
+                                </td>
+                                <td>
+                                    <div class="small fw-semibold">{{ r.organizer.name if r.organizer else 'N/A' }}</div>
+                                    <small class="text-muted">{{ r.organizer.email if r.organizer else '' }}</small>
+                                </td>
+                                <td>
+                                    {% if r.hod_approval_status == 'approved' %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-check-lg"></i> Approved</span>
+                                        <div class="small text-muted">{{ r.hod_reviewer.name if r.hod_reviewer else 'HOD' }}</div>
+                                    {% elif r.hod_approval_status == 'rejected' %}
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle"><i class="bi bi-x-lg"></i> Declined</span>
+                                    {% else %}
+                                        <span class="badge bg-warning-subtle text-dark border border-warning-subtle"><i class="bi bi-hourglass-split"></i> Pending HOD</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if r.dean_approval_status == 'approved' %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-check-all"></i> Approved</span>
+                                        <div class="small text-muted">{{ r.dean_reviewer.name if r.dean_reviewer else 'Dean' }}</div>
+                                    {% elif r.dean_approval_status == 'rejected' %}
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle"><i class="bi bi-x-lg"></i> Declined</span>
+                                    {% elif r.hod_approval_status == 'approved' %}
+                                        <span class="badge bg-info-subtle text-dark border border-info-subtle"><i class="bi bi-hourglass-top"></i> Pending Dean</span>
+                                    {% else %}
+                                        <span class="badge bg-light text-muted border">&mdash;</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if r.overall_status.value == 'approved' %}
+                                        <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Published</span>
+                                    {% elif r.overall_status.value == 'pending_hod_approval' %}
+                                        <span class="badge bg-warning text-dark">Awaiting HOD</span>
+                                    {% elif r.overall_status.value == 'pending_dean_approval' %}
+                                        <span class="badge bg-info text-dark">Awaiting Dean</span>
+                                    {% elif r.overall_status.value == 'rejected_by_hod' %}
+                                        <span class="badge bg-danger" title="{{ r.hod_rejection_reason or '' }}">Declined by HOD</span>
+                                    {% elif r.overall_status.value == 'rejected_by_dean' %}
+                                        <span class="badge bg-danger" title="{{ r.dean_rejection_reason or '' }}">Declined by Dean</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-3">
+                                    {% if r.event_id and r.event and r.overall_status.value == 'approved' %}
+                                        <a href="{{ url_for('public.event_detail', slug=r.event.slug) }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                            <i class="bi bi-box-arrow-up-right me-1"></i> View
+                                        </a>
+                                    {% else %}
+                                        <span class="text-muted small">&mdash;</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="p-5 text-center text-muted">No event proposals found matching the selected filters.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

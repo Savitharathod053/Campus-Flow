@@ -1,0 +1,465 @@
+{% extends 'base.html' %}
+
+{% block title %}Students Affairs Dean Portal - Campus Flow{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header Banner -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1 fs-6">
+                    <i class="bi bi-award-fill me-1"></i> Students Affairs Dean
+                </span>
+                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">
+                    College Administration & Event Governance
+                </span>
+            </div>
+            <h2 class="fw-bold text-dark mb-0">Dean of Student Affairs &mdash; {{ user.name }}</h2>
+            <p class="text-muted small mb-0">{{ user.email }} &bull; Final Institutional Review & Event Clearance Portal</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{{ url_for('dean.events') }}" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-calendar-event me-1"></i> College Events Directory
+            </a>
+            <a href="{{ url_for('dean.organizers') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-person-badge me-1"></i> College Organizers
+            </a>
+        </div>
+    </div>
+
+    <!-- Executive Stat Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-3 h-100 p-3 bg-white border-start border-warning border-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small fw-semibold text-uppercase">Awaiting Dean Approval</span>
+                        <h3 class="fw-bold mb-0 text-dark mt-1">{{ pending_requests|length }}</h3>
+                        <small class="text-warning fw-semibold">HOD Endorsed</small>
+                    </div>
+                    <div class="bg-warning bg-opacity-10 text-warning p-3 rounded-circle fs-4">
+                        <i class="bi bi-hourglass-split"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-3 h-100 p-3 bg-white border-start border-success border-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small fw-semibold text-uppercase">Published Events</span>
+                        <h3 class="fw-bold mb-0 text-dark mt-1">{{ total_approved_events }}</h3>
+                        <small class="text-success fw-semibold">College-Wide Live</small>
+                    </div>
+                    <div class="bg-success bg-opacity-10 text-success p-3 rounded-circle fs-4">
+                        <i class="bi bi-calendar-check-fill"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-3 h-100 p-3 bg-white border-start border-info border-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small fw-semibold text-uppercase">Total Registrations</span>
+                        <h3 class="fw-bold mb-0 text-dark mt-1">{{ total_registrations }}</h3>
+                        <small class="text-info fw-semibold">{{ confirmed_registrations }} Confirmed</small>
+                    </div>
+                    <div class="bg-info bg-opacity-10 text-info p-3 rounded-circle fs-4">
+                        <i class="bi bi-ticket-perforated-fill"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card border-0 shadow-sm rounded-3 h-100 p-3 bg-white border-start border-primary border-4">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="text-muted small fw-semibold text-uppercase">Active Organizers</span>
+                        <h3 class="fw-bold mb-0 text-dark mt-1">{{ total_organizers }}</h3>
+                        <small class="text-primary fw-semibold">Certified Leaders</small>
+                    </div>
+                    <div class="bg-primary bg-opacity-10 text-primary p-3 rounded-circle fs-4">
+                        <i class="bi bi-people-fill"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Tabs -->
+    <div class="card border-0 shadow-sm rounded-3 overflow-hidden mb-4">
+        <div class="card-header bg-white border-bottom p-0">
+            <ul class="nav nav-tabs card-header-tabs m-0 px-3 pt-2" id="deanTab" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if active_tab == 'pending' %}active fw-bold text-primary{% else %}text-muted{% endif %}" id="pending-tab" data-bs-toggle="tab" data-bs-target="#pending" type="button" role="tab">
+                        <i class="bi bi-hourglass-top me-1 text-warning"></i> Pending Dean Review
+                        {% if pending_requests|length > 0 %}
+                            <span class="badge bg-danger ms-1">{{ pending_requests|length }}</span>
+                        {% endif %}
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if active_tab == 'approved' %}active fw-bold text-primary{% else %}text-muted{% endif %}" id="approved-tab" data-bs-toggle="tab" data-bs-target="#approved" type="button" role="tab">
+                        <i class="bi bi-check-circle-fill me-1 text-success"></i> Approved & Published ({{ approved_requests|length }})
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if active_tab == 'rejected' %}active fw-bold text-primary{% else %}text-muted{% endif %}" id="rejected-tab" data-bs-toggle="tab" data-bs-target="#rejected" type="button" role="tab">
+                        <i class="bi bi-x-circle-fill me-1 text-danger"></i> Rejected Proposals ({{ rejected_requests|length }})
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if active_tab == 'analytics' %}active fw-bold text-primary{% else %}text-muted{% endif %}" id="analytics-tab" data-bs-toggle="tab" data-bs-target="#analytics" type="button" role="tab">
+                        <i class="bi bi-bar-chart-line-fill me-1 text-info"></i> Department Analytics
+                    </button>
+                </li>
+            </ul>
+        </div>
+
+        <div class="card-body p-4">
+            <div class="tab-content" id="deanTabContent">
+                
+                <!-- TAB 1: PENDING FINAL APPROVAL -->
+                <div class="tab-pane fade {% if active_tab == 'pending' %}show active{% endif %}" id="pending" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold text-dark mb-0">
+                            <i class="bi bi-shield-check text-warning me-2"></i> Event Proposals Awaiting Dean Final Clearance
+                        </h5>
+                        <small class="text-muted">Requires Step 1 (HOD Endorsement) &bull; Grants Step 2 (Publication)</small>
+                    </div>
+
+                    {% if pending_requests %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle border mb-0">
+                                <thead class="table-light small text-uppercase">
+                                    <tr>
+                                        <th class="ps-3">Event Details</th>
+                                        <th>Department</th>
+                                        <th>Organizer</th>
+                                        <th>HOD Endorsement</th>
+                                        <th>Schedule & Venue</th>
+                                        <th>Scale / Fee</th>
+                                        <th class="text-end pe-3">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for req in pending_requests %}
+                                        <tr>
+                                            <td class="ps-3">
+                                                <div class="fw-bold text-dark fs-6">{{ req.event_name }}</div>
+                                                <div class="small text-muted">
+                                                    <span class="badge bg-secondary-subtle text-dark border">{{ req.category }}</span>
+                                                    &bull; {{ req.registration_type }}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-info-subtle text-info border border-info-subtle fw-semibold">
+                                                    {{ req.department.code if req.department else 'CSE' }}
+                                                </span>
+                                                <div class="small text-muted">{{ req.department.name if req.department else '' }}</div>
+                                            </td>
+                                            <td>
+                                                <div class="fw-semibold text-dark small">{{ req.organizer.name if req.organizer else 'N/A' }}</div>
+                                                <small class="text-muted">{{ req.organizer.email if req.organizer else '' }}</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                                    <i class="bi bi-check-circle-fill me-1"></i> Endorsed by HOD
+                                                </span>
+                                                <div class="small text-muted">
+                                                    {{ req.hod_reviewer.name if req.hod_reviewer else 'HOD' }}
+                                                </div>
+                                                <small class="text-secondary" style="font-size: 0.75rem;">
+                                                    {{ req.hod_decision_at.strftime('%b %d, %Y %I:%M %p') if req.hod_decision_at else '' }}
+                                                </small>
+                                            </td>
+                                            <td>
+                                                <div class="small fw-semibold text-dark">
+                                                    <i class="bi bi-calendar3 me-1"></i>{{ req.start_time.strftime('%b %d, %Y') if req.start_time else 'TBD' }}
+                                                </div>
+                                                <div class="small text-muted">
+                                                    <i class="bi bi-geo-alt me-1"></i>{{ req.venue or 'Campus' }}
+                                                </div>
+                                            </td>
+                                            <td>
+                                                <div class="small fw-semibold">{{ req.expected_participants or 'Open' }} cap</div>
+                                                <div class="small">
+                                                    {% if req.is_free %}
+                                                        <span class="badge bg-success">FREE</span>
+                                                    {% else %}
+                                                        <span class="badge bg-warning text-dark">&#8377;{{ req.registration_fee }}</span>
+                                                    {% endif %}
+                                                </div>
+                                            </td>
+                                            <td class="text-end pe-3">
+                                                <div class="d-inline-flex gap-1">
+                                                    <a href="{{ url_for('dean.request_detail', request_id=req.id) }}" class="btn btn-sm btn-primary">
+                                                        <i class="bi bi-eye-fill me-1"></i> Review
+                                                    </a>
+                                                    <!-- Quick Approve Button -->
+                                                    <form method="POST" action="{{ url_for('dean.approve_request', request_id=req.id) }}" class="d-inline">
+                                                        <button type="submit" class="btn btn-sm btn-success fw-bold" onclick="return confirm('Confirm Dean final approval for {{ req.event_name }}? This will publish the event to students.');">
+                                                            <i class="bi bi-check-lg"></i> Approve
+                                                        </button>
+                                                    </form>
+                                                    <!-- Quick Reject Trigger -->
+                                                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#rejectModal{{ req.id }}">
+                                                        <i class="bi bi-x-lg"></i>
+                                                    </button>
+                                                </div>
+
+                                                <!-- Reject Modal -->
+                                                <div class="modal fade text-start" id="rejectModal{{ req.id }}" tabindex="-1">
+                                                    <div class="modal-dialog">
+                                                        <div class="modal-content">
+                                                            <form method="POST" action="{{ url_for('dean.reject_request', request_id=req.id) }}">
+                                                                <div class="modal-header bg-danger text-white">
+                                                                    <h5 class="modal-title fw-bold"><i class="bi bi-x-circle me-1"></i> Decline Event Proposal</h5>
+                                                                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                                                                </div>
+                                                                <div class="modal-body">
+                                                                    <p class="mb-2">Are you sure you want to decline <strong>{{ req.event_name }}</strong>?</p>
+                                                                    <div class="mb-3">
+                                                                        <label class="form-label fw-semibold">Reason for Decline (Sent to Organizer & HOD) *</label>
+                                                                        <textarea name="reason" class="form-control" rows="3" required placeholder="Please provide specific reasoning or corrective steps..."></textarea>
+                                                                    </div>
+                                                                </div>
+                                                                <div class="modal-footer">
+                                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                                    <button type="submit" class="btn btn-danger fw-bold">Confirm Decline</button>
+                                                                </div>
+                                                            </form>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="p-5 text-center text-muted bg-light rounded-3">
+                            <i class="bi bi-check2-all text-success fs-1 d-block mb-2"></i>
+                            <h5 class="fw-bold text-dark">No Pending Reviews</h5>
+                            <p class="mb-0">All event proposals endorsed by HODs have been processed. The Dean queue is clear!</p>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- TAB 2: APPROVED & PUBLISHED -->
+                <div class="tab-pane fade {% if active_tab == 'approved' %}show active{% endif %}" id="approved" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold text-dark mb-0">
+                            <i class="bi bi-check2-circle text-success me-2"></i> Officially Approved & Published Events
+                        </h5>
+                        <span class="badge bg-success">{{ approved_requests|length }} Approved</span>
+                    </div>
+
+                    {% if approved_requests %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle border mb-0">
+                                <thead class="table-light small text-uppercase">
+                                    <tr>
+                                        <th class="ps-3">Event</th>
+                                        <th>Department</th>
+                                        <th>Organizer</th>
+                                        <th>HOD Endorsed By</th>
+                                        <th>Dean Approved At</th>
+                                        <th>Status</th>
+                                        <th class="text-end pe-3">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for req in approved_requests %}
+                                        <tr>
+                                            <td class="ps-3">
+                                                <div class="fw-bold text-dark">{{ req.event_name }}</div>
+                                                <small class="text-muted">{{ req.category }} &bull; {{ req.start_time.strftime('%b %d, %Y') if req.start_time else '' }}</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary-subtle text-dark border">{{ req.department.code if req.department else 'CSE' }}</span>
+                                            </td>
+                                            <td>
+                                                <div class="small fw-semibold">{{ req.organizer.name if req.organizer else 'N/A' }}</div>
+                                            </td>
+                                            <td>
+                                                <div class="small fw-semibold">{{ req.hod_reviewer.name if req.hod_reviewer else 'HOD' }}</div>
+                                                <small class="text-muted">{{ req.hod_decision_at.strftime('%b %d, %Y') if req.hod_decision_at else '' }}</small>
+                                            </td>
+                                            <td>
+                                                <div class="small fw-semibold">{{ req.dean_reviewer.name if req.dean_reviewer else 'Dean' }}</div>
+                                                <small class="text-muted">{{ req.dean_decision_at.strftime('%b %d, %Y %I:%M %p') if req.dean_decision_at else '' }}</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-success">
+                                                    <i class="bi bi-check-all me-1"></i> Live & Published
+                                                </span>
+                                            </td>
+                                            <td class="text-end pe-3">
+                                                <a href="{{ url_for('dean.request_detail', request_id=req.id) }}" class="btn btn-sm btn-outline-primary">
+                                                    <i class="bi bi-info-circle me-1"></i> Details
+                                                </a>
+                                                {% if req.event_id and req.event %}
+                                                    <a href="{{ url_for('public.event_detail', slug=req.event.slug) }}" target="_blank" class="btn btn-sm btn-primary">
+                                                        <i class="bi bi-box-arrow-up-right me-1"></i> View Live
+                                                    </a>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="p-4 text-center text-muted">No approved requests yet.</div>
+                    {% endif %}
+                </div>
+
+                <!-- TAB 3: REJECTED PROPOSALS -->
+                <div class="tab-pane fade {% if active_tab == 'rejected' %}show active{% endif %}" id="rejected" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold text-dark mb-0">
+                            <i class="bi bi-x-octagon text-danger me-2"></i> Declined Event Proposals
+                        </h5>
+                        <span class="badge bg-danger">{{ rejected_requests|length }} Declined</span>
+                    </div>
+
+                    {% if rejected_requests %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle border mb-0">
+                                <thead class="table-light small text-uppercase">
+                                    <tr>
+                                        <th class="ps-3">Event</th>
+                                        <th>Department</th>
+                                        <th>Organizer</th>
+                                        <th>Declined At Stage</th>
+                                        <th>Reason Provided</th>
+                                        <th class="text-end pe-3">Detail</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for req in rejected_requests %}
+                                        <tr>
+                                            <td class="ps-3">
+                                                <div class="fw-bold text-dark">{{ req.event_name }}</div>
+                                                <small class="text-muted">{{ req.category }}</small>
+                                            </td>
+                                            <td>
+                                                <span class="badge bg-secondary-subtle text-dark border">{{ req.department.code if req.department else 'CSE' }}</span>
+                                            </td>
+                                            <td>
+                                                <div class="small fw-semibold">{{ req.organizer.name if req.organizer else 'N/A' }}</div>
+                                            </td>
+                                            <td>
+                                                {% if req.overall_status.value == 'rejected_by_dean' %}
+                                                    <span class="badge bg-danger">Dean Rejection</span>
+                                                    <div class="small text-muted">{{ req.dean_reviewer.name if req.dean_reviewer else 'Dean' }}</div>
+                                                {% else %}
+                                                    <span class="badge bg-warning text-dark">HOD Rejection</span>
+                                                    <div class="small text-muted">{{ req.hod_reviewer.name if req.hod_reviewer else 'HOD' }}</div>
+                                                {% endif %}
+                                            </td>
+                                            <td>
+                                                <div class="small text-danger fst-italic">
+                                                    {{ req.dean_rejection_reason or req.hod_rejection_reason or 'No specific reason entered.' }}
+                                                </div>
+                                            </td>
+                                            <td class="text-end pe-3">
+                                                <a href="{{ url_for('dean.request_detail', request_id=req.id) }}" class="btn btn-sm btn-outline-secondary">
+                                                    View Details
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="p-4 text-center text-muted">No rejected proposals found.</div>
+                    {% endif %}
+                </div>
+
+                <!-- TAB 4: DEPARTMENT ANALYTICS -->
+                <div class="tab-pane fade {% if active_tab == 'analytics' %}show active{% endif %}" id="analytics" role="tabpanel">
+                    <div class="row g-4">
+                        <div class="col-lg-7">
+                            <div class="card border rounded-3 shadow-none p-3">
+                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-graph-up me-2"></i> Events Distribution by Department</h6>
+                                <canvas id="deptEventsChart" height="220"></canvas>
+                            </div>
+                        </div>
+                        <div class="col-lg-5">
+                            <div class="card border rounded-3 shadow-none p-3">
+                                <h6 class="fw-bold text-dark mb-3"><i class="bi bi-table me-2"></i> Department Request Activity</h6>
+                                <div class="table-responsive">
+                                    <table class="table table-sm table-hover align-middle mb-0">
+                                        <thead class="table-light small">
+                                            <tr>
+                                                <th>Dept</th>
+                                                <th class="text-center">Total</th>
+                                                <th class="text-center">Pending Dean</th>
+                                                <th class="text-center">Approved</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for code, data in dept_request_counts.items() %}
+                                                <tr>
+                                                    <td><strong>{{ code }}</strong></td>
+                                                    <td class="text-center">{{ data.total }}</td>
+                                                    <td class="text-center"><span class="badge bg-warning text-dark">{{ data.pending }}</span></td>
+                                                    <td class="text-center"><span class="badge bg-success">{{ data.approved }}</span></td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    var ctx = document.getElementById('deptEventsChart');
+    if (ctx) {
+        var labels = {{ dept_chart_labels|safe }};
+        var dataValues = {{ dept_chart_data|safe }};
+        new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Approved Events',
+                    data: dataValues,
+                    backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: { stepSize: 1 }
+                    }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

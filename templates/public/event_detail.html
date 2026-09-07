@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}{{ event.title }} - FastFest{% endblock %}
+{% block title %}{{ event.title }} - Campus Flow{% endblock %}
 
 {% block content %}
 <!-- Event Header Banner -->
@@ -126,16 +126,52 @@
                     </div>
                 </div>
 
+                <!-- Registration Type & Team Details Info -->
+                <div class="p-3 bg-light rounded-3 mb-3 border">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <span class="small text-muted fw-bold">REGISTRATION FORMAT</span>
+                        <span class="badge bg-primary">
+                            {% if event.registration_type == 'TEAM' %}Team Only
+                            {% elif event.registration_type == 'BOTH' %}Individual or Team
+                            {% else %}Individual Only{% endif %}
+                        </span>
+                    </div>
+                    {% if event.allows_team_registration %}
+                        <div class="d-flex justify-content-between align-items-center small text-secondary mt-1">
+                            <span>Team Size Range:</span>
+                            <strong>{{ event.min_team_size }} - {{ event.max_team_size }} Members</strong>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center small text-secondary mt-1">
+                            <span>Team Pricing:</span>
+                            <strong>
+                                {% if event.is_free or event.team_payment_type == 'FREE' %}Free
+                                {% elif event.team_payment_type == 'PER_TEAM' %}₹{{ "%.2f"|format(event.registration_fee) }} / Team
+                                {% else %}₹{{ "%.2f"|format(event.registration_fee) }} / Person{% endif %}
+                            </strong>
+                        </div>
+                    {% endif %}
+                </div>
+
                 <!-- Registration Buttons Logic -->
                 {% if is_registered %}
                     <div class="alert alert-success text-center mb-3">
                         <i class="bi bi-check-circle-fill fs-3 d-block mb-1"></i>
                         <strong>You are Registered!</strong>
+                        {% if existing_team %}
+                            <div class="small fw-semibold mt-1">Team: {{ existing_team.team_name }}</div>
+                        {% endif %}
                         <div class="small text-muted mt-1">Ticket ID: {{ existing_registration.registration_code }}</div>
                     </div>
-                    <a href="{{ url_for('student.ticket', code=existing_registration.registration_code) }}" class="btn btn-success btn-lg w-100 fw-bold shadow-sm">
-                        <i class="bi bi-qr-code me-2"></i> View Ticket & QR Code
-                    </a>
+                    <div class="d-flex flex-column gap-2">
+                        <a href="{{ url_for('student.ticket', code=existing_registration.registration_code) }}" class="btn btn-success btn-lg w-100 fw-bold shadow-sm">
+                            <i class="bi bi-qr-code me-2"></i> View Ticket & QR Code
+                        </a>
+                        {% if existing_team %}
+                            <a href="{{ url_for('student.team_detail', team_id=existing_team.id) }}" class="btn btn-outline-primary btn-sm fw-bold">
+                                <i class="bi bi-people me-1"></i> View My Team Roster
+                            </a>
+                        {% endif %}
+                    </div>
                 {% elif event.status not in ('APPROVED', 'REGISTRATION_OPEN') %}
                     <div class="alert alert-warning text-center mb-0">
                         <i class="bi bi-exclamation-triangle me-1"></i> Registrations are currently not active for this event (Status: {{ event.status }}).
@@ -164,9 +200,25 @@
                         <i class="bi bi-x-circle me-1"></i> <strong>Not Eligible:</strong> {{ eligibility_message }}
                     </div>
                 {% else %}
-                    <a href="{{ url_for('student.register_event', event_id=event.id) }}" class="btn btn-primary btn-lg w-100 fw-bold shadow">
-                        <i class="bi bi-pencil-square me-2"></i> Register Now
-                    </a>
+                    <!-- Active Registration Actions -->
+                    <div class="d-flex flex-column gap-2">
+                        {% if event.registration_type == 'TEAM' %}
+                            <a href="{{ url_for('student.register_team', event_id=event.id) }}" class="btn btn-primary btn-lg w-100 fw-bold shadow">
+                                <i class="bi bi-people-fill me-2"></i> Register as Team
+                            </a>
+                        {% elif event.registration_type == 'BOTH' %}
+                            <a href="{{ url_for('student.register_event', event_id=event.id) }}" class="btn btn-primary btn-lg w-100 fw-bold shadow">
+                                <i class="bi bi-person-fill me-2"></i> Register Individually
+                            </a>
+                            <a href="{{ url_for('student.register_team', event_id=event.id) }}" class="btn btn-outline-primary btn-lg w-100 fw-bold">
+                                <i class="bi bi-people-fill me-2"></i> Register as Team
+                            </a>
+                        {% else %}
+                            <a href="{{ url_for('student.register_event', event_id=event.id) }}" class="btn btn-primary btn-lg w-100 fw-bold shadow">
+                                <i class="bi bi-pencil-square me-2"></i> Register Now
+                            </a>
+                        {% endif %}
+                    </div>
                     <div class="text-center mt-2 small text-muted">
                         <i class="bi bi-shield-check text-success"></i> Instant confirmation & QR code
                     </div>

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Participants: {{ event.title }} - FastFest{% endblock %}
+{% block title %}Participants: {{ event.title }} - Campus Flow{% endblock %}
 
 {% block content %}
 <div class="bg-primary text-white py-4 mb-4">
@@ -28,9 +28,19 @@
     <!-- Filter and Search Bar -->
     <div class="ff-card p-3 mb-4 shadow-sm">
         <form method="GET" action="{{ url_for('organizer.participants', event_id=event.id) }}" class="row g-2 align-items-center">
-            <div class="col-md-4">
-                <input type="text" name="q" class="form-control form-control-sm" placeholder="Search student name, roll no, email..." value="{{ search }}">
+            <div class="col-md-3">
+                <input type="text" name="q" class="form-control form-control-sm" placeholder="Search student, roll, team..." value="{{ search }}">
             </div>
+            {% if event.allows_team_registration and teams %}
+                <div class="col-md-2 col-6">
+                    <select name="team_id" class="form-select form-select-sm">
+                        <option value="">All Teams</option>
+                        {% for t in teams %}
+                            <option value="{{ t.id }}" {% if filter_team_id == t.id|string %}selected{% endif %}>{{ t.team_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            {% endif %}
             <div class="col-md-2 col-6">
                 <select name="department" class="form-select form-select-sm">
                     <option value="">All Branches</option>
@@ -40,22 +50,13 @@
                 </select>
             </div>
             <div class="col-md-2 col-6">
-                <select name="year" class="form-select form-select-sm">
-                    <option value="">All Years</option>
-                    <option value="1" {% if filter_year == '1' %}selected{% endif %}>1st Year</option>
-                    <option value="2" {% if filter_year == '2' %}selected{% endif %}>2nd Year</option>
-                    <option value="3" {% if filter_year == '3' %}selected{% endif %}>3rd Year</option>
-                    <option value="4" {% if filter_year == '4' %}selected{% endif %}>4th Year</option>
-                </select>
-            </div>
-            <div class="col-md-2 col-6">
                 <select name="attendance" class="form-select form-select-sm">
                     <option value="">All Attendance</option>
                     <option value="present" {% if filter_attendance == 'present' %}selected{% endif %}>Present</option>
                     <option value="absent" {% if filter_attendance == 'absent' %}selected{% endif %}>Absent / Pending</option>
                 </select>
             </div>
-            <div class="col-md-2 col-6">
+            <div class="col-md-{% if event.allows_team_registration and teams %}3{% else %}5{% endif %} col-6">
                 <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">
                     <i class="bi bi-filter me-1"></i> Filter
                 </button>
@@ -71,6 +72,7 @@
                     <thead>
                         <tr>
                             <th>Student</th>
+                            {% if event.allows_team_registration %}<th>Team</th>{% endif %}
                             <th>Roll Number</th>
                             <th>Branch & Year</th>
                             <th>Contact</th>
@@ -87,6 +89,17 @@
                                     <div class="fw-bold text-dark">{{ reg.student.name }}</div>
                                     <div class="small text-muted">{{ reg.student.email }}</div>
                                 </td>
+                                {% if event.allows_team_registration %}
+                                    <td>
+                                        {% if reg.team %}
+                                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                                                <i class="bi bi-people-fill me-1"></i> {{ reg.team.team_name }}
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-light text-muted border">Individual</span>
+                                        {% endif %}
+                                    </td>
+                                {% endif %}
                                 <td>
                                     <span class="badge bg-light text-dark border">
                                         {{ reg.student.student_profile.roll_number if reg.student.student_profile else 'N/A' }}

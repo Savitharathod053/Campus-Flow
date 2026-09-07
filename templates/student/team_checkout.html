@@ -1,0 +1,61 @@
+﻿{% extends "base.html" %}
+{% block title %}Team Fee Payment - {{ team.team_name }} - Campus Flow{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <h2 class="fw-bold mb-1"><i class="bi bi-credit-card me-2"></i> Team Registration Payment</h2>
+        <p class="text-light opacity-90 mb-0">Complete the group registration fee for team '{{ team.team_name }}'.</p>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="ff-card p-4 p-sm-5 shadow-sm">
+                <div class="text-center mb-4">
+                    <span class="badge bg-primary mb-2">{{ event.event_type }}</span>
+                    <h4 class="fw-bold text-dark mb-1">{{ event.title }}</h4>
+                    <p class="text-muted small">Team: <strong>{{ team.team_name }}</strong> &bull; Lead: <strong>{{ user.name }}</strong></p>
+                </div>
+
+                <!-- Fee Summary Box -->
+                <div class="p-4 bg-light rounded-3 border mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-secondary">Registration Model</span>
+                        <span class="fw-semibold">Flat Per-Team Fee</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-secondary">Confirmed Team Members</span>
+                        <span class="fw-semibold">{{ team.total_confirmed_count }} member(s)</span>
+                    </div>
+                    <hr class="my-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="fs-5 fw-bold text-dark">Total Amount Due</span>
+                        <span class="fs-3 fw-extrabold text-primary">₹{{ "%.2f"|format(event.registration_fee) }}</span>
+                    </div>
+                </div>
+
+                <!-- Payment Options -->
+                <div class="d-flex flex-column gap-3">
+                    <!-- Sandbox Test Simulation Button -->
+                    <form method="POST" action="{{ url_for('student.simulate_team_payment', team_id=team.id) }}">
+                        <button type="submit" class="btn btn-success btn-lg w-100 fw-bold shadow-sm py-3">
+                            <i class="bi bi-lightning-charge-fill me-2"></i> Sandbox Test Payment (Instant Simulation)
+                        </button>
+                    </form>
+
+                    <a href="{{ url_for('student.team_detail', team_id=team.id) }}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-1"></i> Back to Team Details
+                    </a>
+                </div>
+
+                <div class="text-center mt-4 small text-muted">
+                    <i class="bi bi-shield-check text-success me-1"></i>
+                    Secure 256-bit encrypted checkout. All confirmed team members receive entry passes upon confirmation.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

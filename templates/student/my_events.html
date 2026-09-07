@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}My Registered Events - FastFest{% endblock %}
+{% block title %}My Registered Events - Campus Flow{% endblock %}
 
 {% block content %}
 <div class="bg-primary text-white py-4 mb-4">
@@ -10,6 +10,25 @@
 </div>
 
 <div class="container pb-5">
+    <!-- Filter Tabs -->
+    <ul class="nav nav-pills mb-3">
+        <li class="nav-item">
+            <a class="nav-link {% if current_tab == 'active' %}active fw-bold{% endif %}" href="{{ url_for('student.my_events', tab='active') }}">
+                <i class="bi bi-ticket-perforated me-1"></i> Active Passes & Tickets <span class="badge {% if current_tab == 'active' %}bg-white text-primary{% else %}bg-secondary{% endif %} ms-1">{{ active_registrations_count }}</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if current_tab in ('completed', 'history') %}active fw-bold{% endif %}" href="{{ url_for('student.my_events', tab='completed') }}">
+                <i class="bi bi-clock-history me-1"></i> Completed Events & History <span class="badge {% if current_tab in ('completed', 'history') %}bg-white text-primary{% else %}bg-secondary{% endif %} ms-1">{{ completed_registrations_count }}</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if current_tab == 'all' %}active fw-bold{% endif %}" href="{{ url_for('student.my_events', tab='all') }}">
+                All Registrations <span class="badge {% if current_tab == 'all' %}bg-white text-primary{% else %}bg-secondary{% endif %} ms-1">{{ total_registrations_count }}</span>
+            </a>
+        </li>
+    </ul>
+
     {% if registrations %}
         <div class="ff-card shadow-sm overflow-hidden">
             <div class="table-responsive">
@@ -18,8 +37,7 @@
                         <tr>
                             <th>Event Details</th>
                             <th>Date & Time</th>
-                            <th>Registration ID</th>
-                            <th>Reg. Status</th>
+                            <th>Status</th>
                             <th>Payment</th>
                             <th>Attendance</th>
                             <th class="text-end">Actions</th>
@@ -38,45 +56,79 @@
                                     <div class="small text-muted">{{ reg.event.start_time|timeformat }}</div>
                                 </td>
                                 <td>
-                                    <code class="small fw-bold">{{ reg.registration_code }}</code>
-                                </td>
-                                <td>
-                                    {% if reg.status == 'CONFIRMED' %}
-                                        <span class="badge bg-success">Confirmed</span>
+                                    {% if reg.event.is_completed %}
+                                        <span class="badge bg-secondary mb-1">Event Completed</span>
+                                    {% elif reg.status == 'CONFIRMED' %}
+                                        <span class="badge bg-success mb-1">Confirmed</span>
                                     {% elif reg.status == 'PENDING_PAYMENT' %}
-                                        <span class="badge bg-warning text-dark">Payment Pending</span>
+                                        <span class="badge bg-warning text-dark mb-1">Payment Pending</span>
                                     {% else %}
-                                        <span class="badge bg-secondary">{{ reg.status }}</span>
+                                        <span class="badge bg-secondary mb-1">{{ reg.status }}</span>
+                                    {% endif %}
+                                    <div class="small text-muted font-monospace">{{ reg.registration_code }}</div>
+                                </td>
+                                <td>
+                                    {% set badge = reg.payment_badge_info %}
+                                    {% if badge.code == 'FREE' %}
+                                        <span class="badge bg-light text-success border"><i class="bi bi-gift me-1"></i> FREE</span>
+                                    {% elif badge.code == 'VERIFIED' %}
+                                        <div><span class="badge bg-success mb-1"><i class="bi bi-check-circle-fill me-1"></i> 🟢 Payment Verified</span></div>
+                                        <div class="small text-success fw-bold">🎟 Ticket Available</div>
+                                    {% elif badge.code == 'PENDING' %}
+                                        <div><span class="badge bg-warning text-dark mb-1"><i class="bi bi-hourglass-split me-1"></i> 🟡 Payment Verification Pending</span></div>
+                                        <div class="small text-muted">Awaiting organizer review</div>
+                                    {% elif badge.code == 'MANUAL_REVIEW' %}
+                                        <div><span class="badge bg-warning text-dark mb-1"><i class="bi bi-shield-exclamation me-1"></i> 🟠 Payment Under Manual Review</span></div>
+                                        <div class="small text-muted">Organizer manual review</div>
+                                    {% elif badge.code == 'REJECTED' %}
+                                        <div><span class="badge bg-danger mb-1"><i class="bi bi-x-circle-fill me-1"></i> 🔴 Payment Rejected</span></div>
+                                        <div class="small text-danger fw-semibold" style="max-width: 220px;">Reason: {{ badge.message }}</div>
+                                        {% if not reg.event.is_completed %}
+                                            <a href="{{ url_for('payment.checkout', registration_id=reg.id) }}" class="btn btn-outline-danger btn-sm py-0 px-2 fw-bold mt-1">
+                                                Resubmit Proof
+                                            </a>
+                                        {% endif %}
+                                    {% else %}
+                                        {% if not reg.event.is_completed %}
+                                            <a href="{{ url_for('payment.checkout', registration_id=reg.id) }}" class="btn btn-warning btn-sm py-0 px-2 fw-bold small">
+                                                Pay ₹{{ "%.0f"|format(reg.event.registration_fee) }}
+                                            </a>
+                                        {% else %}
+                                            <span class="badge bg-light text-muted border">Expired</span>
+                                        {% endif %}
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if reg.event.is_free %}
-                                        <span class="badge bg-light text-success border">FREE</span>
-                                    {% elif reg.payment and reg.payment.status == 'SUCCESS' %}
-                                        <span class="badge bg-success">Paid ₹{{ "%.0f"|format(reg.payment.amount) }}</span>
+                                    {% if not reg.event.enable_attendance %}
+                                        <span class="badge bg-light text-muted border">N/A</span>
+                                    {% elif reg.attended_sessions_count > 0 %}
+                                        <div>
+                                            <span class="badge bg-success mb-1">
+                                                <i class="bi bi-check2-circle me-1"></i> {{ reg.attended_sessions_count }}/{{ reg.event.total_sessions_count }} ({{ "%.0f"|format(reg.attendance_percentage) }}%)
+                                            </span>
+                                        </div>
                                     {% else %}
-                                        <a href="{{ url_for('payment.checkout', registration_id=reg.id) }}" class="btn btn-warning btn-sm py-0 px-2 fw-bold small">
-                                            Pay ₹{{ "%.0f"|format(reg.event.registration_fee) }}
-                                        </a>
-                                    {% endif %}
-                                </td>
-                                <td>
-                                    {% if reg.attendance %}
-                                        <span class="badge bg-success"><i class="bi bi-check2-circle me-1"></i> Present</span>
-                                    {% else %}
-                                        <span class="badge bg-light text-muted border">Not Marked</span>
+                                        <span class="badge bg-light text-muted border">0/{{ reg.event.total_sessions_count }} Sessions</span>
                                     {% endif %}
                                 </td>
                                 <td class="text-end">
                                     <div class="btn-group btn-group-sm">
-                                        {% if reg.is_confirmed %}
-                                            <a href="{{ url_for('student.ticket', code=reg.registration_code) }}" class="btn btn-outline-primary" title="View Ticket & QR">
-                                                <i class="bi bi-qr-code me-1"></i> Pass
+                                        {% if reg.is_confirmed and reg.is_paid and not reg.event.is_completed %}
+                                            <a href="{{ url_for('student.ticket', code=reg.registration_code) }}" class="btn btn-primary" title="View Ticket & QR Pass">
+                                                <i class="bi bi-qr-code me-1"></i> Active Pass
+                                            </a>
+                                        {% elif reg.is_confirmed and reg.is_paid and reg.event.is_completed %}
+                                            <a href="{{ url_for('student.ticket', code=reg.registration_code) }}" class="btn btn-outline-secondary" title="View Archived Pass">
+                                                <i class="bi bi-card-checklist me-1"></i> Pass
+                                            </a>
+                                        {% elif not reg.is_paid and not reg.event.is_completed %}
+                                            <a href="{{ url_for('payment.checkout', registration_id=reg.id) }}" class="btn btn-outline-warning text-dark fw-bold" title="Payment Proof">
+                                                <i class="bi bi-credit-card me-1"></i> Complete Payment
                                             </a>
                                         {% endif %}
                                         {% if reg.certificate %}
                                             <a href="{{ url_for('static', filename=reg.certificate.certificate_image) }}" class="btn btn-outline-warning text-dark" download title="Download Certificate">
-                                                <i class="bi bi-award me-1"></i> Cert
+                                                <i class="bi bi-award me-1"></i> Certificate
                                             </a>
                                         {% endif %}
                                     </div>
@@ -90,9 +142,18 @@
     {% else %}
         <div class="text-center py-5 ff-card p-5">
             <i class="bi bi-calendar-x text-muted fs-1 mb-3"></i>
-            <h5 class="fw-bold">No event registrations found</h5>
-            <p class="text-muted">You haven't registered for any events yet. Check out the latest campus events!</p>
-            <a href="{{ url_for('public.events') }}" class="btn btn-primary">Browse Events</a>
+            {% if current_tab == 'active' %}
+                <h5 class="fw-bold">No active event registrations</h5>
+                <p class="text-muted">You have no upcoming event tickets. Browse latest events to join!</p>
+                <a href="{{ url_for('public.events') }}" class="btn btn-primary">Browse Events</a>
+            {% elif current_tab in ('completed', 'history') %}
+                <h5 class="fw-bold">No completed events history</h5>
+                <p class="text-muted">You have not attended any completed events yet.</p>
+            {% else %}
+                <h5 class="fw-bold">No event registrations found</h5>
+                <p class="text-muted">You haven't registered for any events yet.</p>
+                <a href="{{ url_for('public.events') }}" class="btn btn-primary">Browse Events</a>
+            {% endif %}
         </div>
     {% endif %}
 </div>

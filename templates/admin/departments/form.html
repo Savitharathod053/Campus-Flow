@@ -1,0 +1,72 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}{% if dept %}Edit Department - {{ dept.code }}{% else %}Add Department{% endif %} - Super Admin{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex align-items-center justify-content-between pb-3 mb-4 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-1">
+            <i class="bi bi-diagram-3-fill text-primary me-2"></i> {% if dept %}Edit Department: {{ dept.code }}{% else %}Add New Department{% endif %}
+        </h3>
+        <p class="text-muted small mb-0">Define academic branch code, full official title, and assign Head of Department.</p>
+    </div>
+    <a href="{{ url_for('admin.departments_list') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Back to Departments
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-3 bg-white p-4 p-md-5">
+            <form action="{% if dept %}{{ url_for('admin.department_edit', dept_id=dept.id) }}{% else %}{{ url_for('admin.department_add') }}{% endif %}" method="POST">
+                <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold">Department Code *</label>
+                        <input type="text" name="code" class="form-control text-uppercase font-monospace" placeholder="e.g. CSD" value="{{ dept.code if dept else '' }}" required {% if dept %}readonly disabled{% endif %}>
+                        <div class="form-text small">Unique canonical branch code (e.g. CSE, IT, CSD).</div>
+                    </div>
+                    <div class="col-md-8">
+                        <label class="form-label small fw-bold">Full Department Name *</label>
+                        <input type="text" name="name" class="form-control" placeholder="e.g. Computer Science and Engineering in Data Science" value="{{ dept.name if dept else '' }}" required>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Assign Head of Department (HOD)</label>
+                    <select name="hod_id" class="form-select">
+                        <option value="">-- No HOD Assigned --</option>
+                        {% for h in eligible_hods %}
+                            <option value="{{ h.id }}" {% if dept and dept.hod_id == h.id %}selected{% endif %}>
+                                {{ h.name }} ({{ h.email }}) &bull; {{ h.faculty_profile.department if h.faculty_profile else h.role }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text small">Only users with Faculty/HOD roles are listed.</div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label small fw-bold">Department Overview / Description</label>
+                    <textarea name="description" class="form-control" rows="3" placeholder="Brief description of the department's academic scope...">{{ dept.description if dept else '' }}</textarea>
+                </div>
+
+                {% if dept %}
+                    <div class="mb-4 p-3 bg-light rounded border">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="deptActiveSwitch" {% if dept.is_active %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="deptActiveSwitch">Department Active Status</label>
+                        </div>
+                        <div class="form-text small">Inactive departments will not appear in new student registrations or event filters.</div>
+                    </div>
+                {% endif %}
+
+                <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                    <a href="{{ url_for('admin.departments_list') }}" class="btn btn-light">Cancel</a>
+                    <button type="submit" class="btn btn-primary fw-bold px-4">
+                        <i class="bi bi-check-lg me-1"></i> {% if dept %}Save Changes{% else %}Create Department{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -53,16 +53,26 @@ class Certificate(db.Model):
         # Compatibility property
         return self.file_path
 
+    @certificate_image.setter
+    def certificate_image(self, val):
+        self.file_path = val
+        if not self.original_filename and val:
+            self.original_filename = val.split('/')[-1].split('\\')[-1]
+
     @property
     def issued_at(self):
         # Compatibility property
         return self.upload_date
 
+    @issued_at.setter
+    def issued_at(self, val):
+        self.upload_date = val
+
     @staticmethod
     def generate_certificate_code(event_id, student_id=None):
         random_hash = uuid.uuid4().hex[:10].upper()
         s_part = f"-S{student_id}" if student_id else ""
-        return f"CERT-FF-{datetime.utcnow().year}-E{event_id}{s_part}-{random_hash}"
+        return f"CERT-CF-{datetime.utcnow().year}-E{event_id}{s_part}-{random_hash}"
 
     def __repr__(self):
         return f'<Certificate {self.certificate_code} ({self.status}) for Roll:{self.roll_number}>'

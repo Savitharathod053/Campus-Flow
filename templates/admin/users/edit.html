@@ -1,0 +1,171 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Edit User - {{ target_user.name }}{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex align-items-center justify-content-between pb-3 mb-4 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-1">
+            <i class="bi bi-pencil-square text-primary me-2"></i> Edit User Profile: {{ target_user.name }}
+        </h3>
+        <p class="text-muted small mb-0">Modify user identification, departmental affiliation, status, and system role.</p>
+    </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('admin.user_detail', user_id=target_user.id) }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-eye me-1"></i> View Profile
+        </a>
+        <a href="{{ url_for('admin.users_list') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> User Directory
+        </a>
+    </div>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm rounded-3 bg-white p-4 p-md-5">
+            <form action="{{ url_for('admin.user_edit', user_id=target_user.id) }}" method="POST">
+                <!-- Status & Role Banner -->
+                <div class="row g-3 mb-4 p-3 bg-light rounded-3 border align-items-center">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold text-dark">System Role</label>
+                        <select name="role" class="form-select fw-semibold">
+                            <option value="STUDENT" {% if target_user.role == 'STUDENT' %}selected{% endif %}>Student</option>
+                            <option value="FACULTY" {% if target_user.role == 'FACULTY' %}selected{% endif %}>Faculty</option>
+                            <option value="HOD" {% if target_user.role == 'HOD' %}selected{% endif %}>HOD</option>
+                            <option value="ORGANIZER" {% if target_user.role == 'ORGANIZER' %}selected{% endif %}>Organizer</option>
+                            <option value="FACULTY_ADMIN" {% if target_user.role == 'FACULTY_ADMIN' %}selected{% endif %}>Faculty Admin</option>
+                            <option value="SUPER_ADMIN" {% if target_user.role == 'SUPER_ADMIN' %}selected{% endif %}>Super Admin</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold text-dark">Account Status</label>
+                        <div class="form-check form-switch mt-2">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="isActiveSwitch" {% if target_user.is_active %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="isActiveSwitch">
+                                {% if target_user.is_active %}Active & Allowed Access{% else %}Inactive / Suspended{% endif %}
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Basic Profile Information -->
+                <h6 class="fw-bold text-secondary text-uppercase small mb-3 tracking-wide"><i class="bi bi-person me-1"></i> Identity Details</h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Full Name *</label>
+                        <input type="text" name="name" class="form-control" value="{{ target_user.name }}" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Email Address *</label>
+                        <input type="email" name="email" class="form-control" value="{{ target_user.email }}" required>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Contact Phone</label>
+                        <input type="text" name="phone" class="form-control" value="{{ target_user.phone or '' }}" placeholder="+91 9876543210">
+                    </div>
+                    <div class="col-md-6 d-flex align-items-end">
+                        <div class="small text-muted p-2 bg-light rounded w-100 border">
+                            <i class="bi bi-shield-lock me-1"></i> Passwords are encrypted. To set a new password, use the <a href="{{ url_for('admin.user_detail', user_id=target_user.id) }}" class="fw-bold">Reset Password</a> button.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Student Profile Attributes -->
+                {% if target_user.student_profile %}
+                    <div class="mb-4 p-3 bg-light rounded-3 border">
+                        <h6 class="fw-bold text-info text-uppercase small mb-3"><i class="bi bi-mortarboard me-1"></i> Student Academic Details</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Roll Number / USN</label>
+                                <input type="text" name="roll_number" class="form-control" value="{{ target_user.student_profile.roll_number }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Department</label>
+                                <select name="department" class="form-select">
+                                    {% for d in departments %}
+                                        <option value="{{ d.code }}" {% if target_user.student_profile.department == d.code %}selected{% endif %}>{{ d.code }} - {{ d.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Year</label>
+                                <select name="year" class="form-select">
+                                    <option value="1" {% if target_user.student_profile.year == 1 %}selected{% endif %}>1st Year</option>
+                                    <option value="2" {% if target_user.student_profile.year == 2 %}selected{% endif %}>2nd Year</option>
+                                    <option value="3" {% if target_user.student_profile.year == 3 %}selected{% endif %}>3rd Year</option>
+                                    <option value="4" {% if target_user.student_profile.year == 4 %}selected{% endif %}>4th Year</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Section</label>
+                                <input type="text" name="section" class="form-control" value="{{ target_user.student_profile.section }}">
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <!-- Faculty Profile Attributes -->
+                {% if target_user.faculty_profile %}
+                    <div class="mb-4 p-3 bg-light rounded-3 border">
+                        <h6 class="fw-bold text-success text-uppercase small mb-3"><i class="bi bi-person-badge me-1"></i> Faculty & Designation Details</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Employee ID</label>
+                                <input type="text" name="employee_id" class="form-control" value="{{ target_user.faculty_profile.employee_id }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Department</label>
+                                <select name="department" class="form-select">
+                                    {% for d in departments %}
+                                        <option value="{{ d.code }}" {% if target_user.faculty_profile.department == d.code %}selected{% endif %}>{{ d.code }} - {{ d.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row g-3">
+                            <div class="col-12">
+                                <label class="form-label small fw-bold">Designation</label>
+                                <input type="text" name="designation" class="form-control" value="{{ target_user.faculty_profile.designation }}">
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <!-- Organizer Profile Attributes -->
+                {% if target_user.organizer_profile %}
+                    <div class="mb-4 p-3 bg-light rounded-3 border">
+                        <h6 class="fw-bold text-primary text-uppercase small mb-3"><i class="bi bi-megaphone me-1"></i> Organizer Details</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Club / Organization Name</label>
+                                <input type="text" name="organization_name" class="form-control" value="{{ target_user.organizer_profile.organization_name }}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Department</label>
+                                <select name="department" class="form-select">
+                                    <option value="General" {% if target_user.organizer_profile.department == 'General' %}selected{% endif %}>General</option>
+                                    {% for d in departments %}
+                                        <option value="{{ d.code }}" {% if target_user.organizer_profile.department == d.code %}selected{% endif %}>{{ d.code }} - {{ d.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                    <a href="{{ url_for('admin.users_list') }}" class="btn btn-light">Cancel</a>
+                    <button type="submit" class="btn btn-primary fw-bold px-4">
+                        <i class="bi bi-check-lg me-1"></i> Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,100 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Department Management - Super Admin{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between pb-3 mb-4 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-1">
+            <i class="bi bi-diagram-3-fill text-primary me-2"></i> Academic Department Management
+        </h3>
+        <p class="text-muted small mb-0">Configure engineering branches, assign departmental HODs, and monitor student/faculty distribution.</p>
+    </div>
+    <a href="{{ url_for('admin.department_add') }}" class="btn btn-primary btn-sm fw-bold mt-3 mt-md-0">
+        <i class="bi bi-plus-circle me-1"></i> Add Department
+    </a>
+</div>
+
+<div class="card border-0 shadow-sm rounded-3 bg-white overflow-hidden">
+    <div class="table-responsive">
+        <table class="table align-middle table-hover mb-0">
+            <thead class="table-light small text-uppercase text-secondary" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                <tr>
+                    <th class="ps-4">Code</th>
+                    <th>Department Name</th>
+                    <th>Assigned HOD</th>
+                    <th>Students</th>
+                    <th>Faculty</th>
+                    <th>Events</th>
+                    <th>Status</th>
+                    <th class="text-end pe-4">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="small">
+                {% for item in dept_stats %}
+                    {% set d = item.dept %}
+                    <tr>
+                        <td class="ps-4">
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace px-2 py-1 fs-6">
+                                {{ d.code }}
+                            </span>
+                        </td>
+                        <td>
+                            <a href="{{ url_for('admin.department_detail', dept_id=d.id) }}" class="fw-bold text-dark text-decoration-none">
+                                {{ d.name }}
+                            </a>
+                            {% if d.description %}
+                                <div class="text-muted" style="font-size: 0.75rem;">{{ d.description|truncate(50) }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if d.hod %}
+                                <div class="fw-semibold text-dark">{{ d.hod.name }}</div>
+                                <div class="text-muted" style="font-size: 0.75rem;">{{ d.hod.email }}</div>
+                            {% else %}
+                                <span class="badge bg-warning text-dark"><i class="bi bi-exclamation-triangle me-1"></i> Unassigned</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="fw-semibold">{{ item.students_count }}</span>
+                            <span class="text-muted" style="font-size: 0.75rem;">enrolled</span>
+                        </td>
+                        <td>
+                            <span class="fw-semibold">{{ item.faculty_count }}</span>
+                            <span class="text-muted" style="font-size: 0.75rem;">members</span>
+                        </td>
+                        <td>
+                            <span class="fw-semibold">{{ item.events_count }}</span>
+                            <span class="text-muted" style="font-size: 0.75rem;">organized</span>
+                        </td>
+                        <td>
+                            {% if d.is_active %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1">Deactivated</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-4">
+                            <div class="d-flex justify-content-end gap-1">
+                                <a href="{{ url_for('admin.department_detail', dept_id=d.id) }}" class="btn btn-xs btn-outline-secondary btn-sm py-1 px-2" title="View Detail">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{{ url_for('admin.department_edit', dept_id=d.id) }}" class="btn btn-xs btn-outline-primary btn-sm py-1 px-2" title="Edit Department">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <form action="{{ url_for('admin.department_toggle_status', dept_id=d.id) }}" method="POST" class="d-inline">
+                                    <button type="submit" class="btn btn-xs btn-sm py-1 px-2 {% if d.is_active %}btn-outline-warning{% else %}btn-outline-success{% endif %}" title="{% if d.is_active %}Deactivate{% else %}Activate{% endif %}">
+                                        <i class="bi {% if d.is_active %}bi-slash-circle{% else %}bi-check-circle{% endif %}"></i>
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="8" class="text-center py-5 text-muted">No departments registered in the database.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

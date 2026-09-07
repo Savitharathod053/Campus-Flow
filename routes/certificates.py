@@ -5,7 +5,7 @@ cert_bp = Blueprint('certificates', __name__, url_prefix='/certificate')
 
 @cert_bp.route('/verify/<certificate_code>')
 def verify(certificate_code):
-    clean_code = certificate_code.replace('FASTFEST-CERT-VERIFY:', '').strip()
+    clean_code = certificate_code.replace('CAMPUSFLOW-CERT-VERIFY:', '').replace('FASTFEST-CERT-VERIFY:', '').strip()
     cert = Certificate.query.filter_by(certificate_code=clean_code).first()
 
     if not cert:

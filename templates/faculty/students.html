@@ -1,0 +1,103 @@
+{% extends 'base.html' %}
+
+{% block title %}Department Students - Faculty Portal{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Breadcrumb & Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1 small">
+                    <li class="breadcrumb-item"><a href="{{ url_for('faculty.dashboard') }}">Faculty Portal</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Department Students</li>
+                </ol>
+            </nav>
+            <h2 class="fw-bold text-dark mb-0">Students Directory &bull; {{ dept }}</h2>
+            <p class="text-muted small mb-0">{{ students|length }} enrolled student profile(s) found</p>
+        </div>
+        <a href="{{ url_for('faculty.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Filters & Search -->
+    <div class="card border-0 shadow-sm rounded-3 p-3 mb-4 bg-white">
+        <form method="GET" action="{{ url_for('faculty.students') }}" class="row g-2 align-items-center">
+            <div class="col-md-7">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+                    <input type="text" name="q" value="{{ search }}" class="form-control border-start-0" placeholder="Search by student name, roll number, email...">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select name="year" class="form-select">
+                    <option value="ALL">All Academic Years</option>
+                    <option value="1" {% if year_filter == '1' %}selected{% endif %}>Year 1</option>
+                    <option value="2" {% if year_filter == '2' %}selected{% endif %}>Year 2</option>
+                    <option value="3" {% if year_filter == '3' %}selected{% endif %}>Year 3</option>
+                    <option value="4" {% if year_filter == '4' %}selected{% endif %}>Year 4</option>
+                </select>
+            </div>
+            <div class="col-md-2 d-flex gap-1">
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-filter"></i> Search</button>
+                {% if search or year_filter %}
+                    <a href="{{ url_for('faculty.students') }}" class="btn btn-light"><i class="bi bi-x-circle"></i></a>
+                {% endif %}
+            </div>
+        </form>
+    </div>
+
+    <!-- Students Roster Table -->
+    <div class="card border-0 shadow-sm rounded-3">
+        <div class="card-body p-0">
+            {% if students %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light small text-uppercase">
+                            <tr>
+                                <th class="ps-3">Roll Number</th>
+                                <th>Student Name</th>
+                                <th>Year & Section</th>
+                                <th>Email</th>
+                                <th>Phone</th>
+                                <th class="text-center">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for s in students %}
+                                <tr>
+                                    <td class="ps-3">
+                                        <span class="badge bg-light text-dark border font-monospace">{{ s.roll_number }}</span>
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold text-dark">{{ s.user.name if s.user else 'Unknown' }}</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info-subtle text-info border border-info-subtle">Year {{ s.year }} - Sec {{ s.section }}</span>
+                                    </td>
+                                    <td><span class="small text-muted">{{ s.user.email if s.user else 'N/A' }}</span></td>
+                                    <td><span class="small text-muted">{{ s.user.phone if (s.user and s.user.phone) else 'N/A' }}</span></td>
+                                    <td class="text-center">
+                                        {% if s.user and s.user.is_active %}
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-people fs-1 d-block mb-2 text-secondary"></i>
+                    <h6 class="fw-bold text-dark">No Students Found</h6>
+                    <p class="small mb-0">No student records found matching the selected search and year filters.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,5 +1,5 @@
 """
-FastFest - Certificates Table Migration Script
+Campus Flow - Certificates Table Migration Script
 Migrates the certificates table schema to support uploaded certificates,
 OCR extracted roll numbers, file paths, statuses, and manual assignment.
 """
@@ -11,7 +11,7 @@ from sqlalchemy import text
 def run_migration():
     app = create_app()
     with app.app_context():
-        print("Running certificates table migration...")
+        print("Running certificates table migration for Campus Flow...")
         
         # Check database dialect
         engine = db.engine

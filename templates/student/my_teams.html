@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}My Teams & Invitations - Campus Flow{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+                <h2 class="fw-bold mb-1"><i class="bi bi-people-fill me-2"></i> My Teams & Invitations</h2>
+                <p class="text-light opacity-90 mb-0">Manage your group participations, team rosters, and incoming event invites.</p>
+            </div>
+            <a href="{{ url_for('public.events') }}" class="btn btn-warning btn-sm fw-bold">
+                <i class="bi bi-search me-1"></i> Browse Team Events
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Pending Invitations Section -->
+    {% if invitations %}
+        <div class="mb-5">
+            <h4 class="fw-bold mb-3 text-dark">
+                <i class="bi bi-envelope-exclamation-fill text-warning me-2"></i> Pending Team Invitations ({{ invitations|length }})
+            </h4>
+            <div class="row g-3">
+                {% for inv in invitations %}
+                    <div class="col-md-6">
+                        <div class="ff-card p-4 border-warning border-2 shadow-sm h-100 d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="badge bg-warning text-dark fw-bold">{{ inv.event.event_type }}</span>
+                                    <span class="small text-muted"><i class="bi bi-clock"></i> Expires in {{ (inv.expires_at - now).days + 1 }} days</span>
+                                </div>
+                                <h5 class="fw-bold text-dark mb-1">{{ inv.event.title }}</h5>
+                                <div class="mb-3">
+                                    <span class="small text-muted">Team:</span>
+                                    <strong class="text-primary fs-6">{{ inv.team.team_name }}</strong>
+                                </div>
+                                <div class="p-2 bg-light rounded small text-secondary mb-3">
+                                    <div><i class="bi bi-person-badge me-1"></i> Invited by Team Lead: <strong>{{ inv.team.lead.name }}</strong> ({{ inv.team.lead.email }})</div>
+                                    <div><i class="bi bi-geo-alt me-1 text-danger"></i> Venue: {{ inv.event.venue }}</div>
+                                    <div><i class="bi bi-calendar3 me-1 text-primary"></i> Date: {{ inv.event.start_time|datetimeformat }}</div>
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2 border-top pt-3">
+                                <a href="{{ url_for('student.accept_invitation', token=inv.token) }}" class="btn btn-success btn-sm fw-bold flex-grow-1">
+                                    <i class="bi bi-check2-circle me-1"></i> Accept Invitation
+                                </a>
+                                <a href="{{ url_for('student.decline_invitation', token=inv.token) }}" class="btn btn-outline-danger btn-sm fw-bold" onclick="return confirm('Are you sure you want to decline this invitation?');">
+                                    <i class="bi bi-x-circle me-1"></i> Decline
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- My Teams Section -->
+    <div>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h4 class="fw-bold mb-0 text-dark"><i class="bi bi-diagram-3-fill text-primary me-2"></i> My Registered Teams</h4>
+        </div>
+
+        {% if teams %}
+            <div class="row g-4">
+                {% for team in teams %}
+                    <div class="col-md-6 col-lg-4">
+                        <div class="ff-card p-4 h-100 d-flex flex-column justify-content-between shadow-sm">
+                            <div>
+                                <div class="d-flex justify-content-between align-items-start mb-2">
+                                    <span class="badge bg-light text-dark border">{{ team.event.event_type }}</span>
+                                    {% if team.status == 'FULL' %}
+                                        <span class="badge bg-success">FULL ({{ team.total_confirmed_count }}/{{ team.event.max_team_size }})</span>
+                                    {% elif team.status == 'COMPLETE' %}
+                                        <span class="badge bg-primary">COMPLETE ({{ team.total_confirmed_count }}/{{ team.event.max_team_size }})</span>
+                                    {% elif team.status == 'PENDING' %}
+                                        <span class="badge bg-warning text-dark">PENDING ({{ team.total_confirmed_count }}/{{ team.event.min_team_size }} min)</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ team.status }}</span>
+                                    {% endif %}
+                                </div>
+
+                                <h5 class="fw-bold text-dark mb-1">{{ team.team_name }}</h5>
+                                <div class="small text-muted mb-3">{{ team.event.title }}</div>
+
+                                <div class="small mb-3">
+                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                        <span class="text-muted">Your Role:</span>
+                                        <strong>{% if team.team_lead_id == user.id %}<span class="badge bg-primary">Team Lead</span>{% else %}Member{% endif %}</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between py-1 border-bottom">
+                                        <span class="text-muted">Confirmed Members:</span>
+                                        <span class="fw-bold text-dark">{{ team.total_confirmed_count }} / {{ team.event.max_team_size }}</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between py-1">
+                                        <span class="text-muted">Payment:</span>
+                                        {% if team.event.is_free or team.event.team_payment_type == 'FREE' %}
+                                            <span class="text-success fw-bold">FREE</span>
+                                        {% elif team.payment_status in ['PAID', 'SUCCESS'] or team.is_paid %}
+                                            <span class="badge bg-success">PAID</span>
+                                        {% elif team.payment_status in ['PENDING', 'PENDING_PAYMENT'] %}
+                                            <span class="badge bg-warning text-dark">PAYMENT PENDING</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ team.payment_status }}</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex gap-2 border-top pt-3">
+                                <a href="{{ url_for('student.team_detail', team_id=team.id) }}" class="btn btn-primary btn-sm fw-bold flex-grow-1">
+                                    <i class="bi bi-gear me-1"></i> View Team & Roster
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="text-center py-5 ff-card shadow-sm">
+                <i class="bi bi-people text-muted opacity-50 fs-1 d-block mb-3"></i>
+                <h5 class="fw-bold text-secondary mb-2">No Teams Found</h5>
+                <p class="text-muted small mb-4">You are not currently part of any team. Join a hackathon or group competition with your peers!</p>
+                <a href="{{ url_for('public.events') }}" class="btn btn-primary btn-sm fw-bold">
+                    <i class="bi bi-plus-circle me-1"></i> Explore Team Events
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -5,6 +5,9 @@ from .organizer import organizer_bp
 from .admin import admin_bp
 from .payment import payment_bp
 from .certificates import cert_bp
+from .faculty import faculty_bp
+from .hod import hod_bp
+from .dean import dean_bp
 
 __all__ = [
     'auth_bp',
@@ -13,5 +16,8 @@ __all__ = [
     'organizer_bp',
     'admin_bp',
     'payment_bp',
-    'cert_bp'
+    'cert_bp',
+    'faculty_bp',
+    'hod_bp',
+    'dean_bp'
 ]

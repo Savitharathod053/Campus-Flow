@@ -12,7 +12,7 @@ def generate_ticket_qr(registration_code, base_url=""):
     upload_dir.mkdir(parents=True, exist_ok=True)
 
     # QR payload can be scanned by organizer camera
-    qr_payload = f"FASTFEST-TICKET:{registration_code}"
+    qr_payload = f"CAMPUSFLOW-TICKET:{registration_code}"
 
     qr = qrcode.QRCode(
         version=1,

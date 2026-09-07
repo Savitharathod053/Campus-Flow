@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}My Profile - FastFest{% endblock %}
+{% block title %}My Profile - Campus Flow{% endblock %}
 
 {% block content %}
 <div class="container py-5">
@@ -48,7 +48,19 @@
                             </div>
                             <div class="col-md-4">
                                 <label class="form-label small fw-bold">Department</label>
-                                <input type="text" name="department" class="form-control" value="{{ user.student_profile.department }}">
+                                <select name="department" class="form-select">
+                                    <option value="CSE" {% if user.student_profile.department == 'CSE' %}selected{% endif %}>1. Computer Science & Engineering (CSE)</option>
+                                    <option value="IT" {% if user.student_profile.department == 'IT' %}selected{% endif %}>2. Information Technology (IT)</option>
+                                    <option value="CSD" {% if user.student_profile.department == 'CSD' %}selected{% endif %}>3. Computer Science & Engineering (Data Science) [CSD]</option>
+                                    <option value="CSM" {% if user.student_profile.department == 'CSM' %}selected{% endif %}>4. Computer Science & Engineering (AI & ML) [CSM]</option>
+                                    <option value="ECE" {% if user.student_profile.department == 'ECE' %}selected{% endif %}>5. Electronics & Communication (ECE)</option>
+                                    <option value="EEE" {% if user.student_profile.department == 'EEE' %}selected{% endif %}>6. Electrical & Electronics (EEE)</option>
+                                    <option value="MECH" {% if user.student_profile.department == 'MECH' %}selected{% endif %}>7. Mechanical Engineering (MECH)</option>
+                                    <option value="CIVILS" {% if user.student_profile.department in ['CIVILS', 'CIVIL'] %}selected{% endif %}>8. Civil Engineering (CIVILS)</option>
+                                    {% if user.student_profile.department not in ['CSE', 'IT', 'CSD', 'CSM', 'ECE', 'EEE', 'MECH', 'CIVILS', 'CIVIL'] %}
+                                        <option value="{{ user.student_profile.department }}" selected>{{ user.student_profile.department }}</option>
+                                    {% endif %}
+                                </select>
                             </div>
                             <div class="col-md-2 col-6">
                                 <label class="form-label small fw-bold">Year</label>

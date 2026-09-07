@@ -4,8 +4,8 @@ from models import (
     db, User, UserRole, StudentProfile, OrganizerProfile, FacultyProfile,
     Event, EventStatus, EventType, CustomRegistrationField,
     EventRegistration, RegistrationStatus, CustomFieldResponse,
-    Payment, PaymentStatus, AttendanceRecord, VerificationMethod,
-    Announcement, Certificate
+    Payment, PaymentStatus, FraudRisk, AttendanceRecord, VerificationMethod,
+    Announcement, Certificate, CollegeDepartment, TargetAudience, AuditLog
 )
 from services.qr_service import generate_ticket_qr
 from services.cert_service import generate_certificate_image
@@ -18,9 +18,29 @@ def seed_database():
         db.create_all()
 
         # ----------------------------------------------------
-        # 1. CREATE FACULTY ADMINS FOR DIFFERENT DEPARTMENTS
+        # 1. CREATE SUPER ADMIN & FACULTY ADMINS
         # ----------------------------------------------------
-        # Central Dean / Super Admin
+        # Dedicated Super Admin
+        super_admin_user = User(
+            name="Chief Super Administrator",
+            email="superadmin@college.edu",
+            phone="+91 9840001122",
+            role=UserRole.SUPER_ADMIN,
+            is_active=True
+        )
+        super_admin_user.set_password("Admin@123")
+        db.session.add(super_admin_user)
+        db.session.flush()
+
+        fp_super = FacultyProfile(
+            user_id=super_admin_user.id,
+            employee_id="SUPER-ADMIN-01",
+            department="General",
+            designation="Chief Super Administrator"
+        )
+        db.session.add(fp_super)
+
+        # Central Dean
         admin_dean = User(
             name="Dr. S. K. Narayanan",
             email="admin@college.edu",
@@ -43,9 +63,13 @@ def seed_database():
         # Department Admins
         dept_admins_data = [
             ("Dr. K. Ramanathan", "admin.cse@college.edu", "FAC-CSE-101", "CSE", "Head of Dept & Faculty Admin (CSE)", "+91 9840112244"),
-            ("Dr. H. V. Venkatesh", "admin.ece@college.edu", "FAC-ECE-102", "ECE", "Professor & Faculty Admin (ECE)", "+91 9840112255"),
-            ("Prof. Meenakshi Sundaram", "admin.it@college.edu", "FAC-IT-103", "IT", "Associate Professor & Faculty Admin (IT)", "+91 9840112266"),
-            ("Dr. R. Ramesh", "admin.mech@college.edu", "FAC-MECH-104", "MECH", "Professor & Faculty Admin (MECH)", "+91 9840112277")
+            ("Prof. Meenakshi Sundaram", "admin.it@college.edu", "FAC-IT-102", "IT", "Associate Professor & Faculty Admin (IT)", "+91 9840112266"),
+            ("Dr. Ananya Roy", "admin.csd@college.edu", "FAC-CSD-103", "CSD", "Associate Professor & Faculty Admin (CSD)", "+91 9840112288"),
+            ("Dr. Arvind Swaminathan", "admin.csm@college.edu", "FAC-CSM-104", "CSM", "Professor & Faculty Admin (CSM)", "+91 9840112299"),
+            ("Dr. H. V. Venkatesh", "admin.ece@college.edu", "FAC-ECE-105", "ECE", "Professor & Faculty Admin (ECE)", "+91 9840112255"),
+            ("Dr. S. Radhakrishnan", "admin.eee@college.edu", "FAC-EEE-106", "EEE", "Professor & Faculty Admin (EEE)", "+91 9840112233"),
+            ("Dr. R. Ramesh", "admin.mech@college.edu", "FAC-MECH-107", "MECH", "Professor & Faculty Admin (MECH)", "+91 9840112277"),
+            ("Dr. N. Murugan", "admin.civils@college.edu", "FAC-CIV-108", "CIVILS", "Professor & Faculty Admin (CIVILS)", "+91 9840112222")
         ]
 
         for name, email, empid, dept, desig, phone in dept_admins_data:
@@ -149,7 +173,11 @@ def seed_database():
             ("Ananya Rao", "student2@college.edu", "1MS22EC012", "ECE", 2, "B", "+91 9123456702"),
             ("Vikram Aditya", "student3@college.edu", "1MS20IT088", "IT", 4, "A", "+91 9123456703"),
             ("Sneha Kulkarni", "student4@college.edu", "1MS23ME034", "MECH", 1, "C", "+91 9123456704"),
-            ("Karthik Sundaram", "student5@college.edu", "1MS21CS099", "CSE", 3, "B", "+91 9123456705")
+            ("Karthik Sundaram", "student5@college.edu", "1MS21CS099", "CSE", 3, "B", "+91 9123456705"),
+            ("Divya Sree", "student6@college.edu", "1MS22CD015", "CSD", 2, "A", "+91 9123456706"),
+            ("Rohit Verma", "student7@college.edu", "1MS22CM042", "CSM", 2, "A", "+91 9123456707"),
+            ("Pooja Nair", "student8@college.edu", "1MS21EE028", "EEE", 3, "B", "+91 9123456708"),
+            ("Manoj Kumar", "student9@college.edu", "1MS21CV019", "CIVILS", 3, "A", "+91 9123456709")
         ]
 
         student_objs = []
@@ -185,8 +213,8 @@ def seed_database():
 
         # Event 1: National Hackathon (Active, Approved, Paid)
         event1 = Event(
-            title="FastFest CodeStorm 24-Hour Hackathon 2026",
-            slug=Event.generate_slug("FastFest CodeStorm 24-Hour Hackathon 2026"),
+            title="Campus Flow CodeStorm 24-Hour Hackathon 2026",
+            slug=Event.generate_slug("Campus Flow CodeStorm 24-Hour Hackathon 2026"),
             organizer_id=org_user1.id,
             event_type=EventType.HACKATHON,
             department="Computer Science & Engineering",
@@ -364,13 +392,19 @@ Every participant will build and test a live modular backend from scratch.""",
 
         pay1 = Payment(
             registration_id=reg1.id,
+            event_id=event1.id,
+            student_id=student_objs[0].id,
+            organizer_id=org_user1.id,
             amount=250.0,
+            expected_amount=250.0,
+            detected_amount=250.0,
             currency="INR",
-            razorpay_order_id=f"order_seed_{reg1.id}",
-            razorpay_payment_id=f"pay_seed_{reg1.id}",
-            razorpay_signature="seed_signature_valid",
-            status=PaymentStatus.SUCCESS,
-            payment_method="UPI_GPAY"
+            transaction_id=f"TXN_SEED_{reg1.id}",
+            status=PaymentStatus.VERIFIED,
+            payment_method="UPI_DIRECT",
+            fraud_risk=FraudRisk.LOW,
+            verified_at=now - timedelta(days=2),
+            verified_by_id=org_user1.id
         )
         db.session.add(pay1)
 
@@ -515,15 +549,20 @@ Every participant will build and test a live modular backend from scratch.""",
         print("Database successfully seeded with realistic sample data!")
         print("\nDEMO CREDENTIALS:")
         print("--------------------------------------------------------------------------------")
+        print("Super Admin (Full Access): superadmin@college.edu   / Admin@123")
         print("Student 1:                 student1@college.edu     / Pass@123")
         print("Student 2:                 student2@college.edu     / Pass@123")
         print("Approved Organizer (CSE):  organizer@college.edu    / Pass@123")
         print("Pending Organizer (IT):    cloud.club@college.edu   / Pass@123 (Awaiting Approval)")
         print("Central Dean / Admin:      admin@college.edu        / Pass@123")
         print("CSE Faculty Admin:         admin.cse@college.edu    / Pass@123")
-        print("ECE Faculty Admin:         admin.ece@college.edu    / Pass@123")
         print("IT Faculty Admin:          admin.it@college.edu     / Pass@123")
+        print("CSD Faculty Admin:         admin.csd@college.edu    / Pass@123")
+        print("CSM Faculty Admin:         admin.csm@college.edu    / Pass@123")
+        print("ECE Faculty Admin:         admin.ece@college.edu    / Pass@123")
+        print("EEE Faculty Admin:         admin.eee@college.edu    / Pass@123")
         print("MECH Faculty Admin:        admin.mech@college.edu   / Pass@123")
+        print("CIVILS Faculty Admin:      admin.civils@college.edu / Pass@123")
         print("--------------------------------------------------------------------------------")
 
 if __name__ == '__main__':

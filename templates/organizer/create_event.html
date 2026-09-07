@@ -1,17 +1,30 @@
 {% extends "base.html" %}
-{% block title %}Create Event - FastFest{% endblock %}
+{% block title %}Create Event - Campus Flow{% endblock %}
 
 {% block content %}
 <div class="bg-primary text-white py-4 mb-4">
     <div class="container">
-        <h2 class="fw-bold mb-1"><i class="bi bi-calendar-plus me-2"></i> Create Campus Event</h2>
-        <p class="text-light opacity-90 mb-0">Fill in the event details for faculty review and student registrations.</p>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge bg-warning text-dark fw-bold px-3 py-1">
+                <i class="bi bi-shield-check me-1"></i> Two-Stage Institutional Approval
+            </span>
+        </div>
+        <h2 class="fw-bold mb-1"><i class="bi bi-calendar-plus me-2"></i> Create Campus Event — Submit Proposal</h2>
+        <p class="text-light opacity-90 mb-0">Event proposals require initial endorsement from your Department HOD followed by institutional clearance from the Students Affairs Dean.</p>
     </div>
 </div>
 
 <div class="container pb-5">
     <div class="row justify-content-center">
         <div class="col-lg-9">
+            <!-- Approval Pipeline Notice -->
+            <div class="alert alert-info border-0 shadow-sm rounded-3 mb-4 d-flex align-items-center gap-3">
+                <i class="bi bi-info-circle-fill fs-3 text-info"></i>
+                <div class="small">
+                    <strong>Dual Approval Workflow:</strong> Your event will be automatically routed to the <strong>{{ dept_obj.name }} ({{ dept_obj.code }})</strong> Head of Department for review. Upon HOD endorsement, it moves to the <strong>Students Affairs Dean</strong>. Once both approve, the event is automatically published to students.
+                </div>
+            </div>
+
             <div class="ff-card p-4 p-sm-5 shadow-sm">
                 <form method="POST" action="{{ url_for('organizer.create_event') }}" enctype="multipart/form-data">
                     <h5 class="fw-bold mb-3 text-secondary"><i class="bi bi-info-circle me-2"></i> Basic Event Information</h5>
@@ -32,8 +45,10 @@
 
                     <div class="row g-3 mb-3">
                         <div class="col-md-6">
-                            <label class="form-label small fw-bold">Organizing Department *</label>
-                            <input type="text" name="department" class="form-control" placeholder="e.g. Department of Computer Science & Engineering" required>
+                            <label class="form-label small fw-bold">Organizing Department * <span class="text-muted fw-normal">(Locked to your department)</span></label>
+                            <input type="text" name="department_display" class="form-control bg-light" value="{{ dept_obj.name }} ({{ dept_obj.code }})" readonly>
+                            <input type="hidden" name="department" value="{{ dept_obj.code }}">
+                            <div class="form-text small">Proposals are automatically submitted under your department.</div>
                         </div>
                         <div class="col-md-6">
                             <label class="form-label small fw-bold">Venue / Room *</label>
@@ -81,9 +96,81 @@
                                 <label class="form-check-label fw-semibold" for="is_free">Free Event</label>
                             </div>
                         </div>
-                        <div class="col-md-4" id="fee_input_group" style="display: none;">
-                            <label class="form-label small fw-bold">Registration Fee (INR ₹)</label>
-                            <input type="number" step="1" name="registration_fee" id="registration_fee" class="form-control" placeholder="e.g. 150">
+                        </div>
+                    </div>
+
+                    <!-- Paid Event - Organizer Payment Setup -->
+                    <div id="fee_input_group" style="display: none;" class="p-3 bg-light rounded border mb-4">
+                        <h6 class="fw-bold text-dark mb-3"><i class="bi bi-wallet2 text-primary me-2"></i> Organizer Direct Payment Configuration</h6>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Event Registration Fee (INR ₹) *</label>
+                                <input type="number" step="1" name="registration_fee" id="registration_fee" class="form-control" placeholder="e.g. 500">
+                                <div class="form-text small">Expected fee per participant.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Option B: UPI Mobile Number</label>
+                                <input type="text" name="upi_number" id="upi_number" class="form-control" placeholder="e.g. 9876543210">
+                                <div class="form-text small">Mobile number linked to UPI account.</div>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Option C: UPI ID</label>
+                                <input type="text" name="upi_id" id="upi_id" class="form-control" placeholder="e.g. organizer@upi">
+                                <div class="form-text small">Virtual Payment Address (VPA).</div>
+                            </div>
+                        </div>
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Option A: UPI QR Code Image</label>
+                                <input type="file" name="upi_qr" id="upi_qr" class="form-control" accept="image/*">
+                                <div class="form-text small">Upload your UPI QR code image for participants to scan and pay directly.</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label small fw-bold">Payment Instructions for Students</label>
+                                <textarea name="payment_instructions" id="payment_instructions" class="form-control" rows="2" placeholder="e.g. Pay ₹500 via GPay/PhonePe to UPI ID or scan QR and attach screenshot proof."></textarea>
+                            </div>
+                        </div>
+                        <div class="alert alert-secondary small mb-0 border-0">
+                            <i class="bi bi-shield-lock-fill text-primary me-1"></i>
+                            <strong>Security Guarantee:</strong> Campus Flow will never ask for your UPI PIN, bank password, OTP, ATM PIN, or internet banking credentials. Campus Flow never accesses or stores confidential credentials.
+                        </div>
+                    </div>
+
+                    <h5 class="fw-bold mb-3 text-secondary border-top pt-4"><i class="bi bi-diagram-3 me-2"></i> Team / Group Registration Settings</h5>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Registration Format *</label>
+                            <select name="registration_type" id="registration_type" class="form-select">
+                                <option value="INDIVIDUAL" selected>Individual Registration</option>
+                                <option value="TEAM">Team / Group Registration</option>
+                                <option value="BOTH">Both (Individual & Team)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4 team-config-field" style="display: none;">
+                            <label class="form-label small fw-bold">Min Team Size</label>
+                            <input type="number" name="min_team_size" id="min_team_size" class="form-control" value="2" min="1">
+                        </div>
+                        <div class="col-md-4 team-config-field" style="display: none;">
+                            <label class="form-label small fw-bold">Max Team Size</label>
+                            <input type="number" name="max_team_size" id="max_team_size" class="form-control" value="4" min="1">
+                        </div>
+                    </div>
+                    <div class="row g-3 mb-4 team-config-field" style="display: none;">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Team Payment Model</label>
+                            <select name="team_payment_type" class="form-select">
+                                <option value="FREE" selected>Option A — Free (No fee)</option>
+                                <option value="PER_PERSON">Option B — Per Person (Each member pays)</option>
+                                <option value="PER_TEAM">Option C — Per Team (Team Lead pays full fee)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 d-flex align-items-center mt-4">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" name="require_full_team" id="require_full_team">
+                                <label class="form-check-label small fw-semibold" for="require_full_team">
+                                    Require Completely Filled Team (must reach Max Team Size)
+                                </label>
+                            </div>
                         </div>
                     </div>
 
@@ -103,6 +190,61 @@
                             <label class="form-label small fw-bold">Allowed Sections</label>
                             <input type="text" name="allowed_sections" class="form-control" value="ALL" placeholder="ALL or A,B,C">
                             <div class="form-text small">Enter 'ALL' or comma-separated sections.</div>
+                        </div>
+                    </div>
+
+                    <h5 class="fw-bold mb-3 text-secondary border-top pt-4"><i class="bi bi-qr-code-scan me-2"></i> Attendance & Session Configuration</h5>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <div class="form-check form-switch mt-2">
+                                <input class="form-check-input" type="checkbox" name="enable_attendance" id="enable_attendance" checked>
+                                <label class="form-check-label fw-semibold" for="enable_attendance">Enable QR Attendance Scanning</label>
+                            </div>
+                            <div class="form-text small">Scan tickets at one or multiple checkpoints during the event.</div>
+                        </div>
+                        <div class="col-md-6" id="min_att_group">
+                            <label class="form-label small fw-bold">Minimum Attendance Required (%)</label>
+                            <input type="number" step="1" min="0" max="100" name="min_attendance_percentage" class="form-control" value="0" placeholder="e.g. 75">
+                            <div class="form-text small">Set 0 for no minimum percentage, or 75 for 75% required attendance.</div>
+                        </div>
+                    </div>
+
+                    <!-- Dynamic Sessions Table / Container -->
+                    <div id="attendance_sessions_container" class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label small fw-bold mb-0">Attendance Checkpoint Sessions</label>
+                            <button type="button" id="addSessionBtn" class="btn btn-outline-primary btn-sm fw-bold">
+                                <i class="bi bi-plus-circle me-1"></i> Add Session Checkpoint
+                            </button>
+                        </div>
+                        <div id="sessionRowsContainer" class="d-flex flex-column gap-2">
+                            <!-- Pre-filled default Session 1 -->
+                            <div class="session-row p-3 bg-light rounded border">
+                                <div class="row g-2 align-items-center">
+                                    <div class="col-md-4">
+                                        <label class="form-label small text-muted mb-0">Session Name *</label>
+                                        <input type="text" name="session_names[]" class="form-control form-control-sm" value="Session 1 - Morning" required>
+                                    </div>
+                                    <div class="col-md-3">
+                                        <label class="form-label small text-muted mb-0">Date</label>
+                                        <input type="date" name="session_dates[]" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-md-2 col-6">
+                                        <label class="form-label small text-muted mb-0">Start Time</label>
+                                        <input type="time" name="session_start_times[]" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-md-2 col-6">
+                                        <label class="form-label small text-muted mb-0">End Time</label>
+                                        <input type="time" name="session_end_times[]" class="form-control form-control-sm">
+                                    </div>
+                                    <div class="col-md-1 text-end">
+                                        <label class="form-label small text-muted mb-0 d-none d-md-block">&nbsp;</label>
+                                        <button type="button" class="btn btn-outline-danger btn-sm remove-session-btn" title="Remove Session" disabled>
+                                            <i class="bi bi-trash3"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -143,4 +285,93 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const isFreeCheckbox = document.getElementById('is_free');
+    const feeGroup = document.getElementById('fee_input_group');
+    const regTypeSelect = document.getElementById('registration_type');
+    const teamFields = document.querySelectorAll('.team-config-field');
+    const enableAttCheckbox = document.getElementById('enable_attendance');
+    const sessionsContainer = document.getElementById('attendance_sessions_container');
+    const minAttGroup = document.getElementById('min_att_group');
+    const sessionRowsContainer = document.getElementById('sessionRowsContainer');
+    const addSessionBtn = document.getElementById('addSessionBtn');
+
+    if (isFreeCheckbox && feeGroup) {
+        isFreeCheckbox.addEventListener('change', function() {
+            feeGroup.style.display = this.checked ? 'none' : 'block';
+        });
+    }
+
+    if (regTypeSelect) {
+        function toggleTeamFields() {
+            const isTeam = regTypeSelect.value === 'TEAM' || regTypeSelect.value === 'BOTH';
+            teamFields.forEach(el => el.style.display = isTeam ? '' : 'none');
+        }
+        regTypeSelect.addEventListener('change', toggleTeamFields);
+        toggleTeamFields();
+    }
+
+    if (enableAttCheckbox) {
+        enableAttCheckbox.addEventListener('change', function() {
+            sessionsContainer.style.display = this.checked ? 'block' : 'none';
+            minAttGroup.style.display = this.checked ? 'block' : 'none';
+        });
+    }
+
+    function createSessionRow(index) {
+        const div = document.createElement('div');
+        div.className = 'session-row p-3 bg-light rounded border';
+        div.innerHTML = `
+            <div class="row g-2 align-items-center">
+                <div class="col-md-4">
+                    <label class="form-label small text-muted mb-0">Session Name *</label>
+                    <input type="text" name="session_names[]" class="form-control form-control-sm" value="Session ${index + 1}" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label small text-muted mb-0">Date</label>
+                    <input type="date" name="session_dates[]" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-2 col-6">
+                    <label class="form-label small text-muted mb-0">Start Time</label>
+                    <input type="time" name="session_start_times[]" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-2 col-6">
+                    <label class="form-label small text-muted mb-0">End Time</label>
+                    <input type="time" name="session_end_times[]" class="form-control form-control-sm">
+                </div>
+                <div class="col-md-1 text-end">
+                    <label class="form-label small text-muted mb-0 d-none d-md-block">&nbsp;</label>
+                    <button type="button" class="btn btn-outline-danger btn-sm remove-session-btn" title="Remove Session">
+                        <i class="bi bi-trash3"></i>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        div.querySelector('.remove-session-btn').addEventListener('click', function() {
+            div.remove();
+            updateRemoveButtons();
+        });
+        return div;
+    }
+
+    function updateRemoveButtons() {
+        const rows = sessionRowsContainer.querySelectorAll('.session-row');
+        rows.forEach((row, i) => {
+            const btn = row.querySelector('.remove-session-btn');
+            btn.disabled = (rows.length === 1);
+        });
+    }
+
+    if (addSessionBtn) {
+        addSessionBtn.addEventListener('click', function() {
+            const count = sessionRowsContainer.querySelectorAll('.session-row').length;
+            sessionRowsContainer.appendChild(createSessionRow(count));
+            updateRemoveButtons();
+        });
+    }
+});
+</script>
 {% endblock %}

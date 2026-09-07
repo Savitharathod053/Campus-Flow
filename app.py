@@ -1,10 +1,15 @@
+import os
 from datetime import datetime
 from pathlib import Path
-from flask import Flask, render_template, session
+from flask import Flask, render_template, session, jsonify
 from flask_migrate import Migrate
 from config import Config
 from models import db, User
-from routes import auth_bp, public_bp, student_bp, organizer_bp, admin_bp, payment_bp, cert_bp
+from routes import (
+    auth_bp, public_bp, student_bp, organizer_bp,
+    admin_bp, payment_bp, cert_bp, faculty_bp, hod_bp, dean_bp
+)
+from services.notification_service import get_unread_count, get_user_notifications, mark_as_read, mark_all_as_read
 
 migrate = Migrate()
 
@@ -34,6 +39,31 @@ def create_app(config_class=Config):
     app.register_blueprint(admin_bp)
     app.register_blueprint(payment_bp)
     app.register_blueprint(cert_bp)
+    app.register_blueprint(faculty_bp)
+    app.register_blueprint(hod_bp)
+    app.register_blueprint(dean_bp)
+
+    # Health Check Endpoint
+    @app.route('/health')
+    def health():
+        return jsonify({"status": "healthy"}), 200
+
+    # Notification API Endpoints
+    @app.route('/notifications/read/<int:notification_id>', methods=['POST'])
+    def read_notification(notification_id):
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        success = mark_as_read(notification_id, user_id=user_id)
+        return jsonify({'success': success})
+
+    @app.route('/notifications/read-all', methods=['POST'])
+    def read_all_notifications():
+        user_id = session.get('user_id')
+        if not user_id:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
+        success = mark_all_as_read(user_id)
+        return jsonify({'success': success})
 
     @app.route('/faculty/dashboard')
     def faculty_dashboard():
@@ -44,13 +74,26 @@ def create_app(config_class=Config):
     @app.context_processor
     def inject_global_vars():
         user = None
+        unread_notifications_count = 0
+        recent_notifications = []
         user_id = session.get('user_id')
         if user_id:
-            user = db.session.get(User, user_id)
+            try:
+                user = db.session.get(User, user_id)
+                if not user:
+                    session.pop('user_id', None)
+                else:
+                    unread_notifications_count = get_unread_count(user.id)
+                    recent_notifications = get_user_notifications(user.id, limit=6)
+            except Exception as e:
+                app.logger.error(f"Database error in inject_global_vars for user_id {user_id}: {e}", exc_info=True)
+                user = None
         return {
             'current_user': user,
+            'unread_notifications_count': unread_notifications_count,
+            'recent_notifications': recent_notifications,
             'now': datetime.utcnow(),
-            'app_name': 'FastFest'
+            'app_name': 'Campus Flow'
         }
 
     # Custom Jinja Filters
@@ -73,6 +116,10 @@ def create_app(config_class=Config):
         return value.strftime(format)
 
     # Error Handlers
+    @app.errorhandler(400)
+    def bad_request_error(error):
+        return render_template('partials/400.html'), 400
+
     @app.errorhandler(404)
     def not_found_error(error):
         return render_template('partials/404.html'), 404
@@ -83,71 +130,27 @@ def create_app(config_class=Config):
 
     @app.errorhandler(500)
     def internal_error(error):
-        db.session.rollback()
-        app.logger.error(f"Internal Server Error 500: {error}", exc_info=True)
-        return render_template('partials/500.html'), 500
+        app.logger.error(f"500 Internal Server Error: {error}", exc_info=True)
+        try:
+            db.session.rollback()
+        except Exception as rb_err:
+            app.logger.warning(f"Rollback failed during 500 error handling: {rb_err}")
+        try:
+            return render_template('partials/500.html'), 500
+        except Exception as render_err:
+            app.logger.error(f"Secondary error rendering 500.html: {render_err}", exc_info=True)
+            return (
+                "<!DOCTYPE html><html><head><title>500 - Internal Server Error</title></head>"
+                "<body style='font-family:sans-serif;text-align:center;padding:50px;'>"
+                "<h1>500 - Internal Server Error</h1>"
+                "<p>A database or server error occurred. Please contact your system administrator.</p>"
+                "</body></html>",
+                500
+            )
 
-    # Auto create tables on initial startup if not using raw migration scripts
     with app.app_context():
         try:
             db.create_all()
-            from models import User, UserRole, StudentProfile, FacultyProfile, OrganizerProfile
-            if User.query.count() == 0:
-                admin_user = User(
-                    name="Faculty Admin",
-                    email="faculty.demo@college.edu",
-                    phone="9840112233",
-                    role=UserRole.FACULTY_ADMIN,
-                    is_active=True
-                )
-                admin_user.set_password("Pass@123")
-                db.session.add(admin_user)
-                db.session.flush()
-                db.session.add(FacultyProfile(
-                    user_id=admin_user.id,
-                    employee_id="FAC-DEMO-001",
-                    department="CSE",
-                    designation="Head & Faculty Admin"
-                ))
-
-                student_user = User(
-                    name="Demo Student",
-                    email="student.demo@college.edu",
-                    phone="9876543210",
-                    role=UserRole.STUDENT,
-                    is_active=True
-                )
-                student_user.set_password("Pass@123")
-                db.session.add(student_user)
-                db.session.flush()
-                db.session.add(StudentProfile(
-                    user_id=student_user.id,
-                    roll_number="23DEMO01",
-                    department="CSE",
-                    year=2,
-                    section="A"
-                ))
-
-                org_user = User(
-                    name="Demo Organizer",
-                    email="organizer.demo@college.edu",
-                    phone="9876543211",
-                    role=UserRole.ORGANIZER,
-                    is_active=True
-                )
-                org_user.set_password("Pass@123")
-                db.session.add(org_user)
-                db.session.flush()
-                db.session.add(OrganizerProfile(
-                    user_id=org_user.id,
-                    organization_name="Campus Tech Club",
-                    department="CSE",
-                    designation="Lead Coordinator",
-                    is_verified=True,
-                    status='APPROVED'
-                ))
-                db.session.commit()
-                app.logger.info("Auto-seeded default demo accounts for initial deployment.")
         except Exception as e:
             app.logger.warning(f"Note: db.create_all() encountered: {e}")
 
@@ -169,10 +172,18 @@ def create_app(config_class=Config):
             for s in skipped_titles:
                 print(f" - {s}")
 
+    # CLI Command to inspect database connection and schema health
+    @app.cli.command("check-db")
+    def check_db_cli():
+        """Run database connectivity and schema diagnostics for SQL Server."""
+        from services.db_diagnostic import run_db_diagnostic
+        run_db_diagnostic(app)
+
     return app
 
 
 app = create_app()
 
 if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=5000, debug=True)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='127.0.0.1', port=port, debug=False)

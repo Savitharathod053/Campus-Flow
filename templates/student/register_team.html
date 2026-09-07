@@ -1,0 +1,210 @@
+﻿{% extends "base.html" %}
+{% block title %}Register Team - {{ event.title }}{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+                <span class="badge bg-warning text-dark mb-1">{{ event.event_type }} &bull; Team Event</span>
+                <h2 class="fw-bold mb-1"><i class="bi bi-people-fill me-2"></i> Register Team: {{ event.title }}</h2>
+                <p class="text-light opacity-90 mb-0">
+                    <i class="bi bi-calendar3 me-1"></i> {{ event.start_time|datetimeformat }} &bull;
+                    <i class="bi bi-geo-alt me-1"></i> {{ event.venue }}
+                </p>
+            </div>
+            <a href="{{ url_for('public.event_detail', slug=event.slug) }}" class="btn btn-outline-light btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Back to Event
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <!-- Guidelines Alert -->
+            <div class="alert alert-info shadow-sm mb-4">
+                <h6 class="fw-bold mb-2"><i class="bi bi-info-circle-fill me-2"></i> Team Registration Guidelines</h6>
+                <ul class="small mb-0 ps-3">
+                    <li>As the creator of this registration, you will be the <strong>Team Lead</strong>.</li>
+                    <li>Required Team Size: <strong>{{ event.min_team_size }} to {{ event.max_team_size }} members</strong> (including you).</li>
+                    <li>Invited members will receive an email invitation to accept or decline the team invite.</li>
+                    <li>
+                        Payment Model: 
+                        {% if event.is_free or event.team_payment_type == 'FREE' %}
+                            <strong class="text-success">FREE EVENT</strong>
+                        {% elif event.team_payment_type == 'PER_TEAM' %}
+                            <strong>₹{{ "%.2f"|format(event.registration_fee) }} per Team</strong> (Paid by Team Lead)
+                        {% elif event.team_payment_type == 'PER_PERSON' %}
+                            <strong>₹{{ "%.2f"|format(event.registration_fee) }} per Member</strong> (Paid individually upon accepting)
+                        {% endif %}
+                    </li>
+                </ul>
+            </div>
+
+            <div class="ff-card p-4 p-sm-5 shadow-sm">
+                <form method="POST" id="teamRegisterForm" action="{{ url_for('student.register_team', event_id=event.id) }}">
+                    <!-- Team Name -->
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Team Name *</label>
+                        <input type="text" name="team_name" class="form-control form-control-lg" placeholder="e.g. Code Warriors, Neural Ninjas" required>
+                        <div class="form-text small">Pick a unique name representing your group.</div>
+                    </div>
+
+                    <!-- Team Lead Info -->
+                    <div class="p-3 bg-light rounded-3 border mb-4">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div>
+                                <span class="badge bg-primary mb-1">TEAM LEAD</span>
+                                <div class="fw-bold text-dark">{{ user.name }} (You)</div>
+                                <div class="small text-muted">{{ user.email }} &bull; {{ user.student_profile.roll_number if user.student_profile else '' }}</div>
+                            </div>
+                            <i class="bi bi-shield-check text-success fs-2"></i>
+                        </div>
+                    </div>
+
+                    <!-- Team Members Email Inputs -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <label class="form-label fw-bold mb-0">Team Member Emails *</label>
+                            <span class="small text-muted" id="memberCountText">
+                                Required: {{ event.min_team_size - 1 }} to {{ event.max_team_size - 1 }} invited members
+                            </span>
+                        </div>
+                        
+                        <div id="membersContainer" class="d-flex flex-column gap-2 mb-3">
+                            <!-- Dynamic email inputs populated via JS -->
+                        </div>
+
+                        <button type="button" id="addMemberBtn" class="btn btn-outline-primary btn-sm fw-bold">
+                            <i class="bi bi-plus-circle me-1"></i> Add Another Member
+                        </button>
+                    </div>
+
+                    <!-- Custom Registration Questions -->
+                    {% if custom_fields %}
+                        <div class="border-top pt-4 mb-4">
+                            <h5 class="fw-bold mb-3 text-secondary"><i class="bi bi-ui-checks me-2"></i> Event Specific Questions</h5>
+                            {% for field in custom_fields %}
+                                <div class="mb-3">
+                                    <label class="form-label small fw-bold">
+                                        {{ field.field_label }} {% if field.is_required %}<span class="text-danger">*</span>{% endif %}
+                                    </label>
+                                    
+                                    {% if field.field_type == 'select' %}
+                                        <select name="custom_field_{{ field.id }}" class="form-select" {% if field.is_required %}required{% endif %}>
+                                            <option value="">-- Select an option --</option>
+                                            {% for opt in field.get_options_list() %}
+                                                <option value="{{ opt }}">{{ opt }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    {% elif field.field_type == 'textarea' %}
+                                        <textarea name="custom_field_{{ field.id }}" class="form-control" rows="3" {% if field.is_required %}required{% endif %}></textarea>
+                                    {% elif field.field_type == 'checkbox' %}
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="checkbox" name="custom_field_{{ field.id }}" value="Yes" id="cf_{{ field.id }}">
+                                            <label class="form-check-label" for="cf_{{ field.id }}">{{ field.field_label }}</label>
+                                        </div>
+                                    {% else %}
+                                        <input type="{{ field.field_type }}" name="custom_field_{{ field.id }}" class="form-control" {% if field.is_required %}required{% endif %}>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+
+                    <!-- Submit Button -->
+                    <div class="d-grid gap-2 border-top pt-4">
+                        <button type="submit" class="btn btn-primary btn-lg fw-bold shadow-sm">
+                            <i class="bi bi-check2-circle me-2"></i> Complete Team Registration & Send Invites
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const minInvites = {{ event.min_team_size - 1 }};
+    const maxInvites = {{ event.max_team_size - 1 }};
+    const userEmail = "{{ user.email }}".toLowerCase();
+    const container = document.getElementById('membersContainer');
+    const addBtn = document.getElementById('addMemberBtn');
+
+    function createMemberInput(index, isRequired) {
+        const div = document.createElement('div');
+        div.className = 'input-group member-row';
+        div.innerHTML = `
+            <span class="input-group-text small bg-light fw-bold text-muted">Member ${index + 2}</span>
+            <input type="email" name="member_emails[]" class="form-control member-email-input" placeholder="colleague@example.com" ${isRequired ? 'required' : ''}>
+            <button type="button" class="btn btn-outline-danger remove-member-btn" title="Remove member"><i class="bi bi-trash3"></i></button>
+        `;
+        
+        div.querySelector('.remove-member-btn').addEventListener('click', function() {
+            if (container.querySelectorAll('.member-row').length > minInvites) {
+                div.remove();
+                updateInputNumbers();
+            } else {
+                alert(`At least ${minInvites} invited member(s) required for this team.`);
+            }
+        });
+        return div;
+    }
+
+    function updateInputNumbers() {
+        const rows = container.querySelectorAll('.member-row');
+        rows.forEach((row, i) => {
+            row.querySelector('.input-group-text').textContent = `Member ${i + 2}`;
+            const input = row.querySelector('.member-email-input');
+            input.required = (i < minInvites);
+        });
+        addBtn.disabled = rows.length >= maxInvites;
+    }
+
+    // Initial inputs
+    const initialCount = Math.max(1, minInvites);
+    for (let i = 0; i < initialCount; i++) {
+        container.appendChild(createMemberInput(i, i < minInvites));
+    }
+    updateInputNumbers();
+
+    addBtn.addEventListener('click', function() {
+        const currentRows = container.querySelectorAll('.member-row').length;
+        if (currentRows < maxInvites) {
+            container.appendChild(createMemberInput(currentRows, false));
+            updateInputNumbers();
+        }
+    });
+
+    // Form validation
+    document.getElementById('teamRegisterForm').addEventListener('submit', function(e) {
+        const inputs = Array.from(document.querySelectorAll('.member-email-input'));
+        const emails = inputs.map(i => i.value.trim().toLowerCase()).filter(e => e.length > 0);
+        
+        if (emails.length < minInvites) {
+            alert(`Please provide at least ${minInvites} invited member email(s).`);
+            e.preventDefault();
+            return;
+        }
+
+        const seen = new Set();
+        for (let email of emails) {
+            if (email === userEmail) {
+                alert("You cannot add your own email as another team member.");
+                e.preventDefault();
+                return;
+            }
+            if (seen.has(email)) {
+                alert(`Duplicate email detected: ${email}`);
+                e.preventDefault();
+                return;
+            }
+            seen.add(email);
+        }
+    });
+});
+</script>
+{% endblock %}

@@ -1,4 +1,4 @@
-// FastFest Application JS
+// Campus Flow Application JS
 
 document.addEventListener('DOMContentLoaded', () => {
     // Auto dismiss flash alerts after 6 seconds

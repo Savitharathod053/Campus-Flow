@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 """
-FastFest Automated Microsoft SQL Server (SSMS) Database Creator
-==============================================================
+Campus Flow Automated Microsoft SQL Server (SSMS) Database Creator
+==================================================================
 Connects to SQL Server (local or remote) using pyodbc with
 Windows Authentication or SQL Authentication and automatically creates
-the 'fastfest' database if it does not exist.
+the 'campus_flow' database if it does not exist.
 
 Usage:
-  python create_mssql_db.py [--server localhost] [--dbname fastfest]
+  python create_mssql_db.py [--server localhost] [--dbname campus_flow]
   python create_mssql_db.py --server localhost --user sa --password YOUR_PASSWORD
 """
 
@@ -19,7 +19,7 @@ import pyodbc
 
 load_dotenv('.env')
 
-def create_database(server="localhost", dbname="fastfest", user=None, password=None, driver="ODBC Driver 18 for SQL Server"):
+def create_database(server="localhost", dbname="campus_flow", user=None, password=None, driver="ODBC Driver 18 for SQL Server"):
     print(f"Connecting to Microsoft SQL Server at '{server}'...")
     
     if user and password:
@@ -64,9 +64,9 @@ def create_database(server="localhost", dbname="fastfest", user=None, password=N
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Create FastFest Microsoft SQL Server (SSMS) Database")
+    parser = argparse.ArgumentParser(description="Create Campus Flow Microsoft SQL Server (SSMS) Database")
     parser.add_argument("--server", default="localhost", help="SQL Server instance (default: localhost)")
-    parser.add_argument("--dbname", default="fastfest", help="Database name to create (default: fastfest)")
+    parser.add_argument("--dbname", default="campus_flow", help="Database name to create (default: campus_flow)")
     parser.add_argument("--user", default=None, help="SQL Server username (optional, defaults to Windows Auth)")
     parser.add_argument("--password", default=None, help="SQL Server password (optional)")
     parser.add_argument("--driver", default="ODBC Driver 18 for SQL Server", help="ODBC Driver name")
@@ -76,8 +76,9 @@ def main():
     
     if success:
         print("\n[+] Ready! You can now run:")
-        print("   python migrate_sqlite_to_mssql.py")
-        print("   python app.py\n")
+        print("   python reset_database.py --confirm")
+        print("   python create_admin.py")
+        print("   python run.py\n")
 
 
 if __name__ == "__main__":

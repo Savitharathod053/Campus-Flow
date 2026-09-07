@@ -1,0 +1,183 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Department - {{ dept.code }} - Super Admin{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between pb-3 mb-4 border-bottom">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <span class="badge bg-primary fs-6 font-monospace">{{ dept.code }}</span>
+            <h3 class="fw-bold text-dark mb-0">{{ dept.name }}</h3>
+            {% if dept.is_active %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+            {% else %}
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Deactivated</span>
+            {% endif %}
+        </div>
+        <p class="text-muted small mb-0">{{ dept.description or 'No departmental description entered.' }}</p>
+    </div>
+    <div class="d-flex gap-2 mt-3 mt-md-0">
+        <a href="{{ url_for('admin.department_edit', dept_id=dept.id) }}" class="btn btn-outline-primary btn-sm fw-bold">
+            <i class="bi bi-pencil me-1"></i> Edit Department
+        </a>
+        <a href="{{ url_for('admin.departments_list') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> All Departments
+        </a>
+    </div>
+</div>
+
+<!-- Department Overview Stats -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+            <span class="text-muted small">Head of Department (HOD)</span>
+            {% if dept.hod %}
+                <h5 class="fw-bold mb-0 mt-1 text-dark">{{ dept.hod.name }}</h5>
+                <span class="small text-muted">{{ dept.hod.email }}</span>
+            {% else %}
+                <h6 class="fw-bold mb-0 mt-1 text-warning">Unassigned</h6>
+                <span class="small text-muted">Assign via Edit Department</span>
+            {% endif %}
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+            <span class="text-muted small">Enrolled Students</span>
+            <h4 class="fw-bold mb-0 mt-1 text-info">{{ students|length }}</h4>
+            <span class="small text-muted">Registered in this branch</span>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+            <span class="text-muted small">Faculty Members</span>
+            <h4 class="fw-bold mb-0 mt-1 text-success">{{ faculty|length }}</h4>
+            <span class="small text-muted">Faculty & staff in department</span>
+        </div>
+    </div>
+</div>
+
+<!-- Nav Tabs for Students, Faculty, Events -->
+<div class="card border-0 shadow-sm rounded-3 bg-white p-4">
+    <ul class="nav nav-pills mb-3" id="deptTabs" role="tablist">
+        <li class="nav-item">
+            <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#tab-students">
+                <i class="bi bi-mortarboard me-1"></i> Students ({{ students|length }})
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-faculty">
+                <i class="bi bi-person-badge me-1"></i> Faculty ({{ faculty|length }})
+            </button>
+        </li>
+        <li class="nav-item">
+            <button class="nav-link" data-bs-toggle="pill" data-bs-target="#tab-events">
+                <i class="bi bi-calendar-event me-1"></i> Department Events ({{ events|length }})
+            </button>
+        </li>
+    </ul>
+
+    <div class="tab-content pt-2">
+        <!-- Students -->
+        <div class="tab-pane fade show active" id="tab-students">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>Student</th>
+                            <th>Roll Number</th>
+                            <th>Year & Section</th>
+                            <th>Status</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="small">
+                        {% for s in students %}
+                            <tr>
+                                <td class="fw-semibold">{{ s.user.name }}</td>
+                                <td><code>{{ s.roll_number }}</code></td>
+                                <td>Year {{ s.year }} - Sec {{ s.section }}</td>
+                                <td>
+                                    {% if s.user.is_active %}
+                                        <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Inactive</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('admin.user_detail', user_id=s.user_id) }}" class="btn btn-xs btn-outline-primary py-0 px-2">Profile</a>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="5" class="text-center text-muted py-3">No students found in this department.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Faculty -->
+        <div class="tab-pane fade" id="tab-faculty">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>Name</th>
+                            <th>Employee ID</th>
+                            <th>Designation</th>
+                            <th>Email</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="small">
+                        {% for f in faculty %}
+                            <tr>
+                                <td class="fw-semibold">{{ f.user.name }}</td>
+                                <td><code>{{ f.employee_id }}</code></td>
+                                <td>{{ f.designation }}</td>
+                                <td>{{ f.user.email }}</td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('admin.user_detail', user_id=f.user_id) }}" class="btn btn-xs btn-outline-primary py-0 px-2">Profile</a>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="5" class="text-center text-muted py-3">No faculty members found in this department.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Events -->
+        <div class="tab-pane fade" id="tab-events">
+            <div class="table-responsive">
+                <table class="table table-sm align-middle mb-0">
+                    <thead class="table-light small">
+                        <tr>
+                            <th>Event Title</th>
+                            <th>Venue</th>
+                            <th>Status</th>
+                            <th>Registrations</th>
+                            <th class="text-end">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="small">
+                        {% for ev in events %}
+                            <tr>
+                                <td class="fw-semibold">{{ ev.title }}</td>
+                                <td>{{ ev.venue }}</td>
+                                <td><span class="badge bg-primary">{{ ev.status }}</span></td>
+                                <td>{{ ev.registrations.count() }}</td>
+                                <td class="text-end">
+                                    <a href="{{ url_for('admin.event_detail', event_id=ev.id) }}" class="btn btn-xs btn-outline-primary py-0 px-2">Inspect</a>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr><td colspan="5" class="text-center text-muted py-3">No events organized under this department.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

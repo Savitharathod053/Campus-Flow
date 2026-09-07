@@ -1,5 +1,5 @@
 """
-FastFest - Expired Events Cleanup Script
+Campus Flow - Expired Events Cleanup Script
 Deletes events whose end_time exceeds the current date/time ONLY IF all certificate
 submissions/issuances for attendees are completed.
 Usage:

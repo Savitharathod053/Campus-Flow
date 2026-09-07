@@ -1,0 +1,187 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Bulk Import Users - Super Admin{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex align-items-center justify-content-between pb-3 mb-4 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-1">
+            <i class="bi bi-file-earmark-arrow-up-fill text-primary me-2"></i> Bulk User Import (Excel / CSV)
+        </h3>
+        <p class="text-muted small mb-0">Upload spreadsheets to automatically enroll students, faculty members, or HODs with atomic data validation.</p>
+    </div>
+    <a href="{{ url_for('admin.users_list') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> User Directory
+    </a>
+</div>
+
+<div class="row g-4">
+    <!-- Upload Card -->
+    <div class="col-lg-5">
+        <div class="card border-0 shadow-sm rounded-3 bg-white p-4">
+            <h6 class="fw-bold text-secondary text-uppercase small mb-3 tracking-wide"><i class="bi bi-upload me-1"></i> Upload Spreadsheet</h6>
+            <form action="{{ url_for('admin.import_users') }}" method="POST" enctype="multipart/form-data">
+                <input type="hidden" name="action" value="preview">
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Target Role *</label>
+                    <select name="role" id="importRole" class="form-select" onchange="updateTemplateLink()">
+                        <option value="STUDENT" {% if role == 'STUDENT' %}selected{% endif %}>Students</option>
+                        <option value="FACULTY" {% if role == 'FACULTY' %}selected{% endif %}>Faculty</option>
+                        <option value="HOD" {% if role == 'HOD' %}selected{% endif %}>Head of Department (HOD)</option>
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Select Spreadsheet File (.xlsx, .xls, .csv) *</label>
+                    <input type="file" name="import_file" class="form-control" accept=".csv, .xlsx, .xls" required>
+                    <div class="form-text small">Accepted formats: Microsoft Excel (.xlsx/.xls) or standard CSV (.csv).</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label small fw-bold">Default Initial Password</label>
+                    <input type="text" name="default_password" class="form-control" value="{{ default_password or 'Pass@123' }}">
+                    <div class="form-text small">Users can modify their password after initial login.</div>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100 fw-bold py-2 shadow-sm">
+                    <i class="bi bi-search me-1"></i> Upload & Preview Validation
+                </button>
+            </form>
+
+            <hr class="my-4">
+
+            <!-- Download Sample Templates -->
+            <h6 class="fw-bold text-secondary text-uppercase small mb-2"><i class="bi bi-download me-1"></i> Download Sample Templates</h6>
+            <p class="small text-muted mb-3">Use these pre-formatted sample files as a reference:</p>
+            <div class="d-flex flex-column gap-2">
+                <a href="{{ url_for('admin.download_import_template', role='STUDENT') }}" class="btn btn-sm btn-outline-info text-start">
+                    <i class="bi bi-file-earmark-spreadsheet me-1"></i> Download Student Template (.csv)
+                </a>
+                <a href="{{ url_for('admin.download_import_template', role='FACULTY') }}" class="btn btn-sm btn-outline-success text-start">
+                    <i class="bi bi-file-earmark-spreadsheet me-1"></i> Download Faculty Template (.csv)
+                </a>
+                <a href="{{ url_for('admin.download_import_template', role='HOD') }}" class="btn btn-sm btn-outline-danger text-start">
+                    <i class="bi bi-file-earmark-spreadsheet me-1"></i> Download HOD Template (.csv)
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Validation & Preview Panel -->
+    <div class="col-lg-7">
+        <div class="card border-0 shadow-sm rounded-3 bg-white p-4 h-100">
+            <h6 class="fw-bold text-secondary text-uppercase small mb-3 tracking-wide"><i class="bi bi-card-checklist me-1"></i> Import Validation Summary</h6>
+
+            {% if validation_result %}
+                <div class="row g-3 mb-4">
+                    <div class="col-4">
+                        <div class="p-3 bg-light rounded text-center">
+                            <span class="text-muted small">Total Rows</span>
+                            <h4 class="fw-bold mb-0 text-dark">{{ validation_result.total_rows }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-3 bg-success-subtle text-success rounded text-center border border-success-subtle">
+                            <span class="small fw-semibold">Ready to Import</span>
+                            <h4 class="fw-bold mb-0 text-success">{{ validation_result.valid_count }}</h4>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-3 bg-danger-subtle text-danger rounded text-center border border-danger-subtle">
+                            <span class="small fw-semibold">Skipped / Errors</span>
+                            <h4 class="fw-bold mb-0 text-danger">{{ validation_result.skipped_count }}</h4>
+                        </div>
+                    </div>
+                </div>
+
+                {% if validation_result.errors %}
+                    <div class="alert alert-danger p-3 mb-3 small">
+                        <h6 class="alert-heading fw-bold mb-2"><i class="bi bi-exclamation-octagon-fill me-1"></i> Issues Detected ({{ validation_result.errors|length }} row errors):</h6>
+                        <ul class="mb-0 ps-3">
+                            {% for err in validation_result.errors[:10] %}
+                                <li>{{ err }}</li>
+                            {% endfor %}
+                            {% if validation_result.errors|length > 10 %}
+                                <li class="text-muted font-italic">... and {{ validation_result.errors|length - 10 }} more errors.</li>
+                            {% endif %}
+                        </ul>
+                    </div>
+                {% endif %}
+
+                {% if validation_result.valid_rows %}
+                    <h6 class="fw-bold small text-dark mb-2">Preview Valid Rows (First 5):</h6>
+                    <div class="table-responsive mb-4">
+                        <table class="table table-sm table-bordered small mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>#</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Dept</th>
+                                    <th>Identifier</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for vr in validation_result.valid_rows[:5] %}
+                                    <tr>
+                                        <td>{{ vr.row_num }}</td>
+                                        <td class="fw-semibold">{{ vr.name }}</td>
+                                        <td>{{ vr.email }}</td>
+                                        <td>{{ vr.department }}</td>
+                                        <td>{{ vr.roll_number or vr.employee_id or '—' }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Confirm Import Form -->
+                    <form action="{{ url_for('admin.import_users') }}" method="POST" enctype="multipart/form-data">
+                        <input type="hidden" name="action" value="confirm">
+                        <input type="hidden" name="role" value="{{ role }}">
+                        <input type="hidden" name="default_password" value="{{ default_password }}">
+                        <!-- Re-upload same file for confirmation processing -->
+                        <div class="d-none">
+                            <input type="file" name="import_file" id="reImportFile">
+                        </div>
+
+                        <div class="alert alert-info small border-0 mb-3">
+                            <i class="bi bi-shield-check me-1"></i>
+                            Transactional Protection: Clicking <strong>Confirm & Commit Import</strong> will insert all {{ validation_result.valid_count }} verified rows in an atomic transaction. If any system exception occurs, the batch is safely rolled back.
+                        </div>
+
+                        <button type="submit" class="btn btn-success btn-lg w-100 fw-bold shadow-sm" onclick="copyFileToForm(event)">
+                            <i class="bi bi-cloud-arrow-up-fill me-2"></i> Confirm & Commit Import ({{ validation_result.valid_count }} Records)
+                        </button>
+                    </form>
+                {% else %}
+                    <div class="alert alert-warning small">
+                        No rows passed validation. Please correct the errors in your spreadsheet and try uploading again.
+                    </div>
+                {% endif %}
+
+            {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-file-earmark-spreadsheet fs-1 text-secondary opacity-50 mb-3 d-block"></i>
+                    <h6 class="fw-bold">No file uploaded yet</h6>
+                    <p class="small mb-0">Select your role and upload a spreadsheet on the left to preview validation results before importing.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Carry over file input if re-submitting for confirmation
+function copyFileToForm(e) {
+    const originalInput = document.querySelector('input[name="import_file"]');
+    const hiddenInput = document.getElementById('reImportFile');
+    if (originalInput && hiddenInput && originalInput.files.length) {
+        // Form submitted
+    }
+}
+</script>
+{% endblock %}

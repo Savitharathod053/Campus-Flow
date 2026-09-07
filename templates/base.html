@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}FastFest - College Event Management Platform{% endblock %}</title>
-    <meta name="description" content="Centralized campus event discovery, registration, Razorpay payments, QR attendance, and automated certificates for college events.">
+    <title>{% block title %}Campus Flow - College Event Management Platform{% endblock %}</title>
+    <meta name="description" content="Centralized campus event discovery, registration, direct UPI payments, QR attendance, and automated certificates for college events.">
     
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,7 +26,7 @@
     <nav class="navbar navbar-expand-lg ff-navbar sticky-top">
         <div class="container">
             <a class="navbar-brand navbar-brand-custom" href="{{ url_for('public.home') }}">
-                <i class="bi bi-calendar2-event-fill text-primary"></i> Fast<span>Fest</span>
+                <i class="bi bi-calendar2-event-fill text-primary"></i> Campus <span>Flow</span>
             </a>
             <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
                 <span class="navbar-toggler-icon"></span>
@@ -38,53 +38,119 @@
                         <a class="nav-link" href="{{ url_for('public.events') }}"><i class="bi bi-compass me-1"></i> Explore Events</a>
                     </li>
                     {% if current_user %}
-                        {% if current_user.is_student %}
+                        {% if current_user.is_super_admin %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('student.dashboard') }}"><i class="bi bi-grid-1x2 me-1"></i> Student Dashboard</a>
+                                <a class="nav-link fw-bold text-primary" href="{{ url_for('admin.dashboard') }}"><i class="bi bi-shield-lock-fill text-warning me-1"></i> Super Admin</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('student.my_events') }}"><i class="bi bi-ticket-perforated me-1"></i> My Events</a>
+                                <a class="nav-link" href="{{ url_for('admin.users_list') }}"><i class="bi bi-people me-1"></i> Users</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('student.certificates') }}"><i class="bi bi-award me-1"></i> Certificates</a>
+                                <a class="nav-link" href="{{ url_for('admin.departments_list') }}"><i class="bi bi-diagram-3 me-1"></i> Departments</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('admin.event_requests_list') }}"><i class="bi bi-calendar2-check me-1"></i> Event Requests</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('admin.organizer_requests_list') }}"><i class="bi bi-person-badge me-1"></i> Organizer Requests</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('admin.events_list') }}"><i class="bi bi-calendar-event me-1"></i> Events</a>
+                            </li>
+                        {% elif current_user.is_students_affairs_dean %}
+                            <li class="nav-item">
+                                <a class="nav-link fw-bold text-info" href="{{ url_for('dean.dashboard') }}"><i class="bi bi-mortarboard-fill me-1"></i> Dean Portal</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('dean.events') }}"><i class="bi bi-calendar-event me-1"></i> College Events</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('dean.organizers') }}"><i class="bi bi-people me-1"></i> Organizers</a>
+                            </li>
+                        {% elif current_user.is_hod %}
+                            <li class="nav-item">
+                                <a class="nav-link fw-bold text-danger" href="{{ url_for('hod.dashboard') }}"><i class="bi bi-building-fill-gear me-1"></i> HOD Portal</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('hod.events') }}"><i class="bi bi-calendar-event me-1"></i> Dept Events</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('hod.students') }}"><i class="bi bi-people me-1"></i> Students</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('hod.faculty') }}"><i class="bi bi-person-badge me-1"></i> Faculty</a>
                             </li>
                         {% elif current_user.is_organizer %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('organizer.dashboard') }}"><i class="bi bi-speedometer2 me-1"></i> Organizer Portal</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('organizer.create_event') }}"><i class="bi bi-plus-circle me-1"></i> Create Event</a>
+                                <a class="nav-link" href="{{ url_for('organizer.create_event') }}"><i class="bi bi-plus-circle me-1"></i> Create Event Request</a>
                             </li>
-                        {% elif current_user.is_admin %}
+                        {% elif current_user.is_student %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('admin.dashboard') }}"><i class="bi bi-shield-check me-1"></i> Admin Portal</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('admin.pending_approvals') }}"><i class="bi bi-clock-history me-1"></i> Approvals</a>
+                                <a class="nav-link" href="{{ url_for('student.dashboard') }}"><i class="bi bi-grid-1x2 me-1"></i> Dashboard</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('admin.students_list') }}"><i class="bi bi-mortarboard me-1"></i> Students</a>
+                                <a class="nav-link" href="{{ url_for('student.my_teams') }}"><i class="bi bi-people me-1"></i> My Teams</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('admin.faculty_list') }}"><i class="bi bi-person-workspace me-1"></i> Faculty</a>
+                                <a class="nav-link" href="{{ url_for('student.my_events') }}"><i class="bi bi-ticket-perforated me-1"></i> My Passes</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('admin.reports') }}"><i class="bi bi-bar-chart-line me-1"></i> Reports</a>
+                                <a class="nav-link" href="{{ url_for('student.certificates') }}"><i class="bi bi-award me-1"></i> Certificates</a>
                             </li>
                         {% endif %}
                     {% endif %}
                 </ul>
 
-                <!-- Right Auth Controls -->
+                <!-- Right Auth & Notification Controls -->
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
                     {% if current_user %}
+                        <!-- In-App Notification Dropdown -->
+                        <li class="nav-item dropdown me-3">
+                            <a class="nav-link position-relative text-dark px-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications">
+                                <i class="bi bi-bell-fill fs-5"></i>
+                                {% if unread_notifications_count and unread_notifications_count > 0 %}
+                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem;">
+                                    {{ unread_notifications_count }}
+                                </span>
+                                {% endif %}
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="min-width: 320px; max-width: 380px;">
+                                <li class="d-flex justify-content-between align-items-center px-2 py-1 border-bottom mb-2">
+                                    <span class="fw-bold fs-6">Notifications</span>
+                                    {% if unread_notifications_count and unread_notifications_count > 0 %}
+                                    <button class="btn btn-sm btn-link text-decoration-none p-0 small" onclick="markAllNotificationsRead()">Mark all read</button>
+                                    {% endif %}
+                                </li>
+                                {% if recent_notifications %}
+                                    {% for n in recent_notifications %}
+                                    <li class="p-2 mb-1 rounded {% if not n.is_read %}bg-light border-start border-3 border-primary{% endif %}">
+                                        <div class="d-flex justify-content-between">
+                                            <strong class="small text-dark">{{ n.title }}</strong>
+                                            <small class="text-muted" style="font-size: 0.68rem;">{{ n.created_at|datetimeformat('%b %d, %I:%M %p') }}</small>
+                                        </div>
+                                        <p class="small text-muted mb-1" style="font-size: 0.8rem;">{{ n.message }}</p>
+                                        {% if n.link %}
+                                        <a href="{{ n.link }}" class="small text-primary text-decoration-none fw-semibold" onclick="markNotificationRead({{ n.id }})">View Details &rarr;</a>
+                                        {% endif %}
+                                    </li>
+                                    {% endfor %}
+                                {% else %}
+                                    <li class="text-center text-muted py-3 small">No notifications yet.</li>
+                                {% endif %}
+                            </ul>
+                        </li>
+
+                        <!-- User Profile Dropdown -->
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
                                 <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-weight: 700; font-size: 0.85rem;">
                                     {{ current_user.name[:1].upper() }}
                                 </div>
                                 <span class="d-none d-sm-inline fw-semibold">{{ current_user.name }}</span>
-                                <span class="badge bg-light text-dark border">{{ current_user.role }}</span>
+                                <span class="badge bg-light text-dark border text-uppercase" style="font-size: 0.7rem;">{{ current_user.role.replace('_', ' ') }}</span>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                                 <li><h6 class="dropdown-header">{{ current_user.email }}</h6></li>
@@ -148,7 +214,7 @@
             <div class="row g-4">
                 <div class="col-lg-4">
                     <h5 class="navbar-brand-custom text-white mb-2">
-                        <i class="bi bi-calendar2-event-fill text-primary"></i> Fast<span class="text-warning">Fest</span>
+                        <i class="bi bi-calendar2-event-fill text-primary"></i> Campus <span class="text-warning">Flow</span>
                     </h5>
                     <p class="small text-secondary">The comprehensive, unified college event management and registration system. Eliminating fragmented Google Forms & WhatsApp coordination.</p>
                     <div class="d-flex gap-3 text-secondary small">
@@ -184,8 +250,8 @@
             </div>
             <hr class="border-secondary my-4">
             <div class="d-flex flex-column flex-sm-row align-items-center justify-content-between small text-secondary">
-                <div>&copy; {{ now.year }} FastFest College Event Management System. All rights reserved.</div>
-                <div class="mt-2 mt-sm-0">Relational Database Powered &bull; No AI/ML &bull; Secure Local App</div>
+                <div>&copy; {{ now.year }} Campus Flow College Event Management System. All rights reserved.</div>
+                <div class="mt-2 mt-sm-0">Microsoft SQL Server (SSMS) Relational Database &bull; Secure Local App</div>
             </div>
         </div>
     </footer>

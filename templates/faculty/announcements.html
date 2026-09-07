@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block title %}Faculty Announcements - Campus Flow{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Breadcrumb & Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1 small">
+                    <li class="breadcrumb-item"><a href="{{ url_for('faculty.dashboard') }}">Faculty Portal</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">Announcements</li>
+                </ol>
+            </nav>
+            <h2 class="fw-bold text-dark mb-0">Department & College Announcements</h2>
+        </div>
+        <a href="{{ url_for('faculty.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+            <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+
+    <!-- Announcements List -->
+    <div class="row g-3">
+        {% if announcements %}
+            {% for a in announcements %}
+                <div class="col-12">
+                    <div class="card border-0 shadow-sm rounded-3 p-4 bg-white {% if a.is_pinned %}border-start border-warning border-4{% endif %}">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <div>
+                                <h5 class="fw-bold text-dark mb-1">
+                                    {% if a.is_pinned %}
+                                        <i class="bi bi-pin-angle-fill text-warning me-1"></i>
+                                    {% endif %}
+                                    {{ a.title }}
+                                </h5>
+                                <div class="d-flex gap-2 align-items-center small text-muted">
+                                    <span><i class="bi bi-person me-1"></i> {{ a.author.name if a.author else 'Administration' }}</span>
+                                    <span>&bull;</span>
+                                    <span><i class="bi bi-clock me-1"></i> {{ a.created_at.strftime('%b %d, %Y %I:%M %p') if a.created_at else '' }}</span>
+                                    <span>&bull;</span>
+                                    <span class="badge bg-light text-dark border">{{ a.target_audience }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="text-secondary mb-0 mt-2" style="white-space: pre-line;">{{ a.message }}</p>
+                    </div>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="col-12">
+                <div class="card border-0 shadow-sm rounded-3 p-5 text-center text-muted">
+                    <i class="bi bi-megaphone fs-1 d-block mb-2 text-secondary"></i>
+                    <h6 class="fw-bold text-dark">No Announcements</h6>
+                    <p class="small mb-0">There are currently no active announcements for this department.</p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

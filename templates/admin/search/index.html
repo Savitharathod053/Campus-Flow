@@ -1,0 +1,232 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Global Search Results - Super Admin{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between pb-3 mb-4 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-1">
+            <i class="bi bi-search text-primary me-2"></i> Global Search Results
+        </h3>
+        <p class="text-muted small mb-0">
+            Found <strong>{{ total_matches }}</strong> matching record{{ 's' if total_matches != 1 else '' }} for query: <code class="text-primary fs-6">"{{ q }}"</code>
+        </p>
+    </div>
+</div>
+
+<!-- Search Input -->
+<div class="card border-0 shadow-sm rounded-3 p-3 bg-white mb-4">
+    <form method="GET" action="{{ url_for('admin.global_search') }}" class="row g-2">
+        <div class="col-md-10">
+            <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                <input type="text" name="q" class="form-control" placeholder="Search by name, email, roll number, employee ID, ticket code, event title..." value="{{ q }}" required>
+            </div>
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i> Search</button>
+        </div>
+    </form>
+</div>
+
+{% if q %}
+    <!-- 1. Users Matches -->
+    <div class="card border-0 shadow-sm rounded-3 bg-white mb-4">
+        <div class="card-header bg-white border-0 pt-3 pb-2 d-flex align-items-center justify-content-between">
+            <h6 class="fw-bold text-dark mb-0">
+                <i class="bi bi-people-fill text-primary me-2"></i> Users ({{ results.users|length }})
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            {% if results.users %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small text-muted text-uppercase">
+                        <tr>
+                            <th class="ps-4">Name</th>
+                            <th>Role</th>
+                            <th>Identifier / Dept</th>
+                            <th>Email & Phone</th>
+                            <th>Status</th>
+                            <th class="text-end pe-4">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for u in results.users %}
+                        <tr>
+                            <td class="ps-4">
+                                <a href="{{ url_for('admin.user_detail', user_id=u.id) }}" class="fw-semibold text-dark text-decoration-none">
+                                    {{ u.name }}
+                                </a>
+                            </td>
+                            <td>
+                                <span class="badge bg-light text-dark border">{{ u.role }}</span>
+                            </td>
+                            <td>
+                                {% if u.student_profile %}
+                                    <span class="small font-monospace">{{ u.student_profile.roll_number or 'N/A' }}</span>
+                                    <div class="text-muted small">{{ u.student_profile.department or '' }}</div>
+                                {% elif u.faculty_profile %}
+                                    <span class="small font-monospace">{{ u.faculty_profile.employee_id or 'N/A' }}</span>
+                                    <div class="text-muted small">{{ u.faculty_profile.department or '' }}</div>
+                                {% else %}
+                                    <span class="text-muted small">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="small">{{ u.email }}</div>
+                                <div class="text-muted small">{{ u.phone or '' }}</div>
+                            </td>
+                            <td>
+                                {% if u.is_active %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">Active</span>
+                                {% else %}
+                                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Deactivated</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <a href="{{ url_for('admin.user_detail', user_id=u.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-arrow-right-short"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-3 text-muted text-center small">No users matched "{{ q }}".</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 2. Events Matches -->
+    <div class="card border-0 shadow-sm rounded-3 bg-white mb-4">
+        <div class="card-header bg-white border-0 pt-3 pb-2 d-flex align-items-center justify-content-between">
+            <h6 class="fw-bold text-dark mb-0">
+                <i class="bi bi-calendar-event-fill text-indigo me-2"></i> Events ({{ results.events|length }})
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            {% if results.events %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small text-muted text-uppercase">
+                        <tr>
+                            <th class="ps-4">Event Title</th>
+                            <th>Department</th>
+                            <th>Venue</th>
+                            <th>Status</th>
+                            <th class="text-end pe-4">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ev in results.events %}
+                        <tr>
+                            <td class="ps-4">
+                                <a href="{{ url_for('admin.event_detail', event_id=ev.id) }}" class="fw-semibold text-primary text-decoration-none">
+                                    {{ ev.title }}
+                                </a>
+                            </td>
+                            <td>{{ ev.department }}</td>
+                            <td><span class="small text-muted">{{ ev.venue or 'Online' }}</span></td>
+                            <td><span class="badge bg-light text-dark border">{{ ev.status }}</span></td>
+                            <td class="text-end pe-4">
+                                <a href="{{ url_for('admin.event_detail', event_id=ev.id) }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-arrow-right-short"></i> View
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-3 text-muted text-center small">No events matched "{{ q }}".</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 3. Registrations Matches -->
+    <div class="card border-0 shadow-sm rounded-3 bg-white mb-4">
+        <div class="card-header bg-white border-0 pt-3 pb-2 d-flex align-items-center justify-content-between">
+            <h6 class="fw-bold text-dark mb-0">
+                <i class="bi bi-ticket-detailed-fill text-success me-2"></i> Registrations ({{ results.registrations|length }})
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            {% if results.registrations %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small text-muted text-uppercase">
+                        <tr>
+                            <th class="ps-4">Registration Code</th>
+                            <th>Participant</th>
+                            <th>Event</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for reg in results.registrations %}
+                        <tr>
+                            <td class="ps-4 font-monospace fw-bold">{{ reg.registration_code }}</td>
+                            <td>{{ reg.student.name if reg.student else 'Unknown' }}</td>
+                            <td>{{ reg.event.title if reg.event else 'Unknown' }}</td>
+                            <td><span class="badge bg-light text-dark border">{{ reg.status }}</span></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-3 text-muted text-center small">No registrations matched "{{ q }}".</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 4. Certificates Matches -->
+    <div class="card border-0 shadow-sm rounded-3 bg-white mb-4">
+        <div class="card-header bg-white border-0 pt-3 pb-2 d-flex align-items-center justify-content-between">
+            <h6 class="fw-bold text-dark mb-0">
+                <i class="bi bi-award-fill text-warning me-2"></i> Certificates ({{ results.certificates|length }})
+            </h6>
+        </div>
+        <div class="card-body p-0">
+            {% if results.certificates %}
+            <div class="table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light small text-muted text-uppercase">
+                        <tr>
+                            <th class="ps-4">Certificate Code</th>
+                            <th>Student</th>
+                            <th>Event</th>
+                            <th>Status</th>
+                            <th class="text-end pe-4">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for c in results.certificates %}
+                        <tr>
+                            <td class="ps-4 font-monospace fw-bold text-warning-emphasis">{{ c.certificate_code }}</td>
+                            <td>{{ c.student.name if c.student else 'Unknown' }} ({{ c.roll_number }})</td>
+                            <td>{{ c.event.title if c.event else 'Unknown' }}</td>
+                            <td><span class="badge bg-light text-dark border">{{ c.status }}</span></td>
+                            <td class="text-end pe-4">
+                                {% if c.file_path %}
+                                    <a href="{{ url_for('static', filename=c.file_path) }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                        <i class="bi bi-file-earmark-image"></i> View
+                                    </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="p-3 text-muted text-center small">No certificates matched "{{ q }}".</div>
+            {% endif %}
+        </div>
+    </div>
+{% endif %}
+{% endblock %}

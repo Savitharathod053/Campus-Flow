@@ -1,0 +1,331 @@
+{% extends "base.html" %}
+{% block title %}{{ team.team_name }} - Team Details - Campus Flow{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge bg-warning text-dark">{{ event.event_type }}</span>
+                    {% if team.status == 'FULL' %}
+                        <span class="badge bg-success">STATUS: FULL</span>
+                    {% elif team.status == 'COMPLETE' %}
+                        <span class="badge bg-info text-white">STATUS: COMPLETE</span>
+                    {% elif team.status == 'PENDING' %}
+                        <span class="badge bg-warning text-dark">STATUS: PENDING</span>
+                    {% else %}
+                        <span class="badge bg-secondary">{{ team.status }}</span>
+                    {% endif %}
+                </div>
+                <h2 class="fw-bold mb-1"><i class="bi bi-people-fill me-2"></i> {{ team.team_name }}</h2>
+                <p class="text-light opacity-90 mb-0">{{ event.title }} &bull; Venue: {{ event.venue }} &bull; {{ event.start_time|datetimeformat }}</p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('student.my_teams') }}" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i> My Teams
+                </a>
+                <a href="{{ url_for('public.event_detail', slug=event.slug) }}" class="btn btn-light btn-sm fw-bold">
+                    <i class="bi bi-eye me-1"></i> Event Page
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Key Status Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-primary text-white">
+                    <i class="bi bi-person-check-fill"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ team.total_confirmed_count }} / {{ event.max_team_size }}</div>
+                    <div class="metric-label">Confirmed Members (Min {{ event.min_team_size }})</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-info text-white">
+                    <i class="bi bi-envelope-paper"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ team.invitations|selectattr("is_active")|list|length }}</div>
+                    <div class="metric-label">Pending Invitations</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box {% if team.payment_status in ['PAID', 'SUCCESS'] or team.is_paid or event.is_free %}bg-success{% else %}bg-warning{% endif %} text-white">
+                    <i class="bi bi-currency-rupee"></i>
+                </div>
+                <div>
+                    <div class="metric-number">
+                        {% if event.is_free or event.team_payment_type == 'FREE' %}
+                            FREE
+                        {% elif team.payment_status in ['PAID', 'SUCCESS'] or team.is_paid %}
+                            PAID
+                        {% else %}
+                            ₹{{ "%.0f"|format(event.registration_fee) }}
+                        {% endif %}
+                    </div>
+                    <div class="metric-label">
+                        {% if event.team_payment_type == 'PER_TEAM' %}Per Team Fee (Lead Pays){% elif event.team_payment_type == 'PER_PERSON' %}Per Member Fee{% else %}Fee Status{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-secondary text-white">
+                    <i class="bi bi-person-badge"></i>
+                </div>
+                <div>
+                    <div class="metric-number fs-6 fw-bold mt-1">{{ team.lead.name }}</div>
+                    <div class="metric-label">Team Lead</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Per-Team Payment Alert for Team Lead -->
+    {% if is_lead and event.team_payment_type == 'PER_TEAM' and not event.is_free and not team.is_paid and team.payment_status not in ['PAID', 'SUCCESS'] %}
+        <div class="alert alert-warning shadow-sm d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+            <div>
+                <h5 class="alert-heading fw-bold mb-1"><i class="bi bi-wallet2 me-2"></i> Team Registration Fee Pending: ₹{{ "%.2f"|format(event.registration_fee) }}</h5>
+                <p class="mb-0 small">As Team Lead, please complete the team payment. Individual tickets for all confirmed members will be activated once payment succeeds.</p>
+            </div>
+            <a href="{{ url_for('student.team_checkout', team_id=team.id) }}" class="btn btn-primary fw-bold shadow-sm">
+                <i class="bi bi-credit-card me-1"></i> Pay Team Fee Now
+            </a>
+        </div>
+    {% endif %}
+
+    <div class="row g-4">
+        <!-- Team Members Roster Column -->
+        <div class="col-lg-8">
+            <div class="ff-card p-4 shadow-sm mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold mb-0 text-dark"><i class="bi bi-people me-2 text-primary"></i> Team Member Roster</h5>
+                    {% if is_lead and team.can_invite_more and not event.is_deadline_passed %}
+                        <button type="button" class="btn btn-outline-primary btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#inviteModal">
+                            <i class="bi bi-person-plus me-1"></i> Invite Member
+                        </button>
+                    {% endif %}
+                </div>
+
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light small">
+                            <tr>
+                                <th>Student</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Ticket / Pass</th>
+                                {% if is_lead %}<th>Actions</th>{% endif %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <!-- Confirmed Team Members -->
+                            {% for m in team.members %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold text-dark">{{ m.student.name if m.student else 'Invited User' }}</div>
+                                        <div class="small text-muted">{{ m.student.email if m.student else '' }}</div>
+                                        {% if m.student and m.student.student_profile %}
+                                            <div class="small text-secondary">{{ m.student.student_profile.department }} &bull; Roll: {{ m.student.student_profile.roll_number }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if m.is_lead %}
+                                            <span class="badge bg-primary">Team Lead</span>
+                                        {% else %}
+                                            <span class="badge bg-light text-dark border">Member</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if m.status == 'CONFIRMED' %}
+                                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Confirmed</span>
+                                        {% elif m.status == 'PENDING' %}
+                                            <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i> Pending Acceptance</span>
+                                        {% elif m.status == 'DECLINED' %}
+                                            <span class="badge bg-danger"><i class="bi bi-x-circle me-1"></i> Declined</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ m.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if m.status == 'CONFIRMED' and m.student_id == user.id %}
+                                            {% set user_reg = team.registrations.filter_by(student_id=user.id).first() %}
+                                            {% if user_reg and user_reg.is_confirmed %}
+                                                <a href="{{ url_for('student.ticket', code=user_reg.registration_code) }}" class="btn btn-outline-success btn-sm fw-bold">
+                                                    <i class="bi bi-qr-code me-1"></i> My Pass
+                                                </a>
+                                            {% elif user_reg and not user_reg.is_confirmed %}
+                                                <a href="{{ url_for('payment.checkout', registration_id=user_reg.id) }}" class="btn btn-outline-warning btn-sm text-dark fw-bold">
+                                                    Pay Fee
+                                                </a>
+                                            {% else %}
+                                                <span class="small text-muted">—</span>
+                                            {% endif %}
+                                        {% elif m.status == 'CONFIRMED' %}
+                                            <span class="small text-success"><i class="bi bi-check-circle-fill"></i> Pass Active</span>
+                                        {% else %}
+                                            <span class="small text-muted">Awaiting Action</span>
+                                        {% endif %}
+                                    </td>
+                                    {% if is_lead %}
+                                        <td>
+                                            {% if not m.is_lead and m.student_id != user.id %}
+                                                <form method="POST" action="{{ url_for('student.remove_team_member', team_id=team.id, member_id=m.id) }}" onsubmit="return confirm('Remove this member from team?');" class="d-inline">
+                                                    <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-2" title="Remove Member">
+                                                        <i class="bi bi-trash3"></i>
+                                                    </button>
+                                                </form>
+                                            {% else %}
+                                                <span class="small text-muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                    {% endif %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Invitations History -->
+            {% if team.invitations %}
+                <div class="ff-card p-4 shadow-sm">
+                    <h5 class="fw-bold mb-3 text-dark"><i class="bi bi-send-check me-2 text-info"></i> Member Invitation Log</h5>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light small">
+                                <tr>
+                                    <th>Invited Email</th>
+                                    <th>Status</th>
+                                    <th>Sent Date</th>
+                                    <th>Expires</th>
+                                    {% if is_lead %}<th>Actions</th>{% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for inv in team.invitations %}
+                                    <tr>
+                                        <td><strong>{{ inv.invited_email }}</strong></td>
+                                        <td>
+                                            {% if inv.status == 'ACCEPTED' %}
+                                                <span class="badge bg-success">Accepted</span>
+                                            {% elif inv.status == 'DECLINED' %}
+                                                <span class="badge bg-danger">Declined</span>
+                                            {% elif inv.status == 'CANCELLED' %}
+                                                <span class="badge bg-secondary">Cancelled</span>
+                                            {% elif inv.is_expired %}
+                                                <span class="badge bg-secondary">Expired</span>
+                                            {% else %}
+                                                <span class="badge bg-warning text-dark">Pending</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="small text-muted">{{ inv.created_at|dateformat }}</td>
+                                        <td class="small text-muted">{{ inv.expires_at|dateformat }}</td>
+                                        {% if is_lead %}
+                                            <td>
+                                                {% if inv.status == 'PENDING' %}
+                                                    <div class="d-flex gap-1">
+                                                        <form method="POST" action="{{ url_for('student.resend_team_invitation', team_id=team.id, invitation_id=inv.id) }}" class="d-inline">
+                                                            <button type="submit" class="btn btn-outline-secondary btn-sm py-0 px-2" title="Resend Invitation Email">
+                                                                <i class="bi bi-arrow-repeat"></i>
+                                                            </button>
+                                                        </form>
+                                                        <form method="POST" action="{{ url_for('student.cancel_team_invitation', team_id=team.id, invitation_id=inv.id) }}" onsubmit="return confirm('Cancel this invitation?');" class="d-inline">
+                                                            <button type="submit" class="btn btn-outline-danger btn-sm py-0 px-2" title="Cancel Invitation">
+                                                                <i class="bi bi-x-circle"></i>
+                                                            </button>
+                                                        </form>
+                                                    </div>
+                                                {% else %}
+                                                    <span class="small text-muted">—</span>
+                                                {% endif %}
+                                            </td>
+                                        {% endif %}
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar Info Column -->
+        <div class="col-lg-4">
+            <div class="ff-card p-4 shadow-sm mb-4">
+                <h6 class="fw-bold mb-3 border-bottom pb-2">Event Information</h6>
+                <div class="small mb-3">
+                    <div class="text-muted fw-bold">EVENT</div>
+                    <div class="fw-semibold text-dark">{{ event.title }}</div>
+                </div>
+                <div class="small mb-3">
+                    <div class="text-muted fw-bold">ORGANIZER</div>
+                    <div>{{ event.organizer.name }} ({{ event.department }})</div>
+                </div>
+                <div class="small mb-3">
+                    <div class="text-muted fw-bold">DATE & TIME</div>
+                    <div>{{ event.start_time|datetimeformat }}</div>
+                </div>
+                <div class="small mb-3">
+                    <div class="text-muted fw-bold">VENUE</div>
+                    <div>{{ event.venue }}</div>
+                </div>
+                <div class="small mb-3">
+                    <div class="text-muted fw-bold">REGISTRATION DEADLINE</div>
+                    <div class="{% if event.is_deadline_passed %}text-danger fw-bold{% endif %}">{{ event.registration_deadline|datetimeformat }}</div>
+                </div>
+            </div>
+
+            <!-- Team Capacity Guidance -->
+            <div class="ff-card p-4 shadow-sm">
+                <h6 class="fw-bold mb-2">Team Sizing Rules</h6>
+                <ul class="small text-muted ps-3 mb-0">
+                    <li>Minimum required: <strong>{{ event.min_team_size }} confirmed members</strong>.</li>
+                    <li>Maximum allowed: <strong>{{ event.max_team_size }} members</strong>.</li>
+                    {% if event.require_full_team %}
+                        <li class="text-danger fw-bold">Team must be fully filled ({{ event.max_team_size }} members) to compete.</li>
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal to Invite Member -->
+{% if is_lead %}
+<div class="modal fade" id="inviteModal" tabindex="-1" aria-labelledby="inviteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="{{ url_for('student.invite_team_member', team_id=team.id) }}">
+                <div class="modal-header">
+                    <h5 class="modal-title fw-bold" id="inviteModalLabel"><i class="bi bi-person-plus me-2 text-primary"></i> Invite Team Member</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="small text-muted">Enter the college email address of the student you want to invite to <strong>{{ team.team_name }}</strong>.</p>
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Student Email Address *</label>
+                        <input type="email" name="email" class="form-control" placeholder="student@example.com" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm fw-bold">Send Invitation</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

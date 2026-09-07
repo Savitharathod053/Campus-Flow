@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, g
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, g, abort
 from models import db, User, UserRole, StudentProfile, OrganizerProfile, FacultyProfile
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -8,7 +8,19 @@ def get_current_user():
     user_id = session.get('user_id')
     if not user_id:
         return None
-    return db.session.get(User, user_id)
+    try:
+        user = db.session.get(User, user_id)
+        if not user:
+            # Stale session detected: user id does not exist in the database
+            session.pop('user_id', None)
+            return None
+        return user
+    except Exception as e:
+        import logging
+        logging.getLogger('CampusFlow.Auth').error(
+            f"Database error in get_current_user (user_id={user_id}): {e}", exc_info=True
+        )
+        return None
 
 
 def get_department_faculty_admins():
@@ -53,8 +65,7 @@ def role_required(*allowed_roles):
                 return redirect(url_for('auth.login', next=request.url))
             user = get_current_user()
             if not user or user.role not in allowed_roles:
-                flash('Access denied. You do not have permission for this portal.', 'danger')
-                return redirect(url_for('public.home'))
+                abort(403)
             return f(*args, **kwargs)
         return decorated_function
     return decorator
@@ -68,8 +79,35 @@ def organizer_required(f):
     return login_required(role_required(UserRole.ORGANIZER)(f))
 
 
-def admin_required(f):
-    return login_required(role_required(UserRole.FACULTY_ADMIN)(f))
+def hod_required(f):
+    return login_required(role_required(UserRole.HOD)(f))
+
+
+def dean_required(f):
+    return login_required(role_required(UserRole.STUDENTS_AFFAIRS_DEAN)(f))
+
+students_affairs_dean_required = dean_required
+
+
+def super_admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not session.get('user_id'):
+            flash('Please log in to access the Super Admin portal.', 'warning')
+            return redirect(url_for('auth.login', next=request.url))
+        user = get_current_user()
+        if not user or not user.is_active:
+            session.clear()
+            flash('Your account is inactive or not found.', 'danger')
+            return redirect(url_for('auth.login'))
+        if not user.is_super_admin:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Backward compatibility aliases
+admin_required = super_admin_required
+faculty_required = hod_required
 
 
 @auth_bp.route('/login', methods=['GET', 'POST'])
@@ -77,12 +115,16 @@ def login():
     if session.get('user_id'):
         user = get_current_user()
         if user:
-            if user.is_student:
+            if user.is_super_admin:
+                return redirect(url_for('admin.dashboard'))
+            elif user.is_students_affairs_dean:
+                return redirect(url_for('dean.dashboard'))
+            elif user.is_hod:
+                return redirect(url_for('hod.dashboard'))
+            elif user.is_student:
                 return redirect(url_for('student.dashboard'))
             elif user.is_organizer:
                 return redirect(url_for('organizer.dashboard'))
-            elif user.is_admin:
-                return redirect(url_for('admin.dashboard'))
 
     if request.method == 'POST':
         email = request.form.get('email', '').strip().lower()
@@ -133,12 +175,16 @@ def login():
         if next_page and next_page.startswith('/'):
             return redirect(next_page)
 
-        if user.is_student:
+        if user.is_super_admin:
+            return redirect(url_for('admin.dashboard'))
+        elif user.is_students_affairs_dean:
+            return redirect(url_for('dean.dashboard'))
+        elif user.is_hod:
+            return redirect(url_for('hod.dashboard'))
+        elif user.is_student:
             return redirect(url_for('student.dashboard'))
         elif user.is_organizer:
             return redirect(url_for('organizer.dashboard'))
-        elif user.is_admin:
-            return redirect(url_for('admin.dashboard'))
 
         return redirect(url_for('public.home'))
 
@@ -208,6 +254,13 @@ def register_student():
         )
         db.session.add(profile)
         db.session.commit()
+
+        # Send welcome email (asynchronous / non-blocking, safe from failure)
+        try:
+            from services.email_service import send_account_registration_email
+            send_account_registration_email(user)
+        except Exception as exc:
+            current_app.logger.warning(f"Could not dispatch student registration email: {exc}")
 
         flash('Registration successful! You can now log in.', 'success')
         return redirect(url_for('auth.login'))

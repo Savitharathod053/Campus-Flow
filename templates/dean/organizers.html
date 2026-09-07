@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+
+{% block title %}College Organizers - Dean Portal{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Header -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1 fs-6">
+                    <i class="bi bi-award-fill me-1"></i> Students Affairs Dean
+                </span>
+            </div>
+            <h2 class="fw-bold text-dark mb-0">College Organizers Roster</h2>
+            <p class="text-muted small mb-0">Certified student and faculty event organizers across all campus departments</p>
+        </div>
+        <div>
+            <a href="{{ url_for('dean.dashboard') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left me-1"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+
+    <!-- Search -->
+    <div class="card border-0 shadow-sm rounded-3 mb-4 p-3 bg-white">
+        <form method="GET" action="{{ url_for('dean.organizers') }}" class="row g-2 align-items-center">
+            <div class="col-md-9">
+                <div class="input-group">
+                    <span class="input-group-text bg-light border-end-0"><i class="bi bi-search"></i></span>
+                    <input type="text" name="q" value="{{ search }}" class="form-control bg-light border-start-0" placeholder="Search organizer name or email...">
+                </div>
+            </div>
+            <div class="col-md-3 d-flex gap-2">
+                <button type="submit" class="btn btn-primary w-100"><i class="bi bi-search me-1"></i> Search</button>
+                <a href="{{ url_for('dean.organizers') }}" class="btn btn-outline-secondary">Reset</a>
+            </div>
+        </form>
+    </div>
+
+    <!-- Organizers List -->
+    <div class="card border-0 shadow-sm rounded-3 overflow-hidden">
+        <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center">
+            <h5 class="fw-bold text-dark mb-0">Active Organizers ({{ organizers|length }})</h5>
+            <small class="text-muted">Approved via HOD Endorsement Pipeline</small>
+        </div>
+        <div class="card-body p-0">
+            {% if organizers %}
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light small text-uppercase">
+                            <tr>
+                                <th class="ps-3">Organizer</th>
+                                <th>Department / Unit</th>
+                                <th>Designation / Organization</th>
+                                <th>Events Hosted</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for org in organizers %}
+                                <tr>
+                                    <td class="ps-3">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="bg-primary bg-opacity-10 text-primary rounded-circle p-2 fs-5">
+                                                <i class="bi bi-person-fill"></i>
+                                            </div>
+                                            <div>
+                                                <div class="fw-bold text-dark">{{ org.name }}</div>
+                                                <small class="text-muted">{{ org.email }}</small>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-secondary-subtle text-dark border">
+                                            {{ org.organizer_profile.department if org.organizer_profile else (org.student_profile.department if org.student_profile else 'College') }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="small fw-semibold">{{ org.organizer_profile.organization_name if org.organizer_profile else 'Organizer' }}</div>
+                                        <small class="text-muted">{{ org.organizer_profile.designation if org.organizer_profile else 'Student Leader' }}</small>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-light text-dark border">{{ org.events_organized.count() }} events</span>
+                                    </td>
+                                    <td>
+                                        {% if org.is_active %}
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                                <i class="bi bi-check-circle-fill me-1"></i> Certified
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Suspended</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% else %}
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-people fs-1 d-block mb-2"></i>
+                    No organizers found matching your search.
+                </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

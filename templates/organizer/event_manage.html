@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Manage {{ event.title }} - FastFest{% endblock %}
+{% block title %}Manage {{ event.title }} - Campus Flow{% endblock %}
 
 {% block content %}
 <div class="bg-primary text-white py-4 mb-4">
@@ -16,7 +16,7 @@
                     <i class="bi bi-geo-alt me-1"></i> {{ event.venue }}
                 </p>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex flex-wrap gap-2 align-items-center">
                 <a href="{{ url_for('public.event_detail', slug=event.slug) }}" class="btn btn-outline-light btn-sm" target="_blank">
                     <i class="bi bi-eye me-1"></i> Student View
                 </a>
@@ -24,7 +24,7 @@
                     <i class="bi bi-pencil me-1"></i> Edit Event
                 </a>
                 {% if event.status != 'EVENT_COMPLETED' %}
-                <form method="POST" action="{{ url_for('organizer.complete_event', event_id=event.id) }}" onsubmit="return confirm('Mark this event as Completed? Active passes will be archived while all historical attendance, payments, and certificates are safely preserved.');" class="d-inline">
+                <form method="POST" action="{{ url_for('organizer.complete_event', event_id=event.id) }}" onsubmit="return confirm('Mark this event as Complete? Active passes will be archived while all historical attendance, payments, and certificates are safely preserved.');" class="d-inline">
                     <button type="submit" class="btn btn-warning btn-sm fw-bold">
                         <i class="bi bi-check2-all me-1"></i> Complete Event
                     </button>
@@ -134,19 +134,47 @@
             </div>
         </div>
 
-        <!-- Live QR Code Attendance Scanner -->
+        {% if event.allows_team_registration %}
+        <!-- Team & Group Management Hub -->
+        <div class="col-md-6 col-lg-4">
+            <div class="ff-card p-4 h-100 d-flex flex-column justify-content-between border-info border-opacity-75">
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-2 text-info">
+                        <i class="bi bi-diagram-3-fill fs-3 text-primary"></i>
+                        <h5 class="fw-bold mb-0 text-dark">Teams & Groups</h5>
+                    </div>
+                    <p class="small text-muted mb-2">Manage registered teams, completion status, and member breakdowns.</p>
+                    <div class="d-flex justify-content-between small text-secondary bg-light p-2 rounded mb-3">
+                        <span>Total: <strong>{{ total_teams_count }}</strong></span>
+                        <span>Complete: <strong class="text-success">{{ complete_teams_count }}</strong></span>
+                        <span>Pending: <strong class="text-warning">{{ pending_teams_count }}</strong></span>
+                    </div>
+                </div>
+                <a href="{{ url_for('organizer.event_teams', event_id=event.id) }}" class="btn btn-outline-info text-dark btn-sm fw-bold shadow-sm">
+                    <i class="bi bi-people me-1"></i> View All Teams ({{ total_teams_count }})
+                </a>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Live QR Code Attendance Scanner & Matrix -->
         <div class="col-md-6 col-lg-4">
             <div class="ff-card p-4 h-100 d-flex flex-column justify-content-between border-primary border-opacity-50">
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-2 text-primary">
                         <i class="bi bi-qr-code-scan fs-3"></i>
-                        <h5 class="fw-bold mb-0">Live QR Scanner</h5>
+                        <h5 class="fw-bold mb-0">Attendance Checkpoints</h5>
                     </div>
-                    <p class="small text-muted mb-3">Use your camera to scan student ticket QR passes at the venue door with duplicate prevention.</p>
+                    <p class="small text-muted mb-3">Multi-session QR scanning, session checkpoints ({{ event.attendance_sessions.count() }} configured), duplicate prevention, and matrix reports.</p>
                 </div>
-                <a href="{{ url_for('organizer.attendance_scanner', event_id=event.id) }}" class="btn btn-primary btn-sm fw-bold shadow-sm">
-                    <i class="bi bi-camera me-1"></i> Launch Attendance Scanner
-                </a>
+                <div class="d-flex flex-column gap-2">
+                    <a href="{{ url_for('organizer.attendance_scanner', event_id=event.id) }}" class="btn btn-primary btn-sm fw-bold shadow-sm">
+                        <i class="bi bi-camera me-1"></i> Launch QR Scanner
+                    </a>
+                    <a href="{{ url_for('organizer.attendance_dashboard', event_id=event.id) }}" class="btn btn-outline-primary btn-sm fw-bold">
+                        <i class="bi bi-grid-3x3 me-1"></i> View Attendance Matrix
+                    </a>
+                </div>
             </div>
         </div>
 

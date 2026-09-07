@@ -56,7 +56,7 @@ def generate_certificate_image(student_name, roll_number, department, event_titl
     font_code = get_font(20, bold=True)
 
     # Top College Header
-    college_title = "FASTFEST COLLEGE OF ENGINEERING & TECHNOLOGY"
+    college_title = "CAMPUS FLOW COLLEGE OF ENGINEERING & TECHNOLOGY"
     draw.text((width / 2, 120), college_title, fill=slate_dark, font=font_college, anchor="mm")
     draw.text((width / 2, 160), "OFFICIAL CAMPUS EVENT PLATFORM", fill=slate_light, font=font_sub, anchor="mm")
 
@@ -87,7 +87,7 @@ def generate_certificate_image(student_name, roll_number, department, event_titl
     draw.text((width / 2, 675), f"Conducted on {event_date_str}", fill=slate_dark, font=font_body, anchor="mm")
 
     # Verification QR Code
-    qr_data = f"FASTFEST-CERT-VERIFY:{certificate_code}"
+    qr_data = f"CAMPUSFLOW-CERT-VERIFY:{certificate_code}"
     qr = qrcode.QRCode(version=1, box_size=4, border=1)
     qr.add_data(qr_data)
     qr.make(fit=True)

@@ -1,0 +1,195 @@
+﻿{% extends "base.html" %}
+{% block title %}Teams: {{ event.title }} - Campus Flow{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h2 class="fw-bold mb-1"><i class="bi bi-people-fill me-2"></i> Team Roster & Groups</h2>
+                <p class="text-light opacity-90 mb-0">{{ event.title }} &bull; Total Teams: <strong>{{ teams|length }}</strong></p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('organizer.participants', event_id=event.id) }}" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-person-lines-fill me-1"></i> Individual Participants
+                </a>
+                <a href="{{ url_for('organizer.manage_event', event_id=event.id) }}" class="btn btn-light btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i> Event Hub
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Team Summary Metrics -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-primary text-white">
+                    <i class="bi bi-people"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ teams|length }}</div>
+                    <div class="metric-label">Total Teams</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-success text-white">
+                    <i class="bi bi-check-circle"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ teams|selectattr("status", "in", ["COMPLETE", "FULL"])|list|length }}</div>
+                    <div class="metric-label">Complete Teams</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-warning text-dark">
+                    <i class="bi bi-clock-history"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ teams|selectattr("status", "equalto", "PENDING")|list|length }}</div>
+                    <div class="metric-label">Pending Teams</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card">
+                <div class="metric-icon-box bg-info text-white">
+                    <i class="bi bi-person-check"></i>
+                </div>
+                <div>
+                    <div class="metric-number">
+                        {% set total_participants = [] %}
+                        {% for t in teams %}
+                            {% for m in t.confirmed_members %}
+                                {% set _ = total_participants.append(1) %}
+                            {% endfor %}
+                        {% endfor %}
+                        {{ total_participants|length }}
+                    </div>
+                    <div class="metric-label">Confirmed Team Participants</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Teams List -->
+    {% if teams %}
+        <div class="d-flex flex-column gap-4">
+            {% for team in teams %}
+                <div class="ff-card p-4 shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 border-bottom pb-3 mb-3">
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <h4 class="fw-bold text-dark mb-0">{{ team.team_name }}</h4>
+                                {% if team.status == 'FULL' %}
+                                    <span class="badge bg-success">FULL</span>
+                                {% elif team.status == 'COMPLETE' %}
+                                    <span class="badge bg-primary">COMPLETE</span>
+                                {% elif team.status == 'PENDING' %}
+                                    <span class="badge bg-warning text-dark">PENDING</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ team.status }}</span>
+                                {% endif %}
+
+                                {% if team.payment_status == 'PAID' %}
+                                    <span class="badge bg-success">PAID</span>
+                                {% elif team.payment_status == 'PENDING' %}
+                                    <span class="badge bg-warning text-dark">PAYMENT PENDING</span>
+                                {% endif %}
+                            </div>
+                            <div class="small text-muted mt-1">
+                                Team Lead: <strong>{{ team.lead.name }}</strong> ({{ team.lead.email }}) &bull;
+                                Registered on {{ team.created_at|dateformat }}
+                            </div>
+                        </div>
+                        <div class="text-end">
+                            <span class="fs-5 fw-bold text-primary">{{ team.total_confirmed_count }}</span>
+                            <span class="text-muted">/ {{ event.max_team_size }} members</span>
+                        </div>
+                    </div>
+
+                    <!-- Team Members Roster -->
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead class="table-light small">
+                                <tr>
+                                    <th>Member Name</th>
+                                    <th>Email</th>
+                                    <th>Roll Number</th>
+                                    <th>Department</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Ticket Code</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for m in team.members %}
+                                    <tr>
+                                        <td class="fw-semibold">{{ m.student.name if m.student else 'Invited' }}</td>
+                                        <td class="small text-muted">{{ m.student.email if m.student else '' }}</td>
+                                        <td>
+                                            <span class="badge bg-light text-dark border small">
+                                                {{ m.student.student_profile.roll_number if m.student and m.student.student_profile else 'N/A' }}
+                                            </span>
+                                        </td>
+                                        <td class="small">{{ m.student.student_profile.department if m.student and m.student.student_profile else 'N/A' }}</td>
+                                        <td>
+                                            {% if m.is_lead %}
+                                                <span class="badge bg-primary">Team Lead</span>
+                                            {% else %}
+                                                <span class="badge bg-light text-dark border">Member</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if m.status == 'CONFIRMED' %}
+                                                <span class="badge bg-success">Confirmed</span>
+                                            {% elif m.status == 'PENDING' %}
+                                                <span class="badge bg-warning text-dark">Pending</span>
+                                            {% elif m.status == 'DECLINED' %}
+                                                <span class="badge bg-danger">Declined</span>
+                                            {% else %}
+                                                <span class="badge bg-secondary">{{ m.status }}</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% set reg = team.registrations.filter_by(student_id=m.student_id).first() if m.student else None %}
+                                            {% if reg %}
+                                                <code class="small">{{ reg.registration_code }}</code>
+                                            {% else %}
+                                                <span class="small text-muted">—</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pending Invitations if any -->
+                    {% set active_invites = team.invitations|selectattr("is_active")|list %}
+                    {% if active_invites %}
+                        <div class="mt-3 pt-2 border-top">
+                            <span class="small fw-bold text-muted me-2">Pending Member Invitations:</span>
+                            {% for inv in active_invites %}
+                                <span class="badge bg-light text-secondary border me-1">{{ inv.invited_email }}</span>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-5 ff-card shadow-sm">
+            <i class="bi bi-people text-muted opacity-50 fs-1 d-block mb-3"></i>
+            <h5 class="fw-bold text-secondary mb-1">No Teams Registered Yet</h5>
+            <p class="text-muted small mb-0">Students will appear here once they register groups for this event.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

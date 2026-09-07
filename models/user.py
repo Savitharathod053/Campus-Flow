@@ -5,11 +5,18 @@ from flask_sqlalchemy import SQLAlchemy
 db = SQLAlchemy()
 
 class UserRole:
-    STUDENT = 'STUDENT'
-    ORGANIZER = 'ORGANIZER'
-    FACULTY_ADMIN = 'FACULTY_ADMIN'
+    SUPER_ADMIN = 'super_admin'
+    STUDENTS_AFFAIRS_DEAN = 'students_affairs_dean'
+    HOD = 'hod'
+    ORGANIZER = 'organizer'
+    STUDENT = 'student'
     
-    CHOICES = [STUDENT, ORGANIZER, FACULTY_ADMIN]
+    CHOICES = [SUPER_ADMIN, STUDENTS_AFFAIRS_DEAN, HOD, ORGANIZER, STUDENT]
+
+    # Backward compatibility aliases for legacy references in legacy tests
+    FACULTY = HOD
+    FACULTY_ADMIN = HOD
+    ADMIN = SUPER_ADMIN
 
 
 class User(db.Model):
@@ -20,7 +27,7 @@ class User(db.Model):
     password_hash = db.Column(db.String(255), nullable=False)
     name = db.Column(db.String(100), nullable=False)
     phone = db.Column(db.String(20), nullable=True)
-    role = db.Column(db.String(20), nullable=False, default=UserRole.STUDENT, index=True)
+    role = db.Column(db.String(50), nullable=False, default=UserRole.STUDENT, index=True)
     is_active = db.Column(db.Boolean, default=True, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
@@ -33,6 +40,7 @@ class User(db.Model):
     organized_events = db.relationship('Event', back_populates='organizer', lazy='dynamic', cascade='all, delete-orphan')
     registrations = db.relationship('EventRegistration', back_populates='student', lazy='dynamic', cascade='all, delete-orphan')
     announcements = db.relationship('Announcement', back_populates='author', lazy='dynamic')
+    audit_logs = db.relationship('AuditLog', back_populates='admin', lazy='dynamic')
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -42,15 +50,37 @@ class User(db.Model):
         
     @property
     def is_student(self):
-        return self.role == UserRole.STUDENT
+        return (self.role or '').lower() in (UserRole.STUDENT, 'student')
         
     @property
     def is_organizer(self):
-        return self.role == UserRole.ORGANIZER
-        
+        return (self.role or '').lower() in (UserRole.ORGANIZER, 'organizer')
+
+    @property
+    def is_hod(self):
+        return (self.role or '').lower() in (UserRole.HOD, 'hod')
+
+    @property
+    def is_students_affairs_dean(self):
+        return (self.role or '').lower() in (UserRole.STUDENTS_AFFAIRS_DEAN, 'students_affairs_dean', 'dean')
+
+    @property
+    def is_dean(self):
+        return self.is_students_affairs_dean
+
+    @property
+    def is_super_admin(self):
+        return (self.role or '').lower() in (UserRole.SUPER_ADMIN, 'super_admin', 'superadmin')
+
+    @property
+    def is_faculty(self):
+        """Backward compatibility helper during migration."""
+        return self.is_hod or (self.role or '').upper() == 'FACULTY'
+
     @property
     def is_admin(self):
-        return self.role == UserRole.FACULTY_ADMIN
+        """Backward compatibility helper."""
+        return self.is_super_admin or (self.role or '').upper() in ('FACULTY_ADMIN', 'ADMIN')
         
     def __repr__(self):
         return f'<User {self.email} ({self.role})>'
@@ -62,7 +92,7 @@ class StudentProfile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), unique=True, nullable=False)
     roll_number = db.Column(db.String(50), unique=True, nullable=False, index=True)
-    department = db.Column(db.String(100), nullable=False)
+    department = db.Column(db.String(100), nullable=False)        # CSE, IT, CSD, CSM, ECE, EEE, MECH, CIVILS
     year = db.Column(db.Integer, nullable=False)  # 1, 2, 3, 4
     section = db.Column(db.String(10), nullable=False)
     college_id_card = db.Column(db.String(255), nullable=True)
@@ -79,7 +109,7 @@ class OrganizerProfile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), unique=True, nullable=False)
     organization_name = db.Column(db.String(150), nullable=False)  # e.g., "Google Developer Student Club", "CSI Student Chapter"
-    department = db.Column(db.String(100), nullable=False)        # Department: CSE, ECE, MECH, IT, CIVIL, EEE, General
+    department = db.Column(db.String(100), nullable=False)        # Department: CSE, IT, CSD, CSM, ECE, EEE, MECH, CIVILS, General
     designation = db.Column(db.String(100), nullable=True)        # e.g., "Lead Organizer", "President"
     
     # Approval fields
@@ -102,7 +132,7 @@ class FacultyProfile(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), unique=True, nullable=False)
     employee_id = db.Column(db.String(50), unique=True, nullable=False)
-    department = db.Column(db.String(100), nullable=False)       # CSE, ECE, MECH, IT, CIVIL, EEE, General
+    department = db.Column(db.String(100), nullable=False)       # CSE, IT, CSD, CSM, ECE, EEE, MECH, CIVILS, General
     designation = db.Column(db.String(100), nullable=False)     # e.g., "Head of Department & Faculty Admin", "Dean"
     
     user = db.relationship('User', back_populates='faculty_profile')

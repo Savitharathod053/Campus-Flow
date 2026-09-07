@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Explore College Events - FastFest{% endblock %}
+{% block title %}Explore College Events - Campus Flow{% endblock %}
 
 {% block content %}
 <div class="bg-primary text-white py-4 mb-4">
@@ -41,7 +41,11 @@
                         <select name="department" class="form-select form-select-sm">
                             <option value="ALL">All Departments</option>
                             {% for d in departments %}
-                                <option value="{{ d }}" {% if selected_dept == d %}selected{% endif %}>{{ d }}</option>
+                                {% if d is string %}
+                                    <option value="{{ d }}" {% if selected_dept == d %}selected{% endif %}>{{ d }}</option>
+                                {% else %}
+                                    <option value="{{ d[0] }}" {% if selected_dept == d[0] %}selected{% endif %}>{{ d[1] }}</option>
+                                {% endif %}
                             {% endfor %}
                         </select>
                     </div>

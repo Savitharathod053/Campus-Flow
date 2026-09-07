@@ -23,24 +23,71 @@
     <div class="container">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div>
+                <span class="badge bg-warning text-dark mb-1">{{ event.event_type }} &bull; Attendance Portal</span>
                 <h2 class="fw-bold mb-1"><i class="bi bi-qr-code-scan me-2"></i> Attendance Check-In Portal</h2>
                 <p class="text-light opacity-90 mb-0">Event: <strong>{{ event.title }}</strong> &bull; Venue: <strong>{{ event.venue }}</strong></p>
             </div>
-            <a href="{{ url_for('organizer.manage_event', event_id=event.id) }}" class="btn btn-light btn-sm fw-bold">
-                <i class="bi bi-arrow-left me-1"></i> Back to Event Hub
-            </a>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('organizer.attendance_dashboard', event_id=event.id) }}" class="btn btn-warning btn-sm fw-bold">
+                    <i class="bi bi-grid-3x3 me-1"></i> Attendance Matrix
+                </a>
+                <a href="{{ url_for('organizer.manage_event', event_id=event.id) }}" class="btn btn-light btn-sm fw-bold">
+                    <i class="bi bi-arrow-left me-1"></i> Event Hub
+                </a>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="container pb-5">
+    <!-- Session Selector Bar -->
+    <div class="ff-card p-3 mb-4 shadow-sm border-primary border-opacity-50">
+        <div class="row align-items-center g-3">
+            <div class="col-md-5">
+                <label class="form-label small fw-bold text-muted mb-1"><i class="bi bi-diagram-3 text-primary me-1"></i> Active Attendance Session</label>
+                <select id="scanner-session-select" class="form-select form-select-lg fw-bold text-primary">
+                    {% for s in sessions %}
+                        <option value="{{ s.id }}" {% if selected_session and selected_session.id == s.id %}selected{% endif %}>
+                            #{{ s.session_number }}: {{ s.session_name }} {% if s.start_time %}({{ s.start_time|timeformat }} - {{ s.end_time|timeformat }}){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-7">
+                <div class="d-flex justify-content-md-end gap-3 text-center flex-wrap">
+                    <div class="bg-light p-2 px-3 rounded-3 border">
+                        <div class="small text-muted fw-bold">Session Check-Ins</div>
+                        <div class="fs-4 fw-extrabold text-success">
+                            <span id="session-present-count">{{ present_count }}</span>
+                            <span class="fs-6 text-muted">/ {{ total_participants }}</span>
+                        </div>
+                    </div>
+                    <div class="bg-light p-2 px-3 rounded-3 border">
+                        <div class="small text-muted fw-bold">Session Status</div>
+                        <div class="fs-6 fw-bold mt-1">
+                            {% if selected_session and selected_session.status == 'ACTIVE' %}
+                                <span class="badge bg-success">ACTIVE</span>
+                            {% elif selected_session and selected_session.status == 'UPCOMING' %}
+                                <span class="badge bg-info text-white">UPCOMING</span>
+                            {% elif selected_session and selected_session.status == 'COMPLETED' %}
+                                <span class="badge bg-secondary">COMPLETED</span>
+                            {% else %}
+                                <span class="badge bg-primary">READY</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="row g-4">
         <!-- Left: Live Camera Scanner & Manual Entry -->
         <div class="col-lg-6">
             <div class="ff-card p-4 shadow-sm mb-4">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="fw-bold mb-0"><i class="bi bi-camera-fill text-primary me-2"></i> Live Camera Scanner</h5>
-                    <span id="scanner-status" class="small text-muted">Ready</span>
+                    <span id="scanner-status" class="small text-muted">Ready for scanning</span>
                 </div>
 
                 <!-- Video Viewport -->
@@ -59,12 +106,12 @@
                 <!-- Scan Results Container -->
                 <div id="scan-result-box"></div>
 
-                <!-- Manual Registration Code Input -->
+                <!-- Manual Ticket Code Input -->
                 <div class="border-top pt-3">
                     <h6 class="fw-bold mb-2 text-secondary"><i class="bi bi-keyboard me-1"></i> Manual Ticket Code Entry</h6>
-                    <form id="manual-entry-form" class="row g-2">
+                    <form id="manual-entry-form" class="row g-2" onsubmit="return false;">
                         <div class="col-8">
-                            <input type="text" id="manual-ticket-code" class="form-control" placeholder="e.g. FF-E1-S1-ABC1234" required>
+                            <input type="text" id="manual-ticket-code" class="form-control" placeholder="Ticket Code, Roll No, or Email" autocomplete="off" required>
                         </div>
                         <div class="col-4">
                             <button type="submit" class="btn btn-dark w-100 fw-bold">
@@ -72,6 +119,9 @@
                             </button>
                         </div>
                     </form>
+                    <div class="form-text small text-muted mt-1">
+                        Enter full ticket code (e.g. <code>CF-E1-S1-ABC1234</code>), student roll number, or registered email.
+                    </div>
                 </div>
             </div>
         </div>
@@ -80,7 +130,7 @@
         <div class="col-lg-6">
             <div class="ff-card p-4 shadow-sm h-100">
                 <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h5 class="fw-bold mb-0"><i class="bi bi-list-check text-success me-2"></i> Live Check-In Log</h5>
+                    <h5 class="fw-bold mb-0"><i class="bi bi-list-check text-success me-2"></i> Session Check-In Log</h5>
                     <span class="badge bg-success" id="live-checkin-count">{{ recent_attendance|length }} Recorded</span>
                 </div>
 
@@ -91,6 +141,7 @@
                                 <th>Student</th>
                                 <th>Roll No</th>
                                 <th>Dept / Year</th>
+                                <th>Session</th>
                                 <th>Time</th>
                                 <th>Status</th>
                             </tr>
@@ -99,7 +150,12 @@
                             {% if recent_attendance %}
                                 {% for att in recent_attendance %}
                                     <tr>
-                                        <td><strong>{{ att.student.name }}</strong></td>
+                                        <td>
+                                            <strong>{{ att.student.name }}</strong>
+                                            {% if att.registration and att.registration.team %}
+                                                <br><span class="badge bg-primary bg-opacity-10 text-primary small">{{ att.registration.team.team_name }}</span>
+                                            {% endif %}
+                                        </td>
                                         <td><span class="badge bg-light text-dark border">{{ att.student.student_profile.roll_number if att.student.student_profile else 'N/A' }}</span></td>
                                         <td>
                                             {% if att.student.student_profile %}
@@ -108,13 +164,16 @@
                                                 N/A
                                             {% endif %}
                                         </td>
+                                        <td>
+                                            <span class="badge bg-info text-dark small">{{ att.session.session_name if att.session else 'General' }}</span>
+                                        </td>
                                         <td>{{ att.scanned_at|timeformat }}</td>
                                         <td><span class="badge bg-success">Verified</span></td>
                                     </tr>
                                 {% endfor %}
                             {% else %}
-                                <tr>
-                                    <td colspan="5" class="text-center text-muted py-4">No check-ins recorded yet. Start scanning to mark attendance.</td>
+                                <tr class="empty-log-row">
+                                    <td colspan="6" class="text-center text-muted py-4">No check-ins recorded for this session yet. Start scanning to mark attendance.</td>
                                 </tr>
                             {% endif %}
                         </tbody>

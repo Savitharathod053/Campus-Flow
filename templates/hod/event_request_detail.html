@@ -1,0 +1,275 @@
+{% extends 'base.html' %}
+
+{% block title %}Review Event Proposal: {{ req.event_name }} - HOD Portal{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- Breadcrumb & Header -->
+    <div class="mb-4">
+        <a href="{{ url_for('hod.dashboard') }}" class="btn btn-outline-secondary btn-sm mb-2">
+            <i class="bi bi-arrow-left me-1"></i> Back to HOD Portal
+        </a>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div>
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1 mb-1">
+                    Department Review &bull; {{ req.department.code if req.department else '' }}
+                </span>
+                <h2 class="fw-bold text-dark mb-0">{{ req.event_name }}</h2>
+                <p class="text-muted small mb-0">Submitted by <strong>{{ req.organizer.name if req.organizer else 'Organizer' }}</strong> ({{ req.organizer.email if req.organizer else '' }})</p>
+            </div>
+            <div>
+                {% if req.overall_status.value == 'pending_hod_approval' %}
+                    <span class="badge bg-warning text-dark fs-6 px-3 py-2 border border-warning">
+                        <i class="bi bi-hourglass-split me-1"></i> Pending Your HOD Endorsement
+                    </span>
+                {% elif req.overall_status.value == 'pending_dean_approval' %}
+                    <span class="badge bg-info text-dark fs-6 px-3 py-2">
+                        <i class="bi bi-send-check me-1"></i> Forwarded to Dean
+                    </span>
+                {% elif req.overall_status.value == 'approved' %}
+                    <span class="badge bg-success fs-6 px-3 py-2">
+                        <i class="bi bi-check-circle-fill me-1"></i> Fully Approved & Published
+                    </span>
+                {% elif req.overall_status.value == 'rejected_by_hod' %}
+                    <span class="badge bg-danger fs-6 px-3 py-2">
+                        <i class="bi bi-x-circle-fill me-1"></i> Declined by HOD
+                    </span>
+                {% elif req.overall_status.value == 'rejected_by_dean' %}
+                    <span class="badge bg-danger fs-6 px-3 py-2">
+                        <i class="bi bi-x-circle-fill me-1"></i> Declined by Dean
+                    </span>
+                {% else %}
+                    <span class="badge bg-secondary fs-6 px-3 py-2">{{ req.overall_status.value }}</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Dual Approval Workflow Stepper -->
+    <div class="card border-0 shadow-sm rounded-3 mb-4 p-3 bg-white">
+        <h6 class="fw-bold text-dark mb-3"><i class="bi bi-diagram-3-fill text-primary me-2"></i> Approval Pipeline Flow</h6>
+        <div class="row text-center g-2">
+            <!-- Step 1 -->
+            <div class="col-md-3">
+                <div class="p-3 border rounded-3 bg-light h-100">
+                    <div class="text-success fs-3 mb-1"><i class="bi bi-check-circle-fill"></i></div>
+                    <div class="fw-bold text-dark small">1. Proposal Submitted</div>
+                    <div class="small text-muted">{{ req.organizer.name if req.organizer else 'Organizer' }}</div>
+                    <small class="text-secondary" style="font-size: 0.72rem;">{{ req.created_at.strftime('%b %d, %Y %I:%M %p') if req.created_at else '' }}</small>
+                </div>
+            </div>
+            <!-- Step 2 -->
+            <div class="col-md-3">
+                <div class="p-3 border rounded-3 h-100 {% if req.hod_approval_status == 'approved' %}bg-success-subtle border-success{% elif req.hod_approval_status == 'rejected' %}bg-danger-subtle border-danger{% else %}bg-warning-subtle border-warning{% endif %}">
+                    {% if req.hod_approval_status == 'approved' %}
+                        <div class="text-success fs-3 mb-1"><i class="bi bi-check-circle-fill"></i></div>
+                        <div class="fw-bold text-success small">2. Endorsed by You</div>
+                        <div class="small text-dark">{{ req.hod_reviewer.name if req.hod_reviewer else 'HOD' }}</div>
+                        <small class="text-secondary" style="font-size: 0.72rem;">{{ req.hod_decision_at.strftime('%b %d, %Y %I:%M %p') if req.hod_decision_at else '' }}</small>
+                    {% elif req.hod_approval_status == 'rejected' %}
+                        <div class="text-danger fs-3 mb-1"><i class="bi bi-x-circle-fill"></i></div>
+                        <div class="fw-bold text-danger small">2. Declined by You</div>
+                    {% else %}
+                        <div class="text-warning fs-3 mb-1"><i class="bi bi-hourglass-split"></i></div>
+                        <div class="fw-bold text-warning small">2. HOD Review (Your Action)</div>
+                    {% endif %}
+                </div>
+            </div>
+            <!-- Step 3 -->
+            <div class="col-md-3">
+                <div class="p-3 border rounded-3 h-100 {% if req.dean_approval_status == 'approved' %}bg-success-subtle border-success{% elif req.dean_approval_status == 'rejected' %}bg-danger-subtle border-danger{% elif req.hod_approval_status == 'approved' %}bg-warning-subtle border-warning{% else %}bg-light{% endif %}">
+                    {% if req.dean_approval_status == 'approved' %}
+                        <div class="text-success fs-3 mb-1"><i class="bi bi-check-circle-fill"></i></div>
+                        <div class="fw-bold text-success small">3. Dean Cleared</div>
+                        <div class="small text-dark">{{ req.dean_reviewer.name if req.dean_reviewer else 'Dean' }}</div>
+                        <small class="text-secondary" style="font-size: 0.72rem;">{{ req.dean_decision_at.strftime('%b %d, %Y %I:%M %p') if req.dean_decision_at else '' }}</small>
+                    {% elif req.dean_approval_status == 'rejected' %}
+                        <div class="text-danger fs-3 mb-1"><i class="bi bi-x-circle-fill"></i></div>
+                        <div class="fw-bold text-danger small">3. Declined by Dean</div>
+                    {% else %}
+                        <div class="text-muted fs-3 mb-1"><i class="bi bi-hourglass"></i></div>
+                        <div class="fw-bold text-muted small">3. Students Affairs Dean Review</div>
+                    {% endif %}
+                </div>
+            </div>
+            <!-- Step 4 -->
+            <div class="col-md-3">
+                <div class="p-3 border rounded-3 h-100 {% if req.overall_status.value == 'approved' %}bg-success text-white border-success{% else %}bg-light{% endif %}">
+                    {% if req.overall_status.value == 'approved' %}
+                        <div class="text-white fs-3 mb-1"><i class="bi bi-megaphone-fill"></i></div>
+                        <div class="fw-bold text-white small">4. Live & Published</div>
+                    {% else %}
+                        <div class="text-muted fs-3 mb-1"><i class="bi bi-eye-slash-fill"></i></div>
+                        <div class="fw-bold text-muted small">4. Unpublished</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Left: Proposal Details -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm rounded-3 mb-4">
+                <div class="card-header bg-white border-bottom py-3">
+                    <h5 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-primary me-2"></i> Event Proposal Details</h5>
+                </div>
+                <div class="card-body p-4">
+                    {% if req.poster_image %}
+                        <div class="mb-4 text-center">
+                            <img src="{{ req.poster_image }}" alt="Poster" class="img-fluid rounded-3 border shadow-sm" style="max-height: 280px; object-fit: cover;">
+                        </div>
+                    {% endif %}
+
+                    <div class="row g-3 mb-4">
+                        <div class="col-md-6">
+                            <label class="text-muted small text-uppercase fw-semibold">Event Category</label>
+                            <p class="fw-bold text-dark mb-0">{{ req.category }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-muted small text-uppercase fw-semibold">Department Host</label>
+                            <p class="fw-bold text-dark mb-0">{{ req.department.name if req.department else 'N/A' }} ({{ req.department.code if req.department else '' }})</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-muted small text-uppercase fw-semibold">Schedule Date & Time</label>
+                            <p class="fw-bold text-dark mb-0">
+                                <i class="bi bi-calendar-event me-1"></i>
+                                {{ req.start_time.strftime('%a, %b %d, %Y %I:%M %p') if req.start_time else 'TBD' }}
+                                {% if req.end_time %}
+                                    <br><small class="text-muted">to {{ req.end_time.strftime('%a, %b %d, %Y %I:%M %p') }}</small>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-muted small text-uppercase fw-semibold">Venue / Location</label>
+                            <p class="fw-bold text-dark mb-0"><i class="bi bi-geo-alt-fill text-danger me-1"></i> {{ req.venue or 'Campus Venue TBD' }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-muted small text-uppercase fw-semibold">Registration Model</label>
+                            <p class="fw-bold text-dark mb-0">{{ req.registration_type }}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-muted small text-uppercase fw-semibold">Participation Capacity</label>
+                            <p class="fw-bold text-dark mb-0">{{ req.expected_participants or 'Open Registration' }} attendees</p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-muted small text-uppercase fw-semibold">Fee & Payment Mode</label>
+                            <p class="fw-bold text-dark mb-0">
+                                {% if req.is_free %}
+                                    <span class="badge bg-success">Free Event</span>
+                                {% else %}
+                                    <span class="badge bg-warning text-dark">&#8377;{{ req.registration_fee }}</span>
+                                    {% if req.upi_id %}
+                                        <small class="text-muted d-block">UPI: {{ req.upi_id }}</small>
+                                    {% endif %}
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-muted small text-uppercase fw-semibold">Faculty Coordinator</label>
+                            <p class="fw-bold text-dark mb-0">{{ req.faculty_coordinator or 'Department Assigned' }}</p>
+                            <small class="text-muted">{{ req.faculty_coordinator_contact or '' }}</small>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-4">
+                        <label class="text-muted small text-uppercase fw-semibold mb-1">Event Description</label>
+                        <div class="p-3 bg-light rounded-3 text-dark">
+                            {{ req.description or 'No description provided.' }}
+                        </div>
+                    </div>
+
+                    {% if req.rules %}
+                        <div class="mb-4">
+                            <label class="text-muted small text-uppercase fw-semibold mb-1">Rules & Guidelines</label>
+                            <div class="p-3 bg-light rounded-3 text-dark">
+                                {{ req.rules }}
+                            </div>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Actions -->
+        <div class="col-lg-4">
+            {% if req.overall_status.value == 'pending_hod_approval' %}
+                <div class="card border-0 shadow-sm rounded-3 mb-4 border-warning border-top border-4">
+                    <div class="card-header bg-white py-3">
+                        <h5 class="fw-bold text-dark mb-0"><i class="bi bi-shield-check text-warning me-2"></i> HOD Endorsement</h5>
+                    </div>
+                    <div class="card-body p-3">
+                        <p class="small text-muted mb-3">
+                            Endorsing this proposal will forward it to the <strong>Students Affairs Dean</strong> for final institutional clearance and publishing.
+                        </p>
+
+                        <!-- Endorse Form -->
+                        <form method="POST" action="{{ url_for('hod.approve_event_request', request_id=req.id) }}" class="mb-3">
+                            <button type="submit" class="btn btn-success w-100 py-2 fw-bold shadow-sm" onclick="return confirm('Endorse {{ req.event_name }} and forward to Dean?');">
+                                <i class="bi bi-check-circle-fill me-1"></i> Endorse & Forward to Dean
+                            </button>
+                        </form>
+
+                        <hr>
+
+                        <!-- Reject Form -->
+                        <h6 class="fw-bold text-danger mb-2"><i class="bi bi-x-circle me-1"></i> Decline Proposal</h6>
+                        <form method="POST" action="{{ url_for('hod.reject_event_request', request_id=req.id) }}">
+                            <div class="mb-3">
+                                <label class="form-label small fw-semibold text-muted">Reason for Decline *</label>
+                                <textarea name="reason" class="form-control form-control-sm" rows="3" required placeholder="Explain why this proposal is declined at the department level..."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-outline-danger btn-sm w-100 fw-bold" onclick="return confirm('Decline this event proposal?');">
+                                <i class="bi bi-x-lg me-1"></i> Decline Proposal
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            {% elif req.overall_status.value == 'pending_dean_approval' %}
+                <div class="card border-0 shadow-sm rounded-3 mb-4 border-primary border-top border-4">
+                    <div class="card-body p-4 text-center">
+                        <div class="text-primary fs-1 mb-2"><i class="bi bi-send-check"></i></div>
+                        <h5 class="fw-bold text-dark">Endorsed & Forwarded</h5>
+                        <p class="small text-muted mb-0">
+                            You endorsed this proposal on {{ req.hod_decision_at.strftime('%b %d, %Y %I:%M %p') if req.hod_decision_at else '' }}. It is currently under review by the Students Affairs Dean.
+                        </p>
+                    </div>
+                </div>
+            {% elif req.overall_status.value == 'approved' %}
+                <div class="card border-0 shadow-sm rounded-3 mb-4 border-success border-top border-4">
+                    <div class="card-body p-4 text-center">
+                        <div class="text-success fs-1 mb-2"><i class="bi bi-check-circle-fill"></i></div>
+                        <h5 class="fw-bold text-dark">Published & Live</h5>
+                        <p class="small text-muted mb-3">Both HOD and Dean approvals completed.</p>
+                        {% if req.event_id and req.event %}
+                            <a href="{{ url_for('public.event_detail', slug=req.event.slug) }}" target="_blank" class="btn btn-primary btn-sm w-100">
+                                View Live Page
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            {% elif req.overall_status.value in ['rejected_by_hod', 'rejected_by_dean'] %}
+                <div class="card border-0 shadow-sm rounded-3 mb-4 border-danger border-top border-4">
+                    <div class="card-body p-4 text-center">
+                        <div class="text-danger fs-1 mb-2"><i class="bi bi-x-circle-fill"></i></div>
+                        <h5 class="fw-bold text-dark">Proposal Declined</h5>
+                        <p class="small text-danger fst-italic mb-0">
+                            "{{ req.hod_rejection_reason or req.dean_rejection_reason }}"
+                        </p>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Organizer Profile Card -->
+            <div class="card border-0 shadow-sm rounded-3 p-3 bg-white">
+                <h6 class="fw-bold text-dark mb-2"><i class="bi bi-person-fill me-2"></i> Organizer Contact</h6>
+                <div class="fw-bold text-dark">{{ req.organizer.name if req.organizer else 'N/A' }}</div>
+                <div class="small text-muted">{{ req.organizer.email if req.organizer else '' }}</div>
+                <div class="small text-muted mt-2"><strong>Phone/Contact:</strong> {{ req.contact_info or 'N/A' }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

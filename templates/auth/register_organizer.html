@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Organizer Registration - FastFest{% endblock %}
+{% block title %}Organizer Registration - Campus Flow{% endblock %}
 
 {% block content %}
 <div class="container py-5">
@@ -43,12 +43,14 @@
                             <label class="form-label small fw-bold">Department / Affiliation *</label>
                             <select name="department" id="department_select" class="form-select" required onchange="updateAdminDisplay(this.value)">
                                 <option value="" disabled selected>Select Department</option>
-                                <option value="CSE">Computer Science & Engineering (CSE)</option>
-                                <option value="IT">Information Technology (IT)</option>
-                                <option value="ECE">Electronics & Communication (ECE)</option>
-                                <option value="MECH">Mechanical Engineering (MECH)</option>
-                                <option value="CIVIL">Civil Engineering (CIVIL)</option>
-                                <option value="EEE">Electrical & Electronics (EEE)</option>
+                                <option value="CSE">1. Computer Science & Engineering (CSE)</option>
+                                <option value="IT">2. Information Technology (IT)</option>
+                                <option value="CSD">3. Computer Science & Engineering (Data Science) [CSD]</option>
+                                <option value="CSM">4. Computer Science & Engineering (AI & ML) [CSM]</option>
+                                <option value="ECE">5. Electronics & Communication (ECE)</option>
+                                <option value="EEE">6. Electrical & Electronics (EEE)</option>
+                                <option value="MECH">7. Mechanical Engineering (MECH)</option>
+                                <option value="CIVILS">8. Civil Engineering (CIVILS)</option>
                                 <option value="General">General / Inter-Departmental / College Level</option>
                             </select>
                         </div>

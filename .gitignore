@@ -1,8 +1,36 @@
+# Virtual environments
 .venv/
+.venv-1/
+venv/
+ENV/
+
+# Environment configuration
 .env
+.env.local
+
+# Byte-compiled / cache
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Local databases & instance files
 *.db
 *.sqlite
+*.sqlite3
 instance/
-static/uploads/
+
+# Local backups
+backups/
+backup_before_pull/
+requirements-full-backup.txt
+
+# User uploads (keep directory structure with .gitkeep)
+static/uploads/*/*
+!static/uploads/*/.gitkeep
+
+# IDE & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

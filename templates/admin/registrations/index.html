@@ -1,0 +1,157 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Registrations Ledger - Super Admin{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between pb-3 mb-4 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-1">
+            <i class="bi bi-ticket-detailed-fill text-primary me-2"></i> University Registrations Ledger
+        </h3>
+        <p class="text-muted small mb-0">Cross-event participant tracking, ticket codes, payment status, and attendance completion.</p>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="card border-0 shadow-sm rounded-3 p-3 bg-white mb-4">
+    <form method="GET" action="{{ url_for('admin.registrations_list') }}" class="row g-2 align-items-center">
+        <div class="col-md-3">
+            <select name="event_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="">All Events</option>
+                {% for ev in events %}
+                    <option value="{{ ev.id }}" {% if event_filter == ev.id %}selected{% endif %}>{{ ev.title|truncate(30) }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-3 col-6">
+            <select name="dept" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="ALL" {% if dept_filter == 'ALL' %}selected{% endif %}>All Departments</option>
+                {% for d in departments %}
+                    <option value="{{ d.code }}" {% if dept_filter == d.code %}selected{% endif %}>{{ d.code }} - {{ d.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="col-md-2 col-6">
+            <select name="payment_status" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="ALL" {% if payment_filter == 'ALL' %}selected{% endif %}>All Payments</option>
+                <option value="VERIFIED" {% if payment_filter == 'VERIFIED' %}selected{% endif %}>Verified / Paid</option>
+                <option value="PENDING" {% if payment_filter == 'PENDING' %}selected{% endif %}>Pending Verification</option>
+                <option value="FREE" {% if payment_filter == 'FREE' %}selected{% endif %}>Free Events</option>
+            </select>
+        </div>
+
+        <div class="col-md-2 col-6">
+            <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                <option value="ALL" {% if status_filter == 'ALL' %}selected{% endif %}>All Statuses</option>
+                <option value="CONFIRMED" {% if status_filter == 'CONFIRMED' %}selected{% endif %}>Confirmed</option>
+                <option value="PENDING" {% if status_filter == 'PENDING' %}selected{% endif %}>Pending</option>
+                <option value="CANCELLED" {% if status_filter == 'CANCELLED' %}selected{% endif %}>Cancelled</option>
+            </select>
+        </div>
+
+        <div class="col-md-2 d-flex gap-1">
+            <button type="submit" class="btn btn-sm btn-primary w-100"><i class="bi bi-filter"></i> Filter</button>
+            <a href="{{ url_for('admin.registrations_list') }}" class="btn btn-sm btn-outline-secondary" title="Reset Filters"><i class="bi bi-arrow-counterclockwise"></i></a>
+        </div>
+    </form>
+</div>
+
+<!-- Table Card -->
+<div class="card border-0 shadow-sm rounded-3 bg-white overflow-hidden">
+    <div class="table-responsive">
+        <table class="table align-middle table-hover mb-0">
+            <thead class="table-light small text-uppercase text-secondary" style="font-size: 0.75rem; letter-spacing: 0.05em;">
+                <tr>
+                    <th class="ps-4">Student</th>
+                    <th>Roll Number</th>
+                    <th>Department</th>
+                    <th>Event</th>
+                    <th>Registration Code</th>
+                    <th>Date</th>
+                    <th>Payment</th>
+                    <th>Attendance</th>
+                    <th class="text-end pe-4">Pass</th>
+                </tr>
+            </thead>
+            <tbody class="small">
+                {% for r in registrations %}
+                    <tr>
+                        <td class="ps-4">
+                            <a href="{{ url_for('admin.user_detail', user_id=r.student_id) }}" class="fw-bold text-dark text-decoration-none">
+                                {{ r.student.name if r.student else 'Unknown' }}
+                            </a>
+                            <div class="text-muted" style="font-size: 0.75rem;">{{ r.student.email if r.student else '' }}</div>
+                        </td>
+                        <td><code>{{ r.student.student_profile.roll_number if r.student and r.student.student_profile else '—' }}</code></td>
+                        <td>{{ r.student.student_profile.department if r.student and r.student.student_profile else '—' }}</td>
+                        <td>
+                            <a href="{{ url_for('admin.event_detail', event_id=r.event_id) }}" class="fw-semibold text-dark text-decoration-none">
+                                {{ r.event.title|truncate(22) if r.event else 'N/A' }}
+                            </a>
+                        </td>
+                        <td><code>{{ r.registration_code }}</code></td>
+                        <td class="text-muted" style="font-size: 0.75rem;">{{ r.created_at.strftime('%b %d, %Y') }}</td>
+                        <td>
+                            {% if r.payment %}
+                                <span class="badge {% if r.payment.status in ('VERIFIED', 'SUCCESS') %}bg-success-subtle text-success border border-success-subtle{% else %}bg-warning-subtle text-warning border border-warning-subtle{% endif %}">
+                                    ₹{{ r.payment.amount }} ({{ r.payment.status }})
+                                </span>
+                            {% elif r.event and r.event.is_free %}
+                                <span class="badge bg-light text-muted border">Free</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Unpaid</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if r.attendance_records %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle">Attended</span>
+                            {% else %}
+                                <span class="badge bg-light text-muted border">Not Scanned</span>
+                            {% endif %}
+                        </td>
+                        <td class="text-end pe-4">
+                            <a href="{{ url_for('student.ticket', code=r.registration_code) }}" target="_blank" class="btn btn-xs btn-outline-primary py-0 px-2" title="View Ticket Pass">
+                                <i class="bi bi-qr-code"></i> Ticket
+                            </a>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr><td colspan="9" class="text-center py-5 text-muted">No registration records found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if pagination.pages > 1 %}
+        <div class="p-3 border-top d-flex align-items-center justify-content-between">
+            <span class="small text-muted">Page {{ pagination.page }} of {{ pagination.pages }} ({{ pagination.total }} total registrations)</span>
+            <nav>
+                <ul class="pagination pagination-sm mb-0">
+                    {% if pagination.has_prev %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('admin.registrations_list', page=pagination.prev_num, event_id=event_filter, dept=dept_filter, payment_status=payment_filter, status=status_filter) }}">&laquo; Prev</a>
+                        </li>
+                    {% endif %}
+                    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if p %}
+                            <li class="page-item {% if p == pagination.page %}active{% endif %}">
+                                <a class="page-link" href="{{ url_for('admin.registrations_list', page=p, event_id=event_filter, dept=dept_filter, payment_status=payment_filter, status=status_filter) }}">{{ p }}</a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled"><span class="page-link">&hellip;</span></li>
+                        {% endif %}
+                    {% endfor %}
+                    {% if pagination.has_next %}
+                        <li class="page-item">
+                            <a class="page-link" href="{{ url_for('admin.registrations_list', page=pagination.next_num, event_id=event_filter, dept=dept_filter, payment_status=payment_filter, status=status_filter) }}">Next &raquo;</a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

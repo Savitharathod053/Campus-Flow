@@ -1,0 +1,109 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}{{ 'Edit Announcement' if ann else 'Create Announcement' }} - Super Admin{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex align-items-center justify-content-between pb-3 mb-4 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-1">
+            <i class="bi bi-megaphone-fill text-danger me-2"></i> {{ 'Edit Announcement' if ann else 'Create Broadcast Announcement' }}
+        </h3>
+        <p class="text-muted small mb-0">Publish important alerts, circulars, and system notices across Campus Flow.</p>
+    </div>
+    <a href="{{ url_for('admin.announcements_list') }}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Back to Announcements
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm rounded-3 bg-white p-4">
+            <form method="POST">
+                <!-- Title -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Announcement Title <span class="text-danger">*</span></label>
+                    <input type="text" name="title" class="form-control" placeholder="e.g. Annual Cultural Fest 2026 Registration Notice" value="{{ ann.title if ann else '' }}" required>
+                </div>
+
+                <!-- Target Audience -->
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label fw-semibold">Target Audience <span class="text-danger">*</span></label>
+                        <select name="target_audience" id="audienceSelect" class="form-select" required onchange="toggleDeptField()">
+                            {% for a_val in audiences %}
+                                <option value="{{ a_val }}" {% if ann and ann.target_audience == a_val %}selected{% endif %}>{{ a_val }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-6" id="deptContainer" style="display: none;">
+                        <label class="form-label fw-semibold">Target Department <span class="text-danger">*</span></label>
+                        <select name="target_department" id="deptSelect" class="form-select">
+                            <option value="">Select Department</option>
+                            {% for d in departments %}
+                                <option value="{{ d.code }}" {% if ann and ann.target_department == d.code %}selected{% endif %}>{{ d.code }} - {{ d.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Message Body -->
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Announcement Message / Notice Body <span class="text-danger">*</span></label>
+                    <textarea name="message" class="form-control" rows="6" placeholder="Write the full announcement details here..." required>{{ ann.message if ann else '' }}</textarea>
+                    <div class="form-text">Plain text format. Keep it concise, informative, and clear.</div>
+                </div>
+
+                <!-- Settings -->
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <div class="form-check form-switch pt-2">
+                            <input class="form-check-input" type="checkbox" name="is_pinned" id="pinnedCheck" {% if ann and ann.is_pinned %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="pinnedCheck">
+                                Pin this announcement to top
+                            </label>
+                            <div class="form-text small">Pinned announcements appear prominently at the top of user dashboards.</div>
+                        </div>
+                    </div>
+
+                    {% if ann %}
+                    <div class="col-md-6">
+                        <div class="form-check form-switch pt-2">
+                            <input class="form-check-input" type="checkbox" name="is_active" id="activeCheck" {% if ann.is_active %}checked{% endif %}>
+                            <label class="form-check-label fw-semibold" for="activeCheck">
+                                Live / Published
+                            </label>
+                            <div class="form-text small">Unchecking this hides the announcement from all users immediately.</div>
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <!-- Actions -->
+                <div class="d-flex justify-content-end gap-2 border-top pt-3">
+                    <a href="{{ url_for('admin.announcements_list') }}" class="btn btn-secondary btn-sm px-3">Cancel</a>
+                    <button type="submit" class="btn btn-primary btn-sm px-4">
+                        <i class="bi bi-send-fill me-1"></i> {{ 'Save Changes' if ann else 'Publish Announcement' }}
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+function toggleDeptField() {
+    const select = document.getElementById('audienceSelect');
+    const container = document.getElementById('deptContainer');
+    const deptSelect = document.getElementById('deptSelect');
+    if (select.value === 'DEPARTMENT') {
+        container.style.display = 'block';
+        deptSelect.required = true;
+    } else {
+        container.style.display = 'none';
+        deptSelect.required = false;
+    }
+}
+document.addEventListener('DOMContentLoaded', toggleDeptField);
+</script>
+{% endblock %}

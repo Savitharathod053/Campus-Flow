@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Student Dashboard - FastFest{% endblock %}
+{% block title %}Student Dashboard - Campus Flow{% endblock %}
 
 {% block content %}
 <div class="bg-primary text-white py-4 mb-4">
@@ -13,14 +13,47 @@
                     Year: <strong>{{ user.student_profile.year if user.student_profile else 'N/A' }}</strong> (Sec {{ user.student_profile.section if user.student_profile else 'N/A' }})
                 </p>
             </div>
-            <a href="{{ url_for('public.events') }}" class="btn btn-warning fw-bold shadow-sm">
-                <i class="bi bi-plus-circle me-1"></i> Browse & Register Events
-            </a>
+            <div class="d-flex gap-2">
+                {% if has_pending_organizer_request %}
+                    <span class="btn btn-light fw-bold shadow-sm disabled">
+                        <i class="bi bi-hourglass-split me-1 text-warning"></i> Organizer Request Under HOD Review
+                    </span>
+                {% else %}
+                    <button type="button" class="btn btn-outline-light fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#requestOrganizerModal">
+                        <i class="bi bi-person-badge me-1"></i> Request to Become Organizer
+                    </button>
+                {% endif %}
+                <a href="{{ url_for('public.events') }}" class="btn btn-warning fw-bold shadow-sm">
+                    <i class="bi bi-plus-circle me-1"></i> Browse & Register Events
+                </a>
+            </div>
         </div>
     </div>
 </div>
 
 <div class="container pb-5">
+    <!-- Pending Invitations Banner -->
+    {% if pending_invitations %}
+        <div class="alert alert-warning border-warning border-2 shadow-sm d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+            <div>
+                <h5 class="alert-heading fw-bold mb-1">
+                    <i class="bi bi-envelope-exclamation-fill text-warning me-2"></i> You have {{ pending_invitations|length }} pending team invitation(s)!
+                </h5>
+                <p class="mb-0 small">
+                    You've been invited to join <strong>{{ pending_invitations[0].team.team_name }}</strong> for '{{ pending_invitations[0].event.title }}'.
+                </p>
+            </div>
+            <div class="d-flex gap-2">
+                <a href="{{ url_for('student.accept_invitation', token=pending_invitations[0].token) }}" class="btn btn-success btn-sm fw-bold">
+                    <i class="bi bi-check2-circle me-1"></i> Accept
+                </a>
+                <a href="{{ url_for('student.my_teams') }}" class="btn btn-outline-dark btn-sm fw-bold">
+                    View All ({{ pending_invitations|length }})
+                </a>
+            </div>
+        </div>
+    {% endif %}
+
     <!-- Stat Metrics -->
     <div class="row g-3 mb-4">
         <div class="col-sm-6 col-lg-3">
@@ -36,12 +69,12 @@
         </div>
         <div class="col-sm-6 col-lg-3">
             <div class="metric-card">
-                <div class="metric-icon-box bg-success text-white">
-                    <i class="bi bi-calendar2-check"></i>
+                <div class="metric-icon-box bg-indigo text-white" style="background-color: #6366f1;">
+                    <i class="bi bi-people-fill text-white"></i>
                 </div>
                 <div>
-                    <div class="metric-number">{{ registrations|length }}</div>
-                    <div class="metric-label">Total Registrations</div>
+                    <div class="metric-number">{{ my_teams|length if my_teams else 0 }}</div>
+                    <div class="metric-label">My Teams</div>
                 </div>
             </div>
         </div>
@@ -75,6 +108,7 @@
             <h5 class="fw-bold mb-3"><i class="bi bi-megaphone-fill text-warning me-2"></i> Event Broadcasts & Updates</h5>
             <div class="row g-3">
                 {% for a in recent_announcements %}
+                    {% if a.event and not a.event.is_completed and not a.event.is_expired %}
                     <div class="col-md-6">
                         <div class="alert {% if a.is_pinned %}alert-warning border-warning{% else %}alert-light border{% endif %} shadow-sm mb-0 h-100">
                             <div class="d-flex justify-content-between align-items-center mb-1">
@@ -85,6 +119,7 @@
                             <p class="small text-secondary mb-0">{{ a.message }}</p>
                         </div>
                     </div>
+                    {% endif %}
                 {% endfor %}
             </div>
         </div>
@@ -112,9 +147,25 @@
                                     <div class="small text-muted"><i class="bi bi-geo-alt me-1 text-danger"></i> {{ reg.event.venue }}</div>
                                 </div>
                                 <div class="d-flex align-items-center gap-2">
-                                    <a href="{{ url_for('student.ticket', code=reg.registration_code) }}" class="btn btn-outline-primary btn-sm fw-bold">
-                                        <i class="bi bi-qr-code me-1"></i> Open Ticket
-                                    </a>
+                                    {% set badge = reg.payment_badge_info %}
+                                    {% if reg.is_confirmed and reg.is_paid %}
+                                        <a href="{{ url_for('student.ticket', code=reg.registration_code) }}" class="btn btn-outline-primary btn-sm fw-bold">
+                                            <i class="bi bi-qr-code me-1"></i> Open Ticket
+                                        </a>
+                                    {% elif badge.code == 'PENDING' %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i> 🟡 Verification Pending</span>
+                                    {% elif badge.code == 'MANUAL_REVIEW' %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-shield-exclamation me-1"></i> 🟠 Under Review</span>
+                                    {% elif badge.code == 'REJECTED' %}
+                                        <span class="badge bg-danger"><i class="bi bi-x-circle-fill me-1"></i> 🔴 Rejected</span>
+                                        <a href="{{ url_for('payment.checkout', registration_id=reg.id) }}" class="btn btn-outline-danger btn-sm fw-bold">
+                                            Resubmit Proof
+                                        </a>
+                                    {% else %}
+                                        <a href="{{ url_for('payment.checkout', registration_id=reg.id) }}" class="btn btn-warning btn-sm fw-bold">
+                                            <i class="bi bi-credit-card me-1"></i> Pay Fee
+                                        </a>
+                                    {% endif %}
                                 </div>
                             </div>
                         {% endfor %}
@@ -131,25 +182,35 @@
             <!-- Recommended Events -->
             <div class="ff-card p-4">
                 <h5 class="fw-bold mb-3"><i class="bi bi-stars text-warning me-2"></i> Recommended For You</h5>
-                <div class="row g-3">
-                    {% for ev in recommended_events %}
-                        <div class="col-md-6">
-                            <div class="p-3 border rounded-3 h-100 d-flex flex-column justify-content-between">
-                                <div>
-                                    <div class="d-flex justify-content-between align-items-center mb-1">
-                                        <span class="badge bg-light text-dark border small">{{ ev.event_type }}</span>
-                                        <span class="small fw-bold text-primary">{% if ev.is_free %}FREE{% else %}₹{{ "%.0f"|format(ev.registration_fee) }}{% endif %}</span>
+                {% if recommended_events %}
+                    <div class="row g-3">
+                        {% for ev in recommended_events %}
+                            {% if not ev.is_expired and not ev.is_completed and not ev.is_deadline_passed and ev.is_upcoming %}
+                                <div class="col-md-6">
+                                    <div class="p-3 border rounded-3 h-100 d-flex flex-column justify-content-between">
+                                        <div>
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="badge bg-light text-dark border small">{{ ev.event_type }}</span>
+                                                <span class="small fw-bold text-primary">{% if ev.is_free %}FREE{% else %}₹{{ "%.0f"|format(ev.registration_fee) }}{% endif %}</span>
+                                            </div>
+                                            <h6 class="fw-bold mb-1 text-dark">{{ ev.title }}</h6>
+                                            <p class="small text-muted mb-2">{{ ev.description|truncate(60) }}</p>
+                                        </div>
+                                        <a href="{{ url_for('public.event_detail', slug=ev.slug) }}" class="btn btn-outline-secondary btn-sm w-100">
+                                            Learn More
+                                        </a>
                                     </div>
-                                    <h6 class="fw-bold mb-1 text-dark">{{ ev.title }}</h6>
-                                    <p class="small text-muted mb-2">{{ ev.description|truncate(60) }}</p>
                                 </div>
-                                <a href="{{ url_for('public.event_detail', slug=ev.slug) }}" class="btn btn-outline-secondary btn-sm w-100">
-                                    Learn More
-                                </a>
-                            </div>
-                        </div>
-                    {% endfor %}
-                </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center py-4 text-muted">
+                        <i class="bi bi-calendar-check fs-1 text-muted opacity-50 d-block mb-2"></i>
+                        <p class="mb-2">No recommended upcoming events available at this time.</p>
+                        <a href="{{ url_for('public.events') }}" class="btn btn-sm btn-outline-primary">Browse All Events</a>
+                    </div>
+                {% endif %}
             </div>
         </div>
 
@@ -158,6 +219,10 @@
             <div class="ff-card p-4 mb-4">
                 <h6 class="fw-bold mb-3">Quick Navigation</h6>
                 <div class="list-group list-group-flush small">
+                    <a href="{{ url_for('student.my_teams') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
+                        <span><i class="bi bi-people-fill me-2 text-indigo" style="color: #6366f1;"></i> My Teams & Groups</span>
+                        <span class="badge bg-primary rounded-pill">{{ my_teams|length if my_teams else 0 }}</span>
+                    </a>
                     <a href="{{ url_for('student.my_events') }}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center px-0">
                         <span><i class="bi bi-ticket-detailed me-2 text-primary"></i> My Event Registrations</span>
                         <span class="badge bg-primary rounded-pill">{{ registrations|length }}</span>
@@ -173,6 +238,47 @@
                 </div>
             </div>
 
+            <!-- My Organizer Requests Tracking Card -->
+            <div class="ff-card p-4 mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold mb-0"><i class="bi bi-person-badge text-primary me-2"></i> Organizer Status</h6>
+                    {% if has_pending_organizer_request %}
+                        <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i> Pending HOD</span>
+                    {% endif %}
+                </div>
+                {% if my_organizer_requests %}
+                    <div class="list-group list-group-flush small">
+                        {% for req in my_organizer_requests %}
+                            <div class="list-group-item px-0 py-2 border-bottom">
+                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                    <span class="fw-semibold text-dark">Request #{{ req.id }}</span>
+                                    {% if req.status.value == 'pending' %}
+                                        <span class="badge bg-warning text-dark">Under HOD Review</span>
+                                    {% elif req.status.value == 'approved' %}
+                                        <span class="badge bg-success"><i class="bi bi-check-lg"></i> Approved</span>
+                                    {% elif req.status.value == 'rejected' %}
+                                        <span class="badge bg-danger"><i class="bi bi-x-lg"></i> Declined</span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-muted" style="font-size: 0.75rem;">
+                                    Routed to: <strong>{{ req.department.code if req.department else 'Dept' }} HOD</strong> &bull; {{ req.created_at.strftime('%b %d, %Y') if req.created_at else '' }}
+                                </div>
+                                {% if req.status.value == 'rejected' and req.rejection_reason %}
+                                    <div class="small text-danger mt-1 p-2 bg-danger-subtle rounded">
+                                        <strong>Feedback:</strong> {{ req.rejection_reason }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="small text-muted mb-2">Want to host campus events, hackathons, and technical workshops?</p>
+                    <button type="button" class="btn btn-outline-primary btn-sm fw-bold w-100" data-bs-toggle="modal" data-bs-target="#requestOrganizerModal">
+                        <i class="bi bi-person-badge me-1"></i> Request Organizer Role
+                    </button>
+                {% endif %}
+            </div>
+
             <!-- Recent Certificate Badge Box -->
             <div class="ff-card p-4 text-center">
                 <i class="bi bi-patch-check-fill text-warning fs-1 mb-2 d-block"></i>
@@ -182,6 +288,53 @@
                     View Earned Certificates
                 </a>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Request to Become an Organizer Modal -->
+<div class="modal fade" id="requestOrganizerModal" tabindex="-1" aria-labelledby="requestOrganizerModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <form method="POST" action="{{ url_for('student.request_organizer') }}">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="requestOrganizerModalLabel">
+                        <i class="bi bi-person-badge me-2"></i> Request to Become an Event Organizer
+                    </h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <div class="alert alert-info border-0 d-flex align-items-center gap-2 mb-3">
+                        <i class="bi bi-info-circle-fill fs-5 text-info"></i>
+                        <small>
+                            Your request will be auto-routed directly to your Head of Department (<strong>{{ user.student_profile.department if user.student_profile else 'CSE' }} HOD</strong>) for approval.
+                        </small>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Department (Auto-Assigned)</label>
+                        <input type="text" class="form-control bg-light" value="{{ user.student_profile.department if user.student_profile else 'CSE' }}" readonly>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Student Club / Society / Initiative Name</label>
+                        <input type="text" name="organization_name" class="form-control" placeholder="e.g. Coding Club, IEEE Student Branch, Robotics Club">
+                        <div class="form-text small">Optional club or group you represent.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label small fw-bold">Reason & Proposed Event Ideas *</label>
+                        <textarea name="reason" class="form-control" rows="4" required placeholder="Explain why you want to become an organizer, your previous experience, and what events or workshops you plan to conduct..."></textarea>
+                        <div class="form-text small">Your HOD will review this justification before granting access.</div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary fw-bold">
+                        <i class="bi bi-send-fill me-1"></i> Submit Request to HOD
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>

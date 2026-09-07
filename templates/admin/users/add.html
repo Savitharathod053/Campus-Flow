@@ -1,0 +1,199 @@
+{% extends "admin/layout.html" %}
+
+{% block title %}Add New User - Super Admin{% endblock %}
+
+{% block admin_content %}
+<div class="d-flex align-items-center justify-content-between pb-3 mb-4 border-bottom">
+    <div>
+        <h3 class="fw-bold text-dark mb-1">
+            <i class="bi bi-person-plus-fill text-primary me-2"></i> Add New User
+        </h3>
+        <p class="text-muted small mb-0">Create students, faculty members, HODs, club organizers, or campus administrators.</p>
+    </div>
+    <a href="{{ url_for('admin.users_list') }}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i> Back to Directory
+    </a>
+</div>
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card border-0 shadow-sm rounded-3 bg-white p-4 p-md-5">
+            <form action="{{ url_for('admin.user_add') }}" method="POST">
+                <!-- Role Selection -->
+                <div class="mb-4 pb-3 border-bottom">
+                    <label class="form-label fw-bold text-dark"><i class="bi bi-award me-1"></i> Account Role *</label>
+                    <select name="role" id="roleSelector" class="form-select form-select-lg fw-semibold" required onchange="toggleRoleFields()">
+                        <option value="STUDENT" selected>Student</option>
+                        <option value="FACULTY">Faculty Member</option>
+                        <option value="HOD">Head of Department (HOD)</option>
+                        <option value="ORGANIZER">Event Organizer</option>
+                        <option value="FACULTY_ADMIN">Faculty Admin</option>
+                        <option value="SUPER_ADMIN">Super Admin</option>
+                    </select>
+                    <div class="form-text small">Form fields will dynamically adjust to match the role specifications.</div>
+                </div>
+
+                <!-- Basic User Fields -->
+                <h6 class="fw-bold text-secondary text-uppercase small mb-3 tracking-wide"><i class="bi bi-person-lines-fill me-1"></i> Basic Identity</h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Full Name *</label>
+                        <input type="text" name="name" class="form-control" placeholder="e.g. Rahul Sharma" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Institutional Email *</label>
+                        <input type="email" name="email" class="form-control" placeholder="name@college.edu" required>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Contact Phone Number</label>
+                        <input type="text" name="phone" class="form-control" placeholder="+91 9876543210">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small fw-bold">Initial Password *</label>
+                        <input type="password" name="password" class="form-control" placeholder="At least 6 characters" required minlength="6" value="Pass@123">
+                        <div class="form-text small">Default: <code>Pass@123</code> (can be changed on first login)</div>
+                    </div>
+                </div>
+
+                <!-- Dynamic Student Fields -->
+                <div id="studentFieldsBlock" class="mb-4 p-3 bg-light rounded-3 border">
+                    <h6 class="fw-bold text-info text-uppercase small mb-3"><i class="bi bi-mortarboard me-1"></i> Student Academic Information</h6>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Roll Number / USN *</label>
+                            <input type="text" name="roll_number" id="input_roll_number" class="form-control" placeholder="e.g. 1MS24CS045">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Academic Department *</label>
+                            <select name="department" id="input_student_dept" class="form-select">
+                                {% for d in departments %}
+                                    <option value="{{ d.code }}">{{ d.code }} - {{ d.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Current Year *</label>
+                            <select name="year" class="form-select">
+                                <option value="1">1st Year (Freshman)</option>
+                                <option value="2">2nd Year (Sophomore)</option>
+                                <option value="3">3rd Year (Junior)</option>
+                                <option value="4">4th Year (Senior)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Class Section *</label>
+                            <input type="text" name="section" class="form-control" value="A" placeholder="e.g. A, B, C">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dynamic Faculty / HOD Fields -->
+                <div id="facultyFieldsBlock" class="mb-4 p-3 bg-light rounded-3 border" style="display: none;">
+                    <h6 class="fw-bold text-success text-uppercase small mb-3"><i class="bi bi-person-badge me-1"></i> Faculty & Departmental Information</h6>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Employee / Faculty ID *</label>
+                            <input type="text" name="employee_id" id="input_employee_id" class="form-control" placeholder="e.g. FAC-CSE-101">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Department *</label>
+                            <select name="department" id="input_faculty_dept" class="form-select">
+                                {% for d in departments %}
+                                    <option value="{{ d.code }}">{{ d.code }} - {{ d.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row g-3">
+                        <div class="col-12">
+                            <label class="form-label small fw-bold">Designation / Title</label>
+                            <input type="text" name="designation" id="input_designation" class="form-control" placeholder="e.g. Professor & Head of Department">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dynamic Organizer Fields -->
+                <div id="organizerFieldsBlock" class="mb-4 p-3 bg-light rounded-3 border" style="display: none;">
+                    <h6 class="fw-bold text-primary text-uppercase small mb-3"><i class="bi bi-megaphone me-1"></i> Club / Organization Information</h6>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Club / Organization Name *</label>
+                            <input type="text" name="organization_name" class="form-control" placeholder="e.g. Coding Club & ACM Student Chapter">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Affiliated Department</label>
+                            <select name="department" class="form-select">
+                                <option value="General">General / College-Wide</option>
+                                {% for d in departments %}
+                                    <option value="{{ d.code }}">{{ d.code }} - {{ d.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 pt-3 border-top">
+                    <a href="{{ url_for('admin.users_list') }}" class="btn btn-light">Cancel</a>
+                    <button type="submit" class="btn btn-primary fw-bold px-4">
+                        <i class="bi bi-check-circle-fill me-1"></i> Create User Account
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function toggleRoleFields() {
+    const role = document.getElementById('roleSelector').value;
+    const studentBlock = document.getElementById('studentFieldsBlock');
+    const facultyBlock = document.getElementById('facultyFieldsBlock');
+    const organizerBlock = document.getElementById('organizerFieldsBlock');
+
+    // Hide all initially
+    studentBlock.style.display = 'none';
+    facultyBlock.style.display = 'none';
+    organizerBlock.style.display = 'none';
+
+    // Disable inputs that are hidden to prevent submitting conflicting form fields
+    setInputsDisabled(studentBlock, true);
+    setInputsDisabled(facultyBlock, true);
+    setInputsDisabled(organizerBlock, true);
+
+    if (role === 'STUDENT') {
+        studentBlock.style.display = 'block';
+        setInputsDisabled(studentBlock, false);
+    } else if (role === 'FACULTY' || role === 'HOD' || role === 'FACULTY_ADMIN') {
+        facultyBlock.style.display = 'block';
+        setInputsDisabled(facultyBlock, false);
+        const desig = document.getElementById('input_designation');
+        if (role === 'HOD') {
+            desig.value = 'Head of Department & Professor';
+        } else if (role === 'FACULTY_ADMIN') {
+            desig.value = 'Associate Professor & Faculty Coordinator';
+        } else {
+            desig.value = 'Assistant Professor';
+        }
+    } else if (role === 'ORGANIZER') {
+        organizerBlock.style.display = 'block';
+        setInputsDisabled(organizerBlock, false);
+    }
+}
+
+function setInputsDisabled(container, disabled) {
+    const inputs = container.querySelectorAll('input, select, textarea');
+    inputs.forEach(el => el.disabled = disabled);
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    toggleRoleFields();
+});
+</script>
+{% endblock %}

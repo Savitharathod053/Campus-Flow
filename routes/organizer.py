@@ -10,11 +10,22 @@ from flask import (
 from models import (
     db, Event, EventStatus, EventType, EventRegistration, RegistrationStatus,
     CustomRegistrationField, CustomFieldResponse, Payment, PaymentStatus,
-    AttendanceRecord, VerificationMethod, Announcement, Certificate, CertificateStatus, User, StudentProfile
+    AttendanceRecord, VerificationMethod, AttendanceStatus, AttendanceSession, AttendanceSessionStatus,
+    Announcement, Certificate, CertificateStatus, User, StudentProfile, OrganizerProfile,
+    Team, TeamStatus, TeamPaymentStatus, TeamRole, TeamMemberStatus, InvitationStatus, TeamMember, TeamInvitation,
+    EventRegistrationType, TeamPaymentType, CollegeDepartment,
+    EventRequest, EventRequestStatus, NotificationType
 )
 from routes.auth import organizer_required, get_current_user
 from services.export_service import export_participants_excel, export_participants_csv
-from services.event_service import delete_event_with_cleanup
+from services.event_service import delete_event_with_cleanup, delete_expired_events
+from services.notification_service import create_notification
+from services.email_service import send_event_request_submitted_email
+from services.attendance_service import (
+    create_or_update_event_sessions, record_session_attendance,
+    manual_override_attendance, calculate_event_attendance_matrix,
+    AttendanceServiceError
+)
 from services.cert_upload_service import (
     process_certificate_uploads, manual_assign_certificate,
     resolve_duplicate_certificate, delete_single_certificate
@@ -33,31 +44,53 @@ def allowed_file(filename):
 def dashboard():
     user = get_current_user()
     now = datetime.utcnow()
+    tab = request.args.get('tab', 'requests').strip().lower()
 
-    # Organizer's events
-    events = Event.query.filter_by(organizer_id=user.id).order_by(Event.created_at.desc()).all()
-    event_ids = [e.id for e in events]
+    # Organizer's Event Requests (Full Dual Approval Lifecycle)
+    event_requests = EventRequest.query.filter_by(organizer_id=user.id).order_by(EventRequest.created_at.desc()).all()
+    pending_hod_requests = [r for r in event_requests if r.overall_status == EventRequestStatus.PENDING_HOD_APPROVAL]
+    forwarded_requests = [r for r in event_requests if r.overall_status == EventRequestStatus.PENDING_DEAN_APPROVAL]
+    approved_requests = [r for r in event_requests if r.overall_status == EventRequestStatus.APPROVED]
+    rejected_requests = [r for r in event_requests if r.overall_status in (EventRequestStatus.REJECTED_BY_HOD, EventRequestStatus.REJECTED_BY_DEAN)]
 
-    total_events = len(events)
-    active_events = len([e for e in events if e.status in (EventStatus.APPROVED, EventStatus.REGISTRATION_OPEN)])
-    pending_approval_events = len([e for e in events if e.status == EventStatus.PENDING_APPROVAL])
-    completed_events_count = len([e for e in events if e.status == EventStatus.EVENT_COMPLETED])
+    # Published and Approved Events for operational management
+    all_events = Event.query.filter_by(organizer_id=user.id, is_published=True).order_by(Event.created_at.desc()).all()
+    event_ids = [e.id for e in all_events]
 
-    # Separate active vs completed events for clean dashboard display
-    active_events_list = [e for e in events if e.status != EventStatus.EVENT_COMPLETED]
-    completed_events_list = [e for e in events if e.status == EventStatus.EVENT_COMPLETED]
+    active_events_list = [e for e in all_events if not e.is_completed and e.status != EventStatus.CANCELLED]
+    completed_events_list = [e for e in all_events if e.is_completed]
 
-    # Registrations across all organizer events
+    total_events = len(all_events)
+    active_events_count = len(active_events_list)
+    completed_events_count = len(completed_events_list)
+
+    # Select events based on active tab
+    if tab == 'completed':
+        displayed_events = completed_events_list
+    elif tab == 'all_published':
+        displayed_events = all_events
+    else:
+        displayed_events = active_events_list
+
+    # Registrations across all published events
     if event_ids:
         all_registrations = EventRegistration.query.filter(EventRegistration.event_id.in_(event_ids)).all()
     else:
         all_registrations = []
 
     total_registrations = len(all_registrations)
-    paid_registrations = len([r for r in all_registrations if r.payment and r.payment.status == PaymentStatus.SUCCESS])
+    paid_registrations = len([r for r in all_registrations if r.payment and r.payment.status in (PaymentStatus.VERIFIED, 'SUCCESS')])
     confirmed_registrations = len([r for r in all_registrations if r.status == RegistrationStatus.CONFIRMED])
     pending_registrations = len([r for r in all_registrations if r.status == RegistrationStatus.PENDING_PAYMENT])
     attended_count = len([r for r in all_registrations if r.attendance is not None])
+
+    # Pending payment verifications for organizer's events
+    pending_payments = []
+    if event_ids:
+        pending_payments = Payment.query.filter(
+            Payment.event_id.in_(event_ids),
+            Payment.status.in_([PaymentStatus.PENDING, PaymentStatus.MANUAL_REVIEW])
+        ).order_by(Payment.submitted_at.desc()).all()
 
     # Recent 10 registrations
     recent_registrations = []
@@ -69,42 +102,61 @@ def dashboard():
     return render_template(
         'organizer/dashboard.html',
         user=user,
-        events=active_events_list,
-        completed_events=completed_events_list,
+        events=displayed_events,
         total_events=total_events,
-        active_events=active_events,
-        pending_approval_events=pending_approval_events,
+        active_events=active_events_count,
         completed_events_count=completed_events_count,
+        event_requests=event_requests,
+        pending_hod_requests=pending_hod_requests,
+        forwarded_requests=forwarded_requests,
+        approved_requests=approved_requests,
+        rejected_requests=rejected_requests,
         total_registrations=total_registrations,
         paid_registrations=paid_registrations,
         confirmed_registrations=confirmed_registrations,
         pending_registrations=pending_registrations,
         attended_count=attended_count,
-        recent_registrations=recent_registrations
+        recent_registrations=recent_registrations,
+        pending_payments=pending_payments,
+        current_tab=tab
     )
 
 
 @organizer_bp.route('/events/create', methods=['GET', 'POST'])
+@organizer_bp.route('/events/request', methods=['GET', 'POST'])
 @organizer_required
 def create_event():
     user = get_current_user()
 
+    # Automatically resolve Organizer's department from profile
+    # The Organizer must NOT manually submit an event for another department
+    dept_code = 'CSE'
+    if user.organizer_profile and user.organizer_profile.department:
+        dept_code = user.organizer_profile.department
+    elif user.student_profile and user.student_profile.department:
+        dept_code = user.student_profile.department
+
+    dept_obj = CollegeDepartment.query.filter_by(code=dept_code).first()
+    if not dept_obj:
+        dept_obj = CollegeDepartment.query.first()
+
     if request.method == 'POST':
         title = request.form.get('title', '').strip()
         event_type = request.form.get('event_type', EventType.WORKSHOP)
-        department = request.form.get('department', '').strip()
+        venue = request.form.get('venue', '').strip()
+        description = request.form.get('description', '').strip()
+        rules = request.form.get('rules', '').strip()
+        budget_requirements = request.form.get('budget_requirements', '').strip()
+        additional_requirements = request.form.get('additional_requirements', '').strip()
+        
         faculty_coordinator = request.form.get('faculty_coordinator', '').strip()
         faculty_coordinator_contact = request.form.get('faculty_coordinator_contact', '').strip()
         contact_info = request.form.get('contact_info', '').strip()
-        
+
         allowed_departments = request.form.get('allowed_departments', 'ALL').strip()
         allowed_years = request.form.get('allowed_years', 'ALL').strip()
         allowed_sections = request.form.get('allowed_sections', 'ALL').strip()
         eligibility_notes = request.form.get('eligibility_notes', '').strip()
-
-        description = request.form.get('description', '').strip()
-        rules = request.form.get('rules', '').strip()
-        venue = request.form.get('venue', '').strip()
 
         start_time_str = request.form.get('start_time', '').strip()
         end_time_str = request.form.get('end_time', '').strip()
@@ -114,17 +166,43 @@ def create_event():
         is_free = request.form.get('is_free') == 'true' or request.form.get('is_free') == 'on'
         registration_fee = 0.0 if is_free else float(request.form.get('registration_fee', 0.0))
 
-        if not all([title, department, faculty_coordinator, venue, start_time_str, end_time_str, deadline_str, description]):
-            flash('Please fill in all required event details.', 'danger')
-            return render_template('organizer/create_event.html', user=user, event_types=EventType.CHOICES)
+        # Attendance Configuration
+        enable_attendance = request.form.get('enable_attendance') != 'false' and request.form.get('enable_attendance') is not None
+        min_attendance_percentage = float(request.form.get('min_attendance_percentage') or 0.0)
+
+        # Team Registration Settings
+        registration_type = request.form.get('registration_type', EventRegistrationType.INDIVIDUAL)
+        min_team_size = int(request.form.get('min_team_size', 2))
+        max_team_size = int(request.form.get('max_team_size', 4))
+        team_payment_type = request.form.get('team_payment_type', TeamPaymentType.FREE)
+        require_full_team = request.form.get('require_full_team') == 'true' or request.form.get('require_full_team') == 'on'
+
+        if not all([title, venue, start_time_str, end_time_str, description]):
+            flash('Please fill in all required event proposal fields.', 'danger')
+            return render_template('organizer/create_event.html', user=user, event_types=EventType.CHOICES, dept_obj=dept_obj)
 
         try:
             start_time = datetime.strptime(start_time_str, '%Y-%m-%dT%H:%M')
             end_time = datetime.strptime(end_time_str, '%Y-%m-%dT%H:%M')
-            registration_deadline = datetime.strptime(deadline_str, '%Y-%m-%dT%H:%M')
+            registration_deadline = datetime.strptime(deadline_str, '%Y-%m-%dT%H:%M') if deadline_str else start_time
         except ValueError:
             flash('Invalid date or time format.', 'danger')
-            return render_template('organizer/create_event.html', user=user, event_types=EventType.CHOICES)
+            return render_template('organizer/create_event.html', user=user, event_types=EventType.CHOICES, dept_obj=dept_obj)
+
+        # Handle UPI & QR upload for paid events
+        upi_id = request.form.get('upi_id', '').strip()
+        upi_number = request.form.get('upi_number', '').strip()
+        payment_instructions = request.form.get('payment_instructions', '').strip()
+
+        upi_qr_path = None
+        if 'upi_qr' in request.files:
+            qr_file = request.files['upi_qr']
+            if qr_file and allowed_file(qr_file.filename):
+                qr_filename = secure_filename(f"upi_qr_{int(datetime.utcnow().timestamp())}_{qr_file.filename}")
+                qr_upload_dir = Path(__file__).resolve().parent.parent / 'static' / 'uploads' / 'organizer_qrs'
+                qr_upload_dir.mkdir(parents=True, exist_ok=True)
+                qr_file.save(qr_upload_dir / qr_filename)
+                upi_qr_path = f"uploads/organizer_qrs/{qr_filename}"
 
         # Handle poster upload
         poster_path = None
@@ -137,40 +215,72 @@ def create_event():
                 file.save(upload_dir / filename)
                 poster_path = f"uploads/posters/{filename}"
 
-        slug = Event.generate_slug(title)
-
-        event = Event(
-            title=title,
-            slug=slug,
+        # MANDATORY: Create EventRequest with status PENDING_HOD_APPROVAL
+        # The organizer must NEVER directly publish an event!
+        event_req = EventRequest(
             organizer_id=user.id,
-            event_type=event_type,
-            department=department,
+            department_id=dept_obj.id,
+            event_name=title,
+            description=description,
+            category=event_type,
+            proposed_event_date=start_time.date(),
+            start_time=start_time,
+            end_time=end_time,
+            venue=venue,
+            expected_participants=max_participants,
+            registration_details=f"Type: {registration_type} | Fee: ₹{registration_fee}",
+            budget_requirements=budget_requirements,
+            additional_requirements=additional_requirements,
+            registration_deadline=registration_deadline,
+            registration_fee=registration_fee,
+            is_free=is_free,
+            poster_image=poster_path,
+            rules=rules,
+            contact_info=contact_info,
             faculty_coordinator=faculty_coordinator,
             faculty_coordinator_contact=faculty_coordinator_contact,
-            contact_info=contact_info,
             allowed_departments=allowed_departments or 'ALL',
             allowed_years=allowed_years or 'ALL',
             allowed_sections=allowed_sections or 'ALL',
             eligibility_notes=eligibility_notes,
-            description=description,
-            rules=rules,
-            poster_image=poster_path,
-            venue=venue,
-            start_time=start_time,
-            end_time=end_time,
-            registration_deadline=registration_deadline,
-            max_participants=max_participants,
-            registration_fee=registration_fee,
-            is_free=is_free,
-            status=EventStatus.PENDING_APPROVAL
+            registration_type=registration_type,
+            min_team_size=min_team_size,
+            max_team_size=max_team_size,
+            team_payment_type=team_payment_type,
+            require_full_team=require_full_team,
+            upi_id=upi_id,
+            upi_number=upi_number,
+            upi_qr_image=upi_qr_path,
+            payment_instructions=payment_instructions,
+            enable_attendance=enable_attendance,
+            min_attendance_percentage=min_attendance_percentage,
+            overall_status=EventRequestStatus.PENDING_HOD_APPROVAL
         )
-        db.session.add(event)
+        db.session.add(event_req)
         db.session.commit()
 
-        flash('Event created successfully! It is now Pending Approval by Faculty/Admin.', 'success')
-        return redirect(url_for('organizer.custom_fields', event_id=event.id))
+        # Step 1 Routing: Route strictly to assigned Department HOD
+        hod_user = dept_obj.hod
+        if hod_user:
+            create_notification(
+                user_id=hod_user.id,
+                title=f"New Event Proposal: {title}",
+                message=f"Organizer {user.name} submitted an event creation request '{title}' for your departmental review.",
+                notification_type=NotificationType.EVENT_REQUEST,
+                link=url_for('hod.event_request_detail', request_id=event_req.id)
+            )
+            try:
+                send_event_request_submitted_email(event_req, user, hod_user, dept_obj)
+            except Exception as em_err:
+                pass
 
-    return render_template('organizer/create_event.html', user=user, event_types=EventType.CHOICES)
+        flash(
+            f"Event proposal '{title}' submitted successfully! It has been forwarded to your Department HOD ({dept_obj.name}) for initial review. Once approved, it will proceed to the Students Affairs Dean for final college-level publication clearance.",
+            'success'
+        )
+        return redirect(url_for('organizer.dashboard', tab='requests'))
+
+    return render_template('organizer/create_event.html', user=user, event_types=EventType.CHOICES, dept_obj=dept_obj)
 
 
 @organizer_bp.route('/events/<int:event_id>/edit', methods=['GET', 'POST'])
@@ -214,6 +324,51 @@ def edit_event(event_id):
         is_free = request.form.get('is_free') == 'true' or request.form.get('is_free') == 'on'
         event.is_free = is_free
         event.registration_fee = 0.0 if is_free else float(request.form.get('registration_fee', 0.0))
+
+        # Multi-Session Attendance Configuration
+        event.enable_attendance = request.form.get('enable_attendance') == 'true' or request.form.get('enable_attendance') == 'on'
+        event.min_attendance_percentage = float(request.form.get('min_attendance_percentage') or 0.0)
+
+        # Team Registration Settings
+        event.registration_type = request.form.get('registration_type', event.registration_type)
+        event.min_team_size = int(request.form.get('min_team_size', event.min_team_size or 2))
+        event.max_team_size = int(request.form.get('max_team_size', event.max_team_size or 4))
+        event.team_payment_type = request.form.get('team_payment_type', event.team_payment_type or 'FREE')
+        event.require_full_team = request.form.get('require_full_team') == 'true' or request.form.get('require_full_team') == 'on'
+
+        # Update Sessions if provided
+        session_names = request.form.getlist('session_names[]')
+        session_dates = request.form.getlist('session_dates[]')
+        session_start_times = request.form.getlist('session_start_times[]')
+        session_end_times = request.form.getlist('session_end_times[]')
+        session_ids = request.form.getlist('session_ids[]')
+
+        if session_names:
+            session_list = []
+            for idx, sname in enumerate(session_names):
+                if sname.strip():
+                    session_list.append({
+                        'id': session_ids[idx] if idx < len(session_ids) and session_ids[idx] else None,
+                        'session_name': sname.strip(),
+                        'event_date': session_dates[idx] if idx < len(session_dates) else None,
+                        'start_time': session_start_times[idx] if idx < len(session_start_times) else None,
+                        'end_time': session_end_times[idx] if idx < len(session_end_times) else None
+                    })
+            create_or_update_event_sessions(event, session_list)
+
+        # Handle organizer UPI & QR upload for paid events
+        event.upi_id = request.form.get('upi_id', event.upi_id or '').strip()
+        event.upi_number = request.form.get('upi_number', event.upi_number or '').strip()
+        event.payment_instructions = request.form.get('payment_instructions', event.payment_instructions or '').strip()
+
+        if 'upi_qr' in request.files:
+            qr_file = request.files['upi_qr']
+            if qr_file and allowed_file(qr_file.filename):
+                qr_filename = secure_filename(f"upi_qr_{event.id}_{int(datetime.utcnow().timestamp())}_{qr_file.filename}")
+                qr_upload_dir = Path(__file__).resolve().parent.parent / 'static' / 'uploads' / 'organizer_qrs'
+                qr_upload_dir.mkdir(parents=True, exist_ok=True)
+                qr_file.save(qr_upload_dir / qr_filename)
+                event.upi_qr_image = f"uploads/organizer_qrs/{qr_filename}"
 
         # Handle poster upload
         if 'poster' in request.files:
@@ -292,7 +447,17 @@ def manage_event(event_id):
     registrations = event.registrations.order_by(EventRegistration.created_at.desc()).all()
     confirmed_regs = [r for r in registrations if r.is_confirmed]
     attended_regs = [r for r in registrations if r.attendance is not None]
-    total_revenue = sum([r.payment.amount for r in registrations if r.payment and r.payment.status == PaymentStatus.SUCCESS])
+    total_revenue = sum([r.payment.amount for r in registrations if r.payment and r.payment.status in (PaymentStatus.VERIFIED, 'SUCCESS')])
+    
+    # Also sum team payments
+    team_revenue = sum([p.amount for p in Payment.query.join(Team).filter(Team.event_id == event.id, Payment.status.in_([PaymentStatus.VERIFIED, 'SUCCESS'])).all()])
+    total_revenue += team_revenue
+
+    teams = event.teams.all()
+    total_teams_count = len(teams)
+    complete_teams_count = len([t for t in teams if t.status in (TeamStatus.COMPLETE, TeamStatus.FULL)])
+    pending_teams_count = len([t for t in teams if t.status == TeamStatus.PENDING])
+    full_teams_count = len([t for t in teams if t.status == TeamStatus.FULL])
 
     return render_template(
         'organizer/event_manage.html',
@@ -301,7 +466,12 @@ def manage_event(event_id):
         registrations=registrations,
         confirmed_count=len(confirmed_regs),
         attended_count=len(attended_regs),
-        total_revenue=total_revenue
+        total_revenue=total_revenue,
+        teams=teams,
+        total_teams_count=total_teams_count,
+        complete_teams_count=complete_teams_count,
+        pending_teams_count=pending_teams_count,
+        full_teams_count=full_teams_count
     )
 
 
@@ -320,11 +490,18 @@ def participants(event_id):
     filter_year = request.args.get('year', '').strip()
     filter_status = request.args.get('status', '').strip()
     filter_attendance = request.args.get('attendance', '').strip()
+    filter_team_id = request.args.get('team_id', '').strip()
 
     query = EventRegistration.query.filter_by(event_id=event.id)
 
     if filter_status:
         query = query.filter_by(status=filter_status)
+
+    if filter_team_id:
+        try:
+            query = query.filter_by(team_id=int(filter_team_id))
+        except ValueError:
+            pass
 
     registrations = query.order_by(EventRegistration.created_at.desc()).all()
 
@@ -339,11 +516,17 @@ def participants(event_id):
             match_email = search.lower() in student.email.lower()
             match_roll = profile and search.lower() in profile.roll_number.lower()
             match_code = search.lower() in r.registration_code.lower()
-            if not (match_name or match_email or match_roll or match_code):
+            match_team = r.team and search.lower() in r.team.team_name.lower()
+            if not (match_name or match_email or match_roll or match_code or match_team):
                 continue
 
-        if filter_dept and profile and profile.department != filter_dept:
-            continue
+        if filter_dept and profile:
+            student_dept = (profile.department or '').strip().upper()
+            filter_dept_upper = filter_dept.strip().upper()
+            dept_matches = (student_dept == filter_dept_upper) or \
+                           (student_dept in ['CIVIL', 'CIVILS'] and filter_dept_upper in ['CIVIL', 'CIVILS'])
+            if not dept_matches:
+                continue
 
         if filter_year and profile and str(profile.year) != filter_year:
             continue
@@ -355,19 +538,40 @@ def participants(event_id):
 
         filtered_regs.append(r)
 
-    departments = ['CSE', 'IT', 'ECE', 'MECH', 'CIVIL', 'EEE']
+    departments = ['CSE', 'IT', 'CSD', 'CSM', 'ECE', 'EEE', 'MECH', 'CIVILS']
+    teams = event.teams.all()
 
     return render_template(
         'organizer/participants.html',
         user=user,
         event=event,
         registrations=filtered_regs,
+        teams=teams,
         search=search,
         filter_dept=filter_dept,
         filter_year=filter_year,
         filter_status=filter_status,
         filter_attendance=filter_attendance,
+        filter_team_id=filter_team_id,
         departments=departments
+    )
+
+
+@organizer_bp.route('/events/<int:event_id>/teams')
+@organizer_required
+def event_teams(event_id):
+    user = get_current_user()
+    event = Event.query.get_or_404(event_id)
+
+    if event.organizer_id != user.id and not user.is_admin:
+        abort(403)
+
+    teams = event.teams.order_by(Team.created_at.desc()).all()
+    return render_template(
+        'organizer/teams.html',
+        user=user,
+        event=event,
+        teams=teams
     )
 
 
@@ -422,13 +626,45 @@ def attendance_scanner(event_id):
     if event.organizer_id != user.id and not user.is_admin:
         abort(403)
 
-    recent_attendance = AttendanceRecord.query.filter_by(event_id=event.id).order_by(AttendanceRecord.scanned_at.desc()).limit(15).all()
+    sessions = event.attendance_sessions.all()
+    if not sessions and event.enable_attendance:
+        # Create default session if none exists
+        default_session = AttendanceSession(
+            event_id=event.id,
+            session_name="General Attendance",
+            session_number=1,
+            status=AttendanceSessionStatus.ACTIVE
+        )
+        db.session.add(default_session)
+        db.session.commit()
+        sessions = [default_session]
+
+    # Select active session
+    selected_session_id = request.args.get('session_id')
+    selected_session = None
+    if selected_session_id:
+        selected_session = AttendanceSession.query.filter_by(id=int(selected_session_id), event_id=event.id).first()
+    if not selected_session and sessions:
+        selected_session = sessions[0]
+
+    # Recent check-ins for the selected session
+    recent_query = AttendanceRecord.query.filter_by(event_id=event.id)
+    if selected_session:
+        recent_query = recent_query.filter_by(session_id=selected_session.id)
+    recent_attendance = recent_query.order_by(AttendanceRecord.scanned_at.desc()).limit(15).all()
+
+    total_participants = event.confirmed_registrations_count
+    present_count = selected_session.present_count if selected_session else 0
 
     return render_template(
         'organizer/attendance_scanner.html',
         user=user,
         event=event,
-        recent_attendance=recent_attendance
+        sessions=sessions,
+        selected_session=selected_session,
+        recent_attendance=recent_attendance,
+        total_participants=total_participants,
+        present_count=present_count
     )
 
 
@@ -437,70 +673,145 @@ def attendance_scanner(event_id):
 def mark_attendance():
     """
     AJAX endpoint called by live camera QR scanner or manual registration code input.
+    Supports multi-session event attendance.
     """
     user = get_current_user()
     data = request.get_json() or {}
-    raw_code = data.get('registration_code', '').strip()
+    raw_code = str(data.get('registration_code', '')).strip()
     event_id = data.get('event_id')
+    session_id = data.get('session_id')
+    allow_time_override = bool(data.get('allow_time_override', False))
 
     if not raw_code or not event_id:
         return jsonify({'status': 'error', 'message': 'Missing ticket code or event identifier.'}), 400
 
-    # Parse raw code if it has the ticket prefix
-    clean_code = raw_code.replace('FASTFEST-TICKET:', '').strip()
+    try:
+        parsed_event_id = int(event_id)
+    except (ValueError, TypeError):
+        return jsonify({'status': 'error', 'message': 'Invalid event identifier.'}), 400
 
-    registration = EventRegistration.query.filter_by(registration_code=clean_code).first()
+    parsed_session_id = None
+    if session_id is not None and str(session_id).strip() != '' and str(session_id).strip().lower() != 'none':
+        try:
+            parsed_session_id = int(session_id)
+        except (ValueError, TypeError):
+            parsed_session_id = None
 
-    if not registration:
-        return jsonify({'status': 'invalid', 'message': f"Ticket '{clean_code}' not found in system."}), 404
-
-    if str(registration.event_id) != str(event_id):
-        return jsonify({
-            'status': 'mismatch',
-            'message': f"This ticket belongs to '{registration.event.title}', not this event."
-        }), 400
-
-    if not registration.is_confirmed:
-        return jsonify({
-            'status': 'unconfirmed',
-            'message': f"Registration is not confirmed (Status: {registration.status})."
-        }), 400
-
-    # Check for duplicate attendance
-    existing_attendance = AttendanceRecord.query.filter_by(registration_id=registration.id).first()
-    if existing_attendance:
-        return jsonify({
-            'status': 'duplicate',
-            'message': f"Attendance already marked for {registration.student.name} at {existing_attendance.scanned_at.strftime('%I:%M %p')}.",
-            'student_name': registration.student.name,
-            'roll_number': registration.student.student_profile.roll_number if registration.student.student_profile else 'N/A',
-            'department': registration.student.student_profile.department if registration.student.student_profile else 'N/A',
-            'scanned_at': existing_attendance.scanned_at.strftime('%I:%M %p')
-        }), 200
-
-    # Mark attendance
-    att_record = AttendanceRecord(
-        registration_id=registration.id,
-        event_id=registration.event_id,
-        student_id=registration.student_id,
-        marked_by_id=user.id,
-        verification_method=VerificationMethod.QR_SCAN
+    response_dict, status_code = record_session_attendance(
+        event_id=parsed_event_id,
+        session_id=parsed_session_id,
+        registration_code=raw_code,
+        marked_by_user=user,
+        allow_time_override=allow_time_override
     )
-    db.session.add(att_record)
-    db.session.commit()
 
-    student_profile = registration.student.student_profile
+    return jsonify(response_dict), status_code
 
-    return jsonify({
-        'status': 'success',
-        'message': f"Attendance marked for {registration.student.name}!",
-        'student_name': registration.student.name,
-        'roll_number': student_profile.roll_number if student_profile else 'N/A',
-        'department': student_profile.department if student_profile else 'N/A',
-        'year': student_profile.year if student_profile else 'N/A',
-        'section': student_profile.section if student_profile else 'N/A',
-        'scanned_at': att_record.scanned_at.strftime('%I:%M %p')
-    }), 200
+
+@organizer_bp.route('/events/<int:event_id>/attendance')
+@organizer_required
+def attendance_dashboard(event_id):
+    """
+    Complete Participant x Attendance Session Matrix view for event organizers.
+    """
+    user = get_current_user()
+    event = Event.query.get_or_404(event_id)
+
+    if event.organizer_id != user.id and not user.is_admin:
+        abort(403)
+
+    matrix_data = calculate_event_attendance_matrix(event)
+    teams = event.teams.all()
+
+    return render_template(
+        'organizer/attendance_dashboard.html',
+        user=user,
+        event=event,
+        sessions=matrix_data['sessions'],
+        matrix=matrix_data['matrix'],
+        total_participants=matrix_data['total_participants'],
+        teams=teams,
+        min_attendance_percentage=event.min_attendance_percentage
+    )
+
+
+@organizer_bp.route('/events/<int:event_id>/attendance/manual', methods=['POST'])
+@organizer_required
+def manual_attendance(event_id):
+    """
+    Organizer manual override to mark student present or absent for a session.
+    """
+    user = get_current_user()
+    event = Event.query.get_or_404(event_id)
+
+    if event.organizer_id != user.id and not user.is_admin:
+        abort(403)
+
+    session_id = request.form.get('session_id')
+    student_id = request.form.get('student_id')
+    status = request.form.get('status', 'PRESENT').strip().upper()
+    remarks = request.form.get('remarks', '').strip()
+
+    if not session_id or not student_id:
+        flash('Missing session or student information.', 'danger')
+        return redirect(url_for('organizer.attendance_dashboard', event_id=event.id))
+
+    try:
+        manual_override_attendance(
+            event_id=event.id,
+            session_id=int(session_id),
+            student_id=int(student_id),
+            new_status=status,
+            marked_by_user=user,
+            remarks=remarks
+        )
+        flash(f'Attendance manually updated to {status} successfully.', 'success')
+    except Exception as e:
+        flash(f'Failed to update attendance: {str(e)}', 'danger')
+
+    return redirect(url_for('organizer.attendance_dashboard', event_id=event.id))
+
+
+@organizer_bp.route('/events/<int:event_id>/attendance/export/csv')
+@organizer_required
+def export_attendance_csv(event_id):
+    user = get_current_user()
+    event = Event.query.get_or_404(event_id)
+
+    if event.organizer_id != user.id and not user.is_admin:
+        abort(403)
+
+    registrations = event.registrations.all()
+    csv_stream = export_participants_csv(event, registrations)
+
+    filename = f"{event.slug}_attendance_matrix.csv"
+    return send_file(
+        io.BytesIO(csv_stream.getvalue().encode('utf-8')),
+        mimetype="text/csv",
+        as_attachment=True,
+        download_name=filename
+    )
+
+
+@organizer_bp.route('/events/<int:event_id>/attendance/export/excel')
+@organizer_required
+def export_attendance_excel(event_id):
+    user = get_current_user()
+    event = Event.query.get_or_404(event_id)
+
+    if event.organizer_id != user.id and not user.is_admin:
+        abort(403)
+
+    registrations = event.registrations.all()
+    excel_stream = export_participants_excel(event, registrations)
+
+    filename = f"{event.slug}_attendance_matrix.xlsx"
+    return send_file(
+        excel_stream,
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        as_attachment=True,
+        download_name=filename
+    )
 
 
 @organizer_bp.route('/events/<int:event_id>/announcements', methods=['GET', 'POST'])
@@ -744,6 +1055,42 @@ def preview_certificate(cert_id):
     )
 
 
+@organizer_bp.route('/events/<int:event_id>/complete', methods=['POST'])
+@organizer_required
+def complete_event(event_id):
+    user = get_current_user()
+    event = Event.query.get_or_404(event_id)
+
+    if event.organizer_id != user.id and not user.is_admin:
+        abort(403)
+
+    event.status = EventStatus.EVENT_COMPLETED
+    # Purge broadcasts for completed/expired event
+    Announcement.query.filter_by(event_id=event.id).delete()
+    db.session.commit()
+    flash(f"Event '{event.title}' has been marked as completed and removed from active dashboard.", 'info')
+    return redirect(url_for('organizer.dashboard', tab='completed'))
+
+
+@organizer_bp.route('/events/delete-completed', methods=['POST'])
+@organizer_required
+def delete_completed_events():
+    user = get_current_user()
+    count, deleted_titles, skipped_titles = delete_expired_events(require_certificates_done=True, organizer_id=user.id)
+
+    if count > 0:
+        flash(f"Successfully deleted {count} completed event(s) from your dashboard.", 'success')
+    elif skipped_titles:
+        flash(f"Retained {len(skipped_titles)} completed event(s) because certificate issuance to attendees is not yet completed.", 'warning')
+    else:
+        flash("No completed events eligible for deletion.", 'info')
+
+    if skipped_titles and count > 0:
+        flash(f"{len(skipped_titles)} event(s) were retained because certificates are still pending.", 'info')
+
+    return redirect(url_for('organizer.dashboard', tab='active'))
+
+
 @organizer_bp.route('/events/<int:event_id>/delete', methods=['POST'])
 @organizer_required
 def delete_event(event_id):
@@ -765,19 +1112,122 @@ def delete_event(event_id):
     return redirect(url_for('organizer.dashboard'))
 
 
-@organizer_bp.route('/events/<int:event_id>/complete', methods=['POST'])
-@organizer_required
-def complete_event(event_id):
-    user = get_current_user()
-    event = Event.query.get_or_404(event_id)
+# ==============================================================================
+# PAYMENT VERIFICATION MANAGEMENT
+# ==============================================================================
 
-    if event.organizer_id != user.id and not user.is_admin:
+@organizer_bp.route('/payments/verification')
+@organizer_required
+def payment_verification():
+    """
+    Dedicated Payment Verification view showing all payments submitted for organizer's events.
+    """
+    user = get_current_user()
+    my_events = Event.query.filter_by(organizer_id=user.id).all()
+    event_ids = [e.id for e in my_events]
+
+    filter_status = request.args.get('status', '').strip().upper()
+    filter_event_id = request.args.get('event_id', '').strip()
+
+    if not event_ids:
+        payments = []
+    else:
+        query = Payment.query.filter(Payment.event_id.in_(event_ids))
+        if filter_status:
+            query = query.filter(Payment.status == filter_status)
+        if filter_event_id:
+            try:
+                ev_id_int = int(filter_event_id)
+                if ev_id_int in event_ids:
+                    query = query.filter(Payment.event_id == ev_id_int)
+            except ValueError:
+                pass
+        payments = query.order_by(Payment.submitted_at.desc()).all()
+
+    return render_template(
+        'organizer/payment_verification.html',
+        user=user,
+        payments=payments,
+        filter_status=filter_status,
+        filter_event_id=filter_event_id,
+        my_events=my_events
+    )
+
+
+@organizer_bp.route('/payments/<int:payment_id>/verify', methods=['POST'])
+@organizer_bp.route('/payment/<int:payment_id>/verify', methods=['POST'])
+@organizer_required
+def verify_student_payment(payment_id):
+    """
+    Organizer approves and verifies student payment proof.
+    Transitions Payment to VERIFIED, confirms registration, and generates ticket + QR.
+    """
+    user = get_current_user()
+    payment = Payment.query.get_or_404(payment_id)
+
+    # Security / Authorization: Organizer can ONLY verify payments for their own events
+    is_authorized = (payment.organizer_id == user.id) or (payment.event and payment.event.organizer_id == user.id) or user.is_admin
+    if not is_authorized:
         abort(403)
 
-    event.status = EventStatus.EVENT_COMPLETED
+    payment.status = PaymentStatus.VERIFIED
+    payment.verified_at = datetime.utcnow()
+    payment.verified_by_id = user.id
+    notes = request.form.get('notes', '').strip()
+    payment.verification_reason = notes if notes else f"Payment verified and approved by organizer ({user.name})."
+
+    # Confirm registration and issue ticket
+    registration = payment.registration
+    if registration:
+        registration.status = RegistrationStatus.CONFIRMED
+        from services.qr_service import generate_ticket_qr
+        if not registration.qr_code_image:
+            registration.qr_code_image = generate_ticket_qr(registration.registration_code)
+
     db.session.commit()
-    flash(f"Event '{event.title}' has been marked as Completed. Active passes and registrations are archived, while all certificates and attendance records are safely preserved.", 'success')
-    return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    # Send payment confirmation and ticket email (safely caught)
+    try:
+        from services.email_service import send_payment_confirmation_email
+        target_user = registration.student if (registration and registration.student) else payment.student
+        target_event = payment.event or (registration.event if registration else None)
+        if target_user and target_event:
+            send_payment_confirmation_email(payment, target_user, target_event, registration)
+    except Exception as exc:
+        current_app.logger.warning(f"Could not dispatch payment confirmation email: {exc}")
+
+    flash(f"Payment for {registration.student.name if registration and registration.student else 'student'} has been VERIFIED! Event ticket and QR pass generated.", 'success')
+    return redirect(request.referrer or url_for('organizer.dashboard'))
+
+
+@organizer_bp.route('/payments/<int:payment_id>/reject', methods=['POST'])
+@organizer_bp.route('/payment/<int:payment_id>/reject', methods=['POST'])
+@organizer_required
+def reject_student_payment(payment_id):
+    """
+    Organizer rejects student payment proof.
+    Transitions Payment to REJECTED with a specified reason. No ticket generated.
+    """
+    user = get_current_user()
+    payment = Payment.query.get_or_404(payment_id)
+
+    # Security / Authorization: Organizer can ONLY reject payments for their own events
+    is_authorized = (payment.organizer_id == user.id) or (payment.event and payment.event.organizer_id == user.id) or user.is_admin
+    if not is_authorized:
+        abort(403)
+
+    reason = request.form.get('rejection_reason', '').strip() or 'Payment proof rejected by event organizer.'
+    payment.status = PaymentStatus.REJECTED
+    payment.verification_reason = reason
+    payment.verified_at = datetime.utcnow()
+    payment.verified_by_id = user.id
+
+    if payment.registration:
+        payment.registration.status = RegistrationStatus.PENDING_PAYMENT
+
+    db.session.commit()
+    flash(f"Payment proof has been REJECTED. Reason: {reason}", 'warning')
+    return redirect(request.referrer or url_for('organizer.dashboard'))
 
 
 
