@@ -108,6 +108,7 @@ class OrganizerProfile(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), unique=True, nullable=False)
+    roll_number = db.Column(db.String(50), unique=True, nullable=True, index=True)
     organization_name = db.Column(db.String(150), nullable=False)  # e.g., "Google Developer Student Club", "CSI Student Chapter"
     department = db.Column(db.String(100), nullable=False)        # Department: CSE, IT, CSD, CSM, ECE, EEE, MECH, CIVILS, General
     designation = db.Column(db.String(100), nullable=True)        # e.g., "Lead Organizer", "President"

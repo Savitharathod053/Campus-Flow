@@ -109,6 +109,7 @@ def seed_database():
 
         org_prof1 = OrganizerProfile(
             user_id=org_user1.id,
+            roll_number="1MS20CS001",
             organization_name="ACM Student Chapter & Coding Club",
             department="CSE",
             designation="President & Student Lead",
@@ -133,6 +134,7 @@ def seed_database():
 
         org_prof2 = OrganizerProfile(
             user_id=org_user2.id,
+            roll_number="1MS20EC001",
             organization_name="Robotics & IoT Innovation Hub",
             department="ECE",
             designation="Secretary",
@@ -157,6 +159,7 @@ def seed_database():
 
         org_prof3 = OrganizerProfile(
             user_id=org_user3.id,
+            roll_number="1MS20IT001",
             organization_name="Cloud & DevOps Student Society",
             department="IT",
             designation="Core Member & Lead",
@@ -549,20 +552,20 @@ Every participant will build and test a live modular backend from scratch.""",
         print("Database successfully seeded with realistic sample data!")
         print("\nDEMO CREDENTIALS:")
         print("--------------------------------------------------------------------------------")
-        print("Super Admin (Full Access): superadmin@college.edu   / Admin@123")
-        print("Student 1:                 student1@college.edu     / Pass@123")
-        print("Student 2:                 student2@college.edu     / Pass@123")
-        print("Approved Organizer (CSE):  organizer@college.edu    / Pass@123")
-        print("Pending Organizer (IT):    cloud.club@college.edu   / Pass@123 (Awaiting Approval)")
-        print("Central Dean / Admin:      admin@college.edu        / Pass@123")
-        print("CSE Faculty Admin:         admin.cse@college.edu    / Pass@123")
-        print("IT Faculty Admin:          admin.it@college.edu     / Pass@123")
-        print("CSD Faculty Admin:         admin.csd@college.edu    / Pass@123")
-        print("CSM Faculty Admin:         admin.csm@college.edu    / Pass@123")
-        print("ECE Faculty Admin:         admin.ece@college.edu    / Pass@123")
-        print("EEE Faculty Admin:         admin.eee@college.edu    / Pass@123")
-        print("MECH Faculty Admin:        admin.mech@college.edu   / Pass@123")
-        print("CIVILS Faculty Admin:      admin.civils@college.edu / Pass@123")
+        print("Super Admin (Full Access): superadmin@college.edu       / Admin@123")
+        print("Student 1:                 1MS21CS045 (Roll Number)     / Pass@123")
+        print("Student 2:                 1MS22EC012 (Roll Number)     / Pass@123")
+        print("Approved Organizer (CSE):  1MS20CS001 (Roll Number)     / Pass@123")
+        print("Pending Organizer (IT):    1MS20IT001 (Roll Number)     / Pass@123 (Awaiting Approval)")
+        print("Central Dean / Admin:      admin@college.edu            / Pass@123")
+        print("CSE Faculty Admin:         admin.cse@college.edu        / Pass@123")
+        print("IT Faculty Admin:          admin.it@college.edu         / Pass@123")
+        print("CSD Faculty Admin:         admin.csd@college.edu        / Pass@123")
+        print("CSM Faculty Admin:         admin.csm@college.edu        / Pass@123")
+        print("ECE Faculty Admin:         admin.ece@college.edu        / Pass@123")
+        print("EEE Faculty Admin:         admin.eee@college.edu        / Pass@123")
+        print("MECH Faculty Admin:        admin.mech@college.edu       / Pass@123")
+        print("CIVILS Faculty Admin:      admin.civils@college.edu     / Pass@123")
         print("--------------------------------------------------------------------------------")
 
 if __name__ == '__main__':

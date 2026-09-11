@@ -75,6 +75,7 @@ def create_demo_data():
         if created:
             db.session.add(OrganizerProfile(
                 user_id=organizer_user.id,
+                roll_number="DEMO2026ORG001",
                 organization_name="Demo Events Club",
                 department="CSE",
                 designation="Coordinator",
@@ -83,7 +84,11 @@ def create_demo_data():
                 approved_by_id=faculty_user.id,
             ))
             db.session.commit()
-            print(f"  [+] Created organizer account: {organizer_user.email}")
+            print(f"  [+] Created organizer account: {organizer_user.email} (Roll No: DEMO2026ORG001)")
+        elif organizer_user.organizer_profile and not organizer_user.organizer_profile.roll_number:
+            organizer_user.organizer_profile.roll_number = "DEMO2026ORG001"
+            db.session.commit()
+            print(f"  [+] Updated organizer roll number: DEMO2026ORG001")
 
         # ------------------------------------------------------------
         # 3. STUDENT
@@ -104,14 +109,14 @@ def create_demo_data():
                 section="A",
             ))
             db.session.commit()
-            print(f"  [+] Created student account: {student_user.email}")
+            print(f"  [+] Created student account: {student_user.email} (Roll No: DEMO2026CS001)")
 
         print("\n" + "=" * 70)
         print(" DONE. Demo login credentials (password is the same for all):")
         print("-" * 70)
-        print(f"  Faculty Admin:  faculty.demo@college.edu   / {DEMO_PASSWORD}")
-        print(f"  Organizer:      organizer.demo@college.edu / {DEMO_PASSWORD}")
-        print(f"  Student:        student.demo@college.edu   / {DEMO_PASSWORD}")
+        print(f"  Faculty Admin:  faculty.demo@college.edu       / {DEMO_PASSWORD}")
+        print(f"  Organizer:      DEMO2026ORG001 (Roll Number)   / {DEMO_PASSWORD}")
+        print(f"  Student:        DEMO2026CS001 (Roll Number)    / {DEMO_PASSWORD}")
         print("=" * 70)
 
 

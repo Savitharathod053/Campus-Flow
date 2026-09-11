@@ -16,11 +16,12 @@
 
                 <form method="POST" action="{{ url_for('auth.login', next=request.args.get('next')) }}">
                     <div class="mb-3">
-                        <label for="email" class="form-label small fw-bold">College Email / ID</label>
+                        <label for="identifier" class="form-label small fw-bold">Roll Number</label>
                         <div class="input-group">
-                            <span class="input-group-text bg-light"><i class="bi bi-envelope text-muted"></i></span>
-                            <input type="email" class="form-control" id="email" name="email" required placeholder="name@college.edu">
+                            <span class="input-group-text bg-light"><i class="bi bi-person-badge text-muted"></i></span>
+                            <input type="text" class="form-control" id="identifier" name="identifier" required placeholder="Enter roll number (or email for faculty/admin)">
                         </div>
+                        <div class="form-text small text-muted">Students and organizers log in using Roll Number. Faculty, HOD, and Admins use Email.</div>
                     </div>
 
                     <div class="mb-3">

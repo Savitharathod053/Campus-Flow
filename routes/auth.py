@@ -1,5 +1,5 @@
 from functools import wraps
-from flask import Blueprint, render_template, request, redirect, url_for, flash, session, g, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, session, g, abort, current_app
 from models import db, User, UserRole, StudentProfile, OrganizerProfile, FacultyProfile
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/auth')
@@ -127,15 +127,40 @@ def login():
                 return redirect(url_for('organizer.dashboard'))
 
     if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
+        identifier = (request.form.get('identifier') or request.form.get('email') or request.form.get('roll_number') or '').strip()
         password = request.form.get('password', '')
         remember = request.form.get('remember') == 'on'
 
-        if not email or not password:
-            flash('Email and password are required.', 'danger')
+        if not identifier or not password:
+            flash('Roll number / email and password are required.', 'danger')
             return render_template('auth/login.html')
 
-        user = User.query.filter_by(email=email).first()
+        user = None
+
+        # Resolution order:
+        # 1. First try StudentProfile.query.filter_by(roll_number=identifier).first() -> use .user
+        student_profile = StudentProfile.query.filter_by(roll_number=identifier).first()
+        if not student_profile and hasattr(identifier, 'upper'):
+            student_profile = StudentProfile.query.filter_by(roll_number=identifier.upper()).first()
+
+        if student_profile:
+            user = student_profile.user
+        else:
+            # 2. Then try OrganizerProfile.query.filter_by(roll_number=identifier).first() -> use .user
+            organizer_profile = OrganizerProfile.query.filter_by(roll_number=identifier).first()
+            if not organizer_profile and hasattr(identifier, 'upper'):
+                organizer_profile = OrganizerProfile.query.filter_by(roll_number=identifier.upper()).first()
+
+            if organizer_profile:
+                user = organizer_profile.user
+            else:
+                # 3. Fall back to User.query.filter_by(email=identifier).first() (kept only for HOD/Dean/Super Admin, who have no roll number)
+                candidate_user = User.query.filter_by(email=identifier.lower()).first()
+                if not candidate_user:
+                    candidate_user = User.query.filter_by(email=identifier).first()
+                # Email is no longer a valid login credential for students and organizers
+                if candidate_user and not (candidate_user.is_student or candidate_user.is_organizer):
+                    user = candidate_user
 
         if not user or not user.check_password(password):
             flash('Invalid email or password credentials.', 'danger')
@@ -278,6 +303,7 @@ def register_organizer():
     if request.method == 'POST':
         name = request.form.get('name', '').strip()
         email = request.form.get('email', '').strip().lower()
+        roll_number = request.form.get('roll_number', '').strip().upper()
         organization_name = request.form.get('organization_name', '').strip()
         department = request.form.get('department', '').strip()
         designation = request.form.get('designation', '').strip()
@@ -285,7 +311,7 @@ def register_organizer():
         password = request.form.get('password', '')
         confirm_password = request.form.get('confirm_password', '')
 
-        if not all([name, email, organization_name, department, password]):
+        if not all([name, email, roll_number, organization_name, department, password]):
             flash('Please fill in all required fields.', 'danger')
             return render_template('auth/register_organizer.html', department_admins=department_admins)
 
@@ -293,8 +319,16 @@ def register_organizer():
             flash('Passwords do not match.', 'danger')
             return render_template('auth/register_organizer.html', department_admins=department_admins)
 
+        if len(password) < 6:
+            flash('Password must be at least 6 characters.', 'danger')
+            return render_template('auth/register_organizer.html', department_admins=department_admins)
+
         if User.query.filter_by(email=email).first():
             flash('An account with this email already exists.', 'danger')
+            return render_template('auth/register_organizer.html', department_admins=department_admins)
+
+        if OrganizerProfile.query.filter_by(roll_number=roll_number).first() or StudentProfile.query.filter_by(roll_number=roll_number).first():
+            flash('An account with this Roll Number is already registered.', 'danger')
             return render_template('auth/register_organizer.html', department_admins=department_admins)
 
         # Create user as Organizer with is_verified=False (Pending Admin Approval)
@@ -311,6 +345,7 @@ def register_organizer():
 
         profile = OrganizerProfile(
             user_id=user.id,
+            roll_number=roll_number,
             organization_name=organization_name,
             department=department,
             designation=designation,

@@ -22,8 +22,19 @@
                             <input type="text" name="name" class="form-control" placeholder="e.g. Priya Patel" required>
                         </div>
                         <div class="col-md-6">
+                            <label class="form-label small fw-bold">Roll Number *</label>
+                            <input type="text" name="roll_number" class="form-control" placeholder="e.g. 1MS21CS045" required>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-6">
                             <label class="form-label small fw-bold">Official College Email *</label>
                             <input type="email" name="email" class="form-control" placeholder="priya.acm@college.edu" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Contact Phone *</label>
+                            <input type="tel" name="phone" class="form-control" placeholder="+91 9876543210" required>
                         </div>
                     </div>
 
@@ -39,7 +50,7 @@
                     </div>
 
                     <div class="row g-3 mb-4">
-                        <div class="col-md-6">
+                        <div class="col-md-12">
                             <label class="form-label small fw-bold">Department / Affiliation *</label>
                             <select name="department" id="department_select" class="form-select" required onchange="updateAdminDisplay(this.value)">
                                 <option value="" disabled selected>Select Department</option>
@@ -53,10 +64,6 @@
                                 <option value="CIVILS">8. Civil Engineering (CIVILS)</option>
                                 <option value="General">General / Inter-Departmental / College Level</option>
                             </select>
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label small fw-bold">Contact Phone *</label>
-                            <input type="tel" name="phone" class="form-control" placeholder="+91 9876543210" required>
                         </div>
                     </div>
 

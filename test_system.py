@@ -90,9 +90,11 @@ class CampusFlowSystemTests(unittest.TestCase):
             client = self.app.test_client()
 
             # 1. Register new organizer in MECH department
+            test_roll_number = f"MECH{unique_id.upper()}"
             reg_res = client.post('/auth/register/organizer', data={
                 'name': 'Test MECH Organizer',
                 'email': test_email,
+                'roll_number': test_roll_number,
                 'organization_name': f'Automotive Society {unique_id}',
                 'department': 'MECH',
                 'designation': 'President',
@@ -104,7 +106,7 @@ class CampusFlowSystemTests(unittest.TestCase):
 
             # 2. Try to log in before approval -> Should be prevented
             login_fail = client.post('/auth/login', data={
-                'email': test_email,
+                'identifier': test_roll_number,
                 'password': 'Pass@123'
             }, follow_redirects=True)
             self.assertEqual(login_fail.status_code, 200)
@@ -151,14 +153,22 @@ class CampusFlowSystemTests(unittest.TestCase):
             }, follow_redirects=True)
             self.assertEqual(approve_res.status_code, 200)
 
-            # 4. Now the organizer logs in successfully
+            # 4. Now the organizer logs in successfully using roll number
             org_client = self.app.test_client()
             login_success = org_client.post('/auth/login', data={
-                'email': test_email,
+                'identifier': test_roll_number,
                 'password': 'Pass@123'
             }, follow_redirects=True)
             self.assertEqual(login_success.status_code, 200)
             self.assertIn(b'Organizer Portal', login_success.data)
+
+            # 5. Email login should fail for organizer
+            fresh_client = self.app.test_client()
+            email_login = fresh_client.post('/auth/login', data={
+                'identifier': test_email,
+                'password': 'Pass@123'
+            }, follow_redirects=True)
+            self.assertIn(b'Invalid email or password credentials', email_login.data)
 
     def test_04_student_auth_and_registration(self):
         """Verify student login and event registration flow."""
@@ -185,8 +195,17 @@ class CampusFlowSystemTests(unittest.TestCase):
                 db.session.add(sp)
                 db.session.commit()
 
+            # Student login with email should fail
+            email_client = self.app.test_client()
+            email_fail = email_client.post('/auth/login', data={
+                'identifier': student.email,
+                'password': 'Pass@123'
+            }, follow_redirects=True)
+            self.assertIn(b'Invalid email or password credentials', email_fail.data)
+
+            # Student logs in with roll number
             login_res = client.post('/auth/login', data={
-                'email': student.email,
+                'identifier': student.student_profile.roll_number,
                 'password': 'Pass@123'
             }, follow_redirects=True)
             self.assertEqual(login_res.status_code, 200)
