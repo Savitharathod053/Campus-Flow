@@ -8,28 +8,40 @@ load_dotenv(BASE_DIR / '.env')
 def get_database_uri():
     """
     Retrieve and normalize the relational database connection URI.
-    Supports Microsoft SQL Server (SSMS / MSSQL), PostgreSQL, MySQL, and SQLite.
-    Automatically handles driver and connection parameters for SQL Server / SSMS.
+    Supports Render PostgreSQL, Microsoft SQL Server (local SSMS / MSSQL), MySQL, and SQLite.
+    Automatically handles driver and connection parameters for Render PostgreSQL and SQL Server.
     """
-    uri = os.environ.get('DATABASE_URL')
-    if not uri:
+    raw_uri = os.environ.get('DATABASE_URL')
+    if not raw_uri or not raw_uri.strip():
         # If running on Windows with local SQL Server:
         if os.name == 'nt':
             return 'mssql+pyodbc://@localhost/fastfest?driver=ODBC+Driver+18+for+SQL+Server&trusted_connection=yes&TrustServerCertificate=yes'
-        # On Linux / Cloud (e.g. Render, Heroku, Container) fallback to SQLite instance database
+        # On Linux / Cloud fallback to SQLite instance database
         db_path = BASE_DIR / 'instance' / 'fastfest.db'
         db_path.parent.mkdir(parents=True, exist_ok=True)
         return f'sqlite:///{db_path}'
     
-    # Normalize mssql:// or sqlserver:// dialect scheme to mssql+pyodbc://
-    if uri.startswith("mssql://"):
+    uri = raw_uri.strip().strip("'\"")
+    
+    # Render / Heroku provides postgres:// or postgresql:// scheme.
+    # In SQLAlchemy 2.0+, 'postgres://' is not recognized; 'postgresql+psycopg2://' explicitly
+    # targets the psycopg2-binary driver installed in requirements.txt.
+    if uri.startswith("postgres://"):
+        uri = uri.replace("postgres://", "postgresql+psycopg2://", 1)
+    elif uri.startswith("postgresql://") and not uri.startswith("postgresql+"):
+        uri = uri.replace("postgresql://", "postgresql+psycopg2://", 1)
+    elif uri.startswith("mssql://"):
         uri = uri.replace("mssql://", "mssql+pyodbc://", 1)
     elif uri.startswith("sqlserver://"):
         uri = uri.replace("sqlserver://", "mssql+pyodbc://", 1)
     elif uri.startswith("mysql://"):
         uri = uri.replace("mysql://", "mysql+pymysql://", 1)
-    elif uri.startswith("postgres://"):
-        uri = uri.replace("postgres://", "postgresql://", 1)
+
+    # If connecting to a remote PostgreSQL instance (e.g. Render external database URL)
+    # and sslmode is not specified, append sslmode=require for secure TLS connectivity.
+    if uri.startswith("postgresql") and "@localhost" not in uri and "@127.0.0.1" not in uri and "sslmode=" not in uri:
+        delimiter = "&" if "?" in uri else "?"
+        uri = f"{uri}{delimiter}sslmode=require"
     
     return uri
 
@@ -37,7 +49,7 @@ def get_database_uri():
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'campus-flow-secure-college-event-secret-key-2026')
     
-    # Relational Database URI (Microsoft SQL Server / SSMS)
+    # Relational Database URI (Render PostgreSQL / Microsoft SQL Server)
     SQLALCHEMY_DATABASE_URI = get_database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {

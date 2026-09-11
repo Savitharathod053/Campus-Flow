@@ -15,20 +15,23 @@ CAMPUS_FLOW_TABLES = [
     'student_profiles',
     'organizer_profiles',
     'faculty_profiles',
+    'departments',
     'events',
     'custom_registration_fields',
     'event_registrations',
     'custom_field_responses',
-    'payments',
-    'attendance_records',
-    'attendance_sessions',
-    'announcements',
-    'certificates',
     'teams',
     'team_members',
     'team_invitations',
-    'departments',
-    'audit_logs'
+    'payments',
+    'attendance_sessions',
+    'attendance_records',
+    'announcements',
+    'certificates',
+    'audit_logs',
+    'organizer_requests',
+    'event_requests',
+    'notifications'
 ]
 
 def get_safe_db_info():
@@ -46,7 +49,7 @@ def get_safe_db_info():
     safe_db_name = url.database or 'unknown'
     
     current_db_actual = safe_db_name
-    current_schema = 'dbo'
+    current_schema = 'public' if dialect == 'postgresql' else ('dbo' if dialect == 'mssql' else 'main')
     table_status = {}
     db_connected = False
     error_msg = None
@@ -55,7 +58,7 @@ def get_safe_db_info():
         with engine.connect() as conn:
             db_connected = True
             
-            # For SQL Server, get real current DB and schema from server
+            # Query real current DB and schema from server
             if dialect == 'mssql':
                 try:
                     res = conn.execute(text("SELECT DB_NAME(), SCHEMA_NAME()")).fetchone()
@@ -64,6 +67,14 @@ def get_safe_db_info():
                         current_schema = res[1] or 'dbo'
                 except Exception as e:
                     logger.warning(f"Could not query DB_NAME()/SCHEMA_NAME(): {e}")
+            elif dialect == 'postgresql':
+                try:
+                    res = conn.execute(text("SELECT current_database(), current_schema()")).fetchone()
+                    if res:
+                        current_db_actual = res[0]
+                        current_schema = res[1] or 'public'
+                except Exception as e:
+                    logger.warning(f"Could not query current_database()/current_schema(): {e}")
             elif dialect == 'sqlite':
                 current_schema = 'main'
 

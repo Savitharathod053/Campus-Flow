@@ -3,6 +3,7 @@ from datetime import datetime
 from pathlib import Path
 from flask import Flask, render_template, session, jsonify
 from flask_migrate import Migrate
+from werkzeug.middleware.proxy_fix import ProxyFix
 from config import Config
 from models import db, User
 from routes import (
@@ -16,6 +17,16 @@ migrate = Migrate()
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
+
+    # Reverse proxy support for Render / Cloudflare (ensures correct HTTPS redirects and secure cookies)
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
+
+    # Enable Cross-Origin Resource Sharing with credentials support if available
+    try:
+        from flask_cors import CORS
+        CORS(app, supports_credentials=True)
+    except ImportError:
+        pass
 
     # Initialize Database and Migrations
     db.init_app(app)
@@ -150,9 +161,21 @@ def create_app(config_class=Config):
 
     with app.app_context():
         try:
-            db.create_all()
+            from services.db_init import init_db_and_seed
+            init_db_and_seed(app)
         except Exception as e:
-            app.logger.warning(f"Note: db.create_all() encountered: {e}")
+            app.logger.warning(f"Note: Automatic database initialization encountered: {e}")
+
+    # CLI Command to initialize and seed database
+    @app.cli.command("init-db")
+    def init_db_cli():
+        """Initialize all tables and baseline users in the database."""
+        from services.db_init import init_db_and_seed
+        success = init_db_and_seed(app)
+        if success:
+            print("[SUCCESS] Database initialization and seeding completed successfully.")
+        else:
+            print("[FAILURE] Database initialization encountered an error.")
 
     # CLI Command to delete expired events
     @app.cli.command("delete-expired-events")
@@ -175,7 +198,7 @@ def create_app(config_class=Config):
     # CLI Command to inspect database connection and schema health
     @app.cli.command("check-db")
     def check_db_cli():
-        """Run database connectivity and schema diagnostics for SQL Server."""
+        """Run database connectivity and schema diagnostics."""
         from services.db_diagnostic import run_db_diagnostic
         run_db_diagnostic(app)
 
