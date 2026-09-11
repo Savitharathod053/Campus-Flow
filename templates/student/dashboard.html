@@ -1,30 +1,41 @@
 {% extends "base.html" %}
-{% block title %}Student Dashboard - Campus Flow{% endblock %}
+{% block title %}Student Dashboard — Campus Flow{% endblock %}
 
 {% block content %}
-<div class="bg-primary text-white py-4 mb-4">
-    <div class="container">
+<!-- Student Welcome Header Banner -->
+<div class="py-4 mb-4 text-white position-relative overflow-hidden" style="background: linear-gradient(135deg, #090d16 0%, #1e3a8a 55%, #1e1b4b 100%);">
+    <div class="hero-orb hero-orb-1" style="width: 280px; height: 280px; top: -100px; right: 5%; opacity: 0.35;" aria-hidden="true"></div>
+    <div class="container position-relative" style="z-index: 2;">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div>
-                <h2 class="fw-bold mb-1">Welcome, {{ user.name }}!</h2>
-                <p class="text-light opacity-90 mb-0">
-                    <i class="bi bi-mortarboard me-1"></i> Roll No: <strong>{{ user.student_profile.roll_number if user.student_profile else 'N/A' }}</strong> &bull;
-                    Dept: <strong>{{ user.student_profile.department if user.student_profile else 'N/A' }}</strong> &bull;
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-1">
+                        <i class="bi bi-mortarboard-fill me-1"></i> Student Portal
+                    </span>
+                    <span class="badge bg-white bg-opacity-10 text-white border border-white border-opacity-20 px-2 py-1">
+                        {{ user.student_profile.department if user.student_profile else 'Undergraduate' }}
+                    </span>
+                </div>
+                <h2 class="fw-bold mb-1 text-white dynamic-greeting" data-user-name="{{ user.name }}">
+                    Welcome, {{ user.name }}! 👋
+                </h2>
+                <p class="text-light opacity-90 mb-0 small">
+                    <i class="bi bi-person-badge me-1 text-warning"></i> Roll No: <strong class="font-monospace text-white">{{ user.student_profile.roll_number if user.student_profile else 'N/A' }}</strong> &bull;
                     Year: <strong>{{ user.student_profile.year if user.student_profile else 'N/A' }}</strong> (Sec {{ user.student_profile.section if user.student_profile else 'N/A' }})
                 </p>
             </div>
-            <div class="d-flex gap-2">
+            <div class="d-flex gap-2 flex-wrap">
                 {% if has_pending_organizer_request %}
-                    <span class="btn btn-light fw-bold shadow-sm disabled">
-                        <i class="bi bi-hourglass-split me-1 text-warning"></i> Organizer Request Under HOD Review
+                    <span class="btn btn-light fw-bold shadow-sm disabled btn-sm">
+                        <i class="bi bi-hourglass-split me-1 text-warning"></i> Organizer Request Under Review
                     </span>
                 {% else %}
-                    <button type="button" class="btn btn-outline-light fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#requestOrganizerModal">
-                        <i class="bi bi-person-badge me-1"></i> Request to Become Organizer
+                    <button type="button" class="btn btn-outline-light fw-bold shadow-sm btn-sm" data-bs-toggle="modal" data-bs-target="#requestOrganizerModal">
+                        <i class="bi bi-person-badge me-1"></i> Request Organizer Role
                     </button>
                 {% endif %}
-                <a href="{{ url_for('public.events') }}" class="btn btn-warning fw-bold shadow-sm">
-                    <i class="bi bi-plus-circle me-1"></i> Browse & Register Events
+                <a href="{{ url_for('public.events') }}" class="btn btn-warning fw-bold shadow-sm btn-sm">
+                    <i class="bi bi-compass me-1"></i> Browse Events
                 </a>
             </div>
         </div>
@@ -34,7 +45,7 @@
 <div class="container pb-5">
     <!-- Pending Invitations Banner -->
     {% if pending_invitations %}
-        <div class="alert alert-warning border-warning border-2 shadow-sm d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <div class="alert alert-warning border-warning border-2 shadow-sm d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4 rounded-3">
             <div>
                 <h5 class="alert-heading fw-bold mb-1">
                     <i class="bi bi-envelope-exclamation-fill text-warning me-2"></i> You have {{ pending_invitations|length }} pending team invitation(s)!
@@ -54,48 +65,48 @@
         </div>
     {% endif %}
 
-    <!-- Stat Metrics -->
+    <!-- 3D Stat Metrics -->
     <div class="row g-3 mb-4">
         <div class="col-sm-6 col-lg-3">
-            <div class="metric-card">
+            <div class="metric-card tilt-card h-100">
                 <div class="metric-icon-box bg-primary text-white">
                     <i class="bi bi-ticket-detailed"></i>
                 </div>
                 <div>
-                    <div class="metric-number">{{ upcoming_registrations|length }}</div>
+                    <div class="metric-number count-up" data-target="{{ upcoming_registrations|length }}">{{ upcoming_registrations|length }}</div>
                     <div class="metric-label">Upcoming Events</div>
                 </div>
             </div>
         </div>
         <div class="col-sm-6 col-lg-3">
-            <div class="metric-card">
-                <div class="metric-icon-box bg-indigo text-white" style="background-color: #6366f1;">
+            <div class="metric-card tilt-card h-100">
+                <div class="metric-icon-box bg-primary text-white" style="background: linear-gradient(135deg, #6366f1, #4f46e5) !important;">
                     <i class="bi bi-people-fill text-white"></i>
                 </div>
                 <div>
-                    <div class="metric-number">{{ my_teams|length if my_teams else 0 }}</div>
+                    <div class="metric-number count-up" data-target="{{ my_teams|length if my_teams else 0 }}">{{ my_teams|length if my_teams else 0 }}</div>
                     <div class="metric-label">My Teams</div>
                 </div>
             </div>
         </div>
         <div class="col-sm-6 col-lg-3">
-            <div class="metric-card">
+            <div class="metric-card tilt-card h-100">
                 <div class="metric-icon-box bg-warning text-dark">
                     <i class="bi bi-award-fill"></i>
                 </div>
                 <div>
-                    <div class="metric-number">{{ certificates|length }}</div>
+                    <div class="metric-number count-up" data-target="{{ certificates|length }}">{{ certificates|length }}</div>
                     <div class="metric-label">Certificates Earned</div>
                 </div>
             </div>
         </div>
         <div class="col-sm-6 col-lg-3">
-            <div class="metric-card">
+            <div class="metric-card tilt-card h-100">
                 <div class="metric-icon-box bg-info text-white">
-                    <i class="bi bi-qr-code"></i>
+                    <i class="bi bi-qr-code-scan"></i>
                 </div>
                 <div>
-                    <div class="metric-number">{{ registrations|selectattr("is_attended")|list|length }}</div>
+                    <div class="metric-number count-up" data-target="{{ registrations|selectattr('is_attended')|list|length }}">{{ registrations|selectattr('is_attended')|list|length }}</div>
                     <div class="metric-label">Events Attended</div>
                 </div>
             </div>

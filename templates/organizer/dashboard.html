@@ -2,25 +2,34 @@
 {% block title %}Organizer Dashboard - Campus Flow{% endblock %}
 
 {% block content %}
-<div class="bg-primary text-white py-4 mb-4">
-    <div class="container">
+<div class="py-4 mb-4" style="background: linear-gradient(135deg, #0b1329 0%, #1e3a8a 60%, #172554 100%); border-radius: 0 0 1.5rem 1.5rem; box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.4);">
+    <div class="container py-2">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
             <div>
-                <h2 class="fw-bold mb-1">Organizer Dashboard</h2>
-                <p class="text-light opacity-90 mb-0">
-                    <i class="bi bi-person-badge me-1"></i> {{ user.name }} &bull;
-                    <strong>{{ user.organizer_profile.organization_name if user.organizer_profile else 'College Event Club' }}</strong>
-                </p>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge bg-warning text-dark fw-bold px-2 py-1 text-uppercase" style="letter-spacing: 0.5px; font-size: 0.72rem;">Organizer Console</span>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace" style="font-size: 0.72rem;">Institutional Coordination</span>
+                </div>
+                <h2 class="fw-bold text-white mb-1 tracking-tight">
+                    <span class="dynamic-greeting" data-user-name="{{ user.name }}">Welcome, {{ user.name }}</span>
+                </h2>
+                <div class="d-flex flex-wrap align-items-center gap-2 text-light opacity-80 small mt-1">
+                    <span><i class="bi bi-building me-1 text-warning"></i>{{ user.organizer_profile.organization_name if user.organizer_profile else 'College Event Club' }}</span>
+                    <span>&bull;</span>
+                    <span><i class="bi bi-person-badge me-1"></i>Roll: <strong>{{ user.organizer_profile.roll_number if user.organizer_profile and user.organizer_profile.roll_number else 'N/A' }}</strong></span>
+                    <span>&bull;</span>
+                    <span><i class="bi bi-mortarboard me-1"></i>Dept: {{ user.organizer_profile.department if user.organizer_profile and user.organizer_profile.department else 'General' }}</span>
+                </div>
             </div>
-            <div class="d-flex gap-2">
-                <a href="{{ url_for('organizer.payment_verification') }}" class="btn btn-light fw-bold shadow-sm">
-                    <i class="bi bi-shield-check me-1 text-primary"></i> Payment Verifications
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ url_for('organizer.payment_verification') }}" class="btn btn-outline-light btn-sm fw-bold px-3 py-2 rounded-pill shadow-sm">
+                    <i class="bi bi-shield-check me-1 text-warning"></i> Payment Verifications
                     {% if pending_payments %}
                         <span class="badge bg-danger ms-1">{{ pending_payments|length }}</span>
                     {% endif %}
                 </a>
-                <a href="{{ url_for('organizer.create_event') }}" class="btn btn-warning fw-bold shadow-sm">
-                    <i class="bi bi-plus-circle me-1"></i> Create New Event
+                <a href="{{ url_for('organizer.create_event') }}" class="btn btn-warning btn-sm fw-bold px-3.5 py-2 rounded-pill shadow-sm text-dark">
+                    <i class="bi bi-plus-circle-fill me-1"></i> Create New Event
                 </a>
             </div>
         </div>
@@ -31,45 +40,45 @@
     <!-- Stat Metrics Row -->
     <div class="row g-3 mb-4">
         <div class="col-sm-6 col-lg-3">
-            <div class="metric-card">
+            <div class="metric-card shadow-3d">
                 <div class="metric-icon-box bg-primary text-white">
                     <i class="bi bi-calendar-event"></i>
                 </div>
                 <div>
-                    <div class="metric-number">{{ total_events }}</div>
+                    <div class="metric-number count-up" data-target="{{ total_events }}">{{ total_events }}</div>
                     <div class="metric-label">Total Events</div>
                 </div>
             </div>
         </div>
         <div class="col-sm-6 col-lg-3">
-            <div class="metric-card">
+            <div class="metric-card shadow-3d">
                 <div class="metric-icon-box bg-success text-white">
                     <i class="bi bi-people-fill"></i>
                 </div>
                 <div>
-                    <div class="metric-number">{{ total_registrations }}</div>
+                    <div class="metric-number count-up" data-target="{{ total_registrations }}">{{ total_registrations }}</div>
                     <div class="metric-label">Registrations</div>
                 </div>
             </div>
         </div>
         <div class="col-sm-6 col-lg-3">
-            <div class="metric-card">
+            <div class="metric-card shadow-3d">
                 <div class="metric-icon-box bg-warning text-dark">
                     <i class="bi bi-hourglass-split"></i>
                 </div>
                 <div>
-                    <div class="metric-number">{{ pending_approval_events }}</div>
+                    <div class="metric-number count-up" data-target="{{ pending_approval_events }}">{{ pending_approval_events }}</div>
                     <div class="metric-label">Pending Approvals</div>
                 </div>
             </div>
         </div>
         <div class="col-sm-6 col-lg-3">
-            <div class="metric-card">
+            <div class="metric-card shadow-3d">
                 <div class="metric-icon-box bg-info text-white">
                     <i class="bi bi-qr-code-scan"></i>
                 </div>
                 <div>
-                    <div class="metric-number">{{ attended_count }}</div>
+                    <div class="metric-number count-up" data-target="{{ attended_count }}">{{ attended_count }}</div>
                     <div class="metric-label">Attended Check-ins</div>
                 </div>
             </div>
@@ -77,15 +86,15 @@
     </div>
 
     <!-- Event Proposals & Dual Approval Pipeline Tracker -->
-    <div class="card border-0 shadow-sm rounded-3 mb-4 overflow-hidden">
-        <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div class="card border-0 shadow-3d rounded-4 mb-4 overflow-hidden">
+        <div class="card-header bg-white border-bottom py-3.5 px-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h5 class="fw-bold text-dark mb-1">
-                    <i class="bi bi-shield-check text-primary me-2"></i> Event Creation Proposals & Dual Approval Status
+                    <i class="bi bi-shield-check text-primary me-2"></i> Event Proposals & Dual Approval Workflow
                 </h5>
-                <p class="small text-muted mb-0">Track your event proposals through the mandatory two-stage institutional approval workflow (HOD &rarr; Dean).</p>
+                <p class="small text-muted mb-0">Track institutional evaluation pipeline: Stage 1 (Department HOD) &rarr; Stage 2 (Dean of Student Affairs).</p>
             </div>
-            <a href="{{ url_for('organizer.create_event') }}" class="btn btn-primary btn-sm fw-bold">
+            <a href="{{ url_for('organizer.create_event') }}" class="btn btn-primary btn-sm fw-bold px-3 py-2 rounded-pill shadow-sm">
                 <i class="bi bi-plus-circle me-1"></i> Submit New Event Proposal
             </a>
         </div>
@@ -93,72 +102,72 @@
             {% if event_requests %}
                 <div class="table-responsive">
                     <table class="table table-hover align-middle mb-0">
-                        <thead class="table-light small text-uppercase">
+                        <thead class="table-light small text-uppercase" style="letter-spacing: 0.5px; font-size: 0.72rem;">
                             <tr>
-                                <th class="ps-3">Event Proposal</th>
+                                <th class="ps-4">Event Proposal</th>
                                 <th>Department</th>
                                 <th>Submitted On</th>
                                 <th>Dual Approval Stage</th>
                                 <th>Status / Feedback</th>
-                                <th class="text-end pe-3">Action</th>
+                                <th class="text-end pe-4">Action</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% for req in event_requests %}
                                 <tr>
-                                    <td class="ps-3">
+                                    <td class="ps-4">
                                         <div class="fw-bold text-dark">{{ req.event_name }}</div>
-                                        <small class="text-muted">{{ req.category }} &bull; {{ req.venue or 'Campus' }}</small>
+                                        <small class="text-muted"><i class="bi bi-tag me-1"></i>{{ req.category }} &bull; <i class="bi bi-geo-alt me-1"></i>{{ req.venue or 'Campus' }}</small>
                                     </td>
                                     <td>
-                                        <span class="badge bg-secondary-subtle text-dark border">{{ req.department.code if req.department else 'N/A' }}</span>
+                                        <span class="badge bg-light text-dark border font-monospace">{{ req.department.code if req.department else 'N/A' }}</span>
                                     </td>
                                     <td>
                                         <small class="text-muted">{{ req.created_at.strftime('%b %d, %Y') if req.created_at else '' }}</small>
                                     </td>
                                     <td>
                                         {% if req.overall_status.value == 'pending_hod_approval' %}
-                                            <span class="badge bg-warning text-dark border border-warning">
-                                                <i class="bi bi-hourglass-top me-1"></i> Step 1: Pending HOD Approval
-                                            </span>
-                                            <div class="small text-muted">Awaiting endorsement from department HOD</div>
+                                            <div class="d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle small fw-bold">
+                                                <i class="bi bi-hourglass-top"></i> Step 1: Pending HOD Endorsement
+                                            </div>
+                                            <div class="small text-muted mt-1">Awaiting review from Department Head</div>
                                         {% elif req.overall_status.value == 'pending_dean_approval' %}
-                                            <span class="badge bg-info text-dark border border-info">
-                                                <i class="bi bi-send-check me-1"></i> Step 2: Pending Dean Clearance
-                                            </span>
-                                            <div class="small text-success">
-                                                <i class="bi bi-check-lg"></i> HOD Endorsed ({{ req.hod_decision_at.strftime('%b %d') if req.hod_decision_at else '' }})
+                                            <div class="d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill bg-info-subtle text-info-emphasis border border-info-subtle small fw-bold">
+                                                <i class="bi bi-send-check"></i> Step 2: Pending Dean Clearance
+                                            </div>
+                                            <div class="small text-success mt-1">
+                                                <i class="bi bi-check-circle-fill me-1"></i> HOD Endorsed ({{ req.hod_decision_at.strftime('%b %d') if req.hod_decision_at else '' }})
                                             </div>
                                         {% elif req.overall_status.value == 'approved' %}
-                                            <span class="badge bg-success">
-                                                <i class="bi bi-check-circle-fill me-1"></i> Approved & Published
-                                            </span>
-                                            <div class="small text-muted">Cleared by Dean ({{ req.dean_decision_at.strftime('%b %d') if req.dean_decision_at else '' }})</div>
+                                            <div class="d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill bg-success-subtle text-success border border-success-subtle small fw-bold">
+                                                <i class="bi bi-check-circle-fill"></i> Fully Cleared & Published
+                                            </div>
+                                            <div class="small text-muted mt-1">Dean Cleared ({{ req.dean_decision_at.strftime('%b %d') if req.dean_decision_at else '' }})</div>
                                         {% elif req.overall_status.value == 'rejected_by_hod' %}
-                                            <span class="badge bg-danger">
-                                                <i class="bi bi-x-circle-fill me-1"></i> Declined by HOD
-                                            </span>
+                                            <div class="d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill bg-danger-subtle text-danger border border-danger-subtle small fw-bold">
+                                                <i class="bi bi-x-circle-fill"></i> Declined by HOD
+                                            </div>
                                         {% elif req.overall_status.value == 'rejected_by_dean' %}
-                                            <span class="badge bg-danger">
-                                                <i class="bi bi-x-circle-fill me-1"></i> Declined by Dean
-                                            </span>
+                                            <div class="d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill bg-danger-subtle text-danger border border-danger-subtle small fw-bold">
+                                                <i class="bi bi-x-circle-fill"></i> Declined by Dean
+                                            </div>
                                         {% endif %}
                                     </td>
                                     <td>
                                         {% if req.overall_status.value in ['rejected_by_hod', 'rejected_by_dean'] %}
-                                            <div class="small text-danger fw-semibold">
-                                                Reason: "{{ req.hod_rejection_reason or req.dean_rejection_reason or 'No reason provided.' }}"
+                                            <div class="small text-danger fw-semibold bg-danger-subtle p-2 rounded-2 border border-danger-subtle">
+                                                <i class="bi bi-exclamation-circle me-1"></i>"{{ req.hod_rejection_reason or req.dean_rejection_reason or 'No reason provided.' }}"
                                             </div>
                                         {% elif req.overall_status.value == 'approved' %}
-                                            <small class="text-success fw-semibold"><i class="bi bi-globe me-1"></i> Live on Campus Flow</small>
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-globe me-1"></i>Live on Campus Flow</span>
                                         {% else %}
-                                            <small class="text-muted">Under institutional evaluation</small>
+                                            <small class="text-muted"><i class="bi bi-shield-shaded me-1"></i>Under evaluation</small>
                                         {% endif %}
                                     </td>
-                                    <td class="text-end pe-3">
+                                    <td class="text-end pe-4">
                                         {% if req.overall_status.value == 'approved' and req.event_id %}
-                                            <a href="{{ url_for('organizer.manage_event', event_id=req.event_id) }}" class="btn btn-sm btn-primary">
-                                                <i class="bi bi-gear-fill me-1"></i> Manage Event
+                                            <a href="{{ url_for('organizer.manage_event', event_id=req.event_id) }}" class="btn btn-sm btn-outline-primary fw-bold rounded-pill px-3">
+                                                <i class="bi bi-gear-fill me-1"></i> Manage
                                             </a>
                                         {% else %}
                                             <span class="text-muted small">&mdash;</span>
@@ -170,9 +179,11 @@
                     </table>
                 </div>
             {% else %}
-                <div class="p-4 text-center text-muted">
-                    <p class="mb-2">You haven't submitted any event proposals yet.</p>
-                    <a href="{{ url_for('organizer.create_event') }}" class="btn btn-sm btn-primary">Submit First Event Proposal</a>
+                <div class="p-5 text-center text-muted">
+                    <i class="bi bi-clipboard2-plus fs-1 text-muted opacity-50 d-block mb-2"></i>
+                    <h6 class="fw-bold text-dark">No Event Proposals Yet</h6>
+                    <p class="mb-3 small">Submit your event proposal to initiate HOD and Dean review.</p>
+                    <a href="{{ url_for('organizer.create_event') }}" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold">Submit First Event Proposal</a>
                 </div>
             {% endif %}
         </div>

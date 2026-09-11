@@ -13,23 +13,33 @@
     </div>
 
     <!-- Digital Ticket Card (Printable Area) -->
-    <div class="ticket-container printable-area">
+    <div class="ticket-container printable-area shadow-3d">
         <!-- Ticket Header -->
         <div class="ticket-header">
-            <div class="d-flex justify-content-between align-items-start">
+            <div class="d-flex justify-content-between align-items-start position-relative" style="z-index: 2;">
                 <div>
-                    <span class="badge bg-warning text-dark fw-bold mb-2">{{ registration.event.event_type }}</span>
-                    <h3 class="fw-bold mb-1 text-white">{{ registration.event.title }}</h3>
-                    <p class="small text-light opacity-75 mb-0">CAMPUS FLOW CAMPUS EVENT ENTRY PASS</p>
+                    <span class="badge bg-warning text-dark fw-bold mb-2 shadow-sm text-uppercase px-2 py-1" style="letter-spacing: 0.5px;">{{ registration.event.event_type }}</span>
+                    <h3 class="fw-bold mb-1 text-white tracking-tight">{{ registration.event.title }}</h3>
+                    <div class="d-flex align-items-center gap-2 small text-light opacity-75">
+                        <i class="bi bi-shield-check text-warning"></i>
+                        <span>CAMPUS FLOW &bull; OFFICIAL DIGITAL ACCESS PASS</span>
+                    </div>
                 </div>
                 <div class="text-end">
                     {% if registration.event.status == 'EVENT_COMPLETED' or registration.event.end_time < now %}
-                        <span class="badge bg-secondary px-3 py-2 fw-bold"><i class="bi bi-archive-fill me-1"></i> CONCLUDED</span>
+                        <span class="badge bg-secondary px-3 py-2 fw-bold text-uppercase shadow-sm"><i class="bi bi-archive-fill me-1"></i> Concluded</span>
                     {% else %}
-                        <span class="badge bg-success px-3 py-2 fw-bold">CONFIRMED</span>
+                        <span class="badge bg-success px-3 py-2 fw-bold text-uppercase shadow-sm"><i class="bi bi-check-circle-fill me-1"></i> Verified Entry</span>
                     {% endif %}
                 </div>
             </div>
+        </div>
+
+        <!-- Realistic Ticket Perforation Cut -->
+        <div class="ticket-perforation">
+            <div class="ticket-notch-left"></div>
+            <div class="ticket-tear-line"></div>
+            <div class="ticket-notch-right"></div>
         </div>
 
         <!-- Ticket Body -->
@@ -37,58 +47,61 @@
             <div class="row align-items-center g-4">
                 <!-- Left Details Column -->
                 <div class="col-sm-7">
-                    <div class="mb-3">
-                        <div class="small text-muted fw-bold">ATTENDEE NAME</div>
+                    <div class="mb-3 pb-2 border-bottom border-light-subtle">
+                        <div class="text-uppercase text-muted fw-bold small" style="letter-spacing: 0.05em; font-size: 0.72rem;">Pass Holder</div>
                         <div class="fs-5 fw-bold text-dark">{{ registration.student.name }}</div>
-                        <div class="small text-muted">
-                            Roll No: <strong>{{ registration.student.student_profile.roll_number if registration.student.student_profile else 'N/A' }}</strong> &bull;
-                            Dept: {{ registration.student.student_profile.department if registration.student.student_profile else 'N/A' }}
+                        <div class="small text-muted mt-1">
+                            <span class="badge bg-light text-dark border me-1"><i class="bi bi-person-badge me-1"></i>Roll: {{ registration.student.student_profile.roll_number if registration.student.student_profile else 'N/A' }}</span>
+                            <span class="badge bg-light text-dark border"><i class="bi bi-building me-1"></i>Dept: {{ registration.student.student_profile.department if registration.student.student_profile else 'N/A' }}</span>
                         </div>
                     </div>
 
                     {% if registration.team %}
-                        <div class="p-2 bg-light rounded border mb-3">
+                        <div class="p-2.5 bg-light rounded-3 border mb-3">
                             <div class="d-flex justify-content-between align-items-center">
                                 <div>
-                                    <div class="small text-muted fw-bold">TEAM NAME</div>
-                                    <div class="fw-bold text-primary">{{ registration.team.team_name }}</div>
+                                    <div class="text-uppercase text-muted fw-bold small" style="font-size: 0.7rem;">Team Registration</div>
+                                    <div class="fw-bold text-primary"><i class="bi bi-people-fill me-1"></i>{{ registration.team.team_name }}</div>
                                 </div>
                                 <div class="text-end">
-                                    <div class="small text-muted fw-bold">TEAM ID</div>
-                                    <span class="badge bg-secondary font-monospace">#TEAM-{{ registration.team.id }}</span>
+                                    <span class="badge bg-dark-subtle text-dark font-monospace">#TEAM-{{ registration.team.id }}</span>
                                 </div>
                             </div>
                         </div>
                     {% endif %}
 
-                    <div class="row g-2 mb-3">
+                    <div class="row g-3 mb-3">
                         <div class="col-6">
-                            <div class="small text-muted fw-bold">EVENT DATE</div>
-                            <div class="fw-semibold text-dark">{{ registration.event.start_time|dateformat }}</div>
+                            <div class="text-uppercase text-muted fw-bold small" style="font-size: 0.7rem;"><i class="bi bi-calendar-event me-1 text-primary"></i>Event Date</div>
+                            <div class="fw-bold text-dark">{{ registration.event.start_time|dateformat }}</div>
                             <div class="small text-muted">{{ registration.event.start_time|timeformat }}</div>
                         </div>
                         <div class="col-6">
-                            <div class="small text-muted fw-bold">VENUE</div>
-                            <div class="fw-semibold text-dark">{{ registration.event.venue }}</div>
+                            <div class="text-uppercase text-muted fw-bold small" style="font-size: 0.7rem;"><i class="bi bi-geo-alt me-1 text-danger"></i>Venue</div>
+                            <div class="fw-bold text-dark text-truncate">{{ registration.event.venue }}</div>
                         </div>
                     </div>
 
-                    <div class="row g-2 mb-3">
+                    <div class="row g-3 mb-3">
                         <div class="col-6">
-                            <div class="small text-muted fw-bold">PAYMENT</div>
-                            <div class="fw-semibold text-success">
-                                {% if registration.event.is_free %}FREE{% else %}₹{{ "%.2f"|format(registration.event.registration_fee) }} (PAID){% endif %}
+                            <div class="text-uppercase text-muted fw-bold small" style="font-size: 0.7rem;"><i class="bi bi-cash-coin me-1 text-success"></i>Admission</div>
+                            <div class="fw-bold text-success">
+                                {% if registration.event.is_free %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">FREE PASS</span>
+                                {% else %}
+                                    <span class="badge bg-success-subtle text-success border border-success-subtle">₹{{ "%.2f"|format(registration.event.registration_fee) }} (PAID)</span>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="col-6">
-                            <div class="small text-muted fw-bold">ATTENDANCE CHECKPOINTS</div>
+                            <div class="text-uppercase text-muted fw-bold small" style="font-size: 0.7rem;"><i class="bi bi-qr-code-scan me-1 text-info"></i>Checkpoints</div>
                             <div class="fw-semibold">
                                 {% if not registration.event.enable_attendance %}
-                                    <span class="text-muted">Not Required</span>
+                                    <span class="text-muted small">Not Required</span>
                                 {% elif registration.attended_sessions_count > 0 %}
-                                    <span class="text-success"><i class="bi bi-check-circle-fill"></i> {{ registration.attended_sessions_count }}/{{ registration.event.total_sessions_count }} ({{ "%.0f"|format(registration.attendance_percentage) }}%)</span>
+                                    <span class="text-success small fw-bold"><i class="bi bi-check-circle-fill"></i> {{ registration.attended_sessions_count }}/{{ registration.event.total_sessions_count }} ({{ "%.0f"|format(registration.attendance_percentage) }}%)</span>
                                 {% else %}
-                                    <span class="text-secondary">Scan QR at each session</span>
+                                    <span class="text-secondary small">Pending Entry Scan</span>
                                 {% endif %}
                             </div>
                         </div>
@@ -96,7 +109,7 @@
 
                     {% if registration.custom_responses %}
                         <div class="border-top pt-2 mt-2">
-                            <div class="small text-muted fw-bold mb-1">REGISTRATION DETAILS</div>
+                            <div class="text-uppercase text-muted fw-bold small mb-1" style="font-size: 0.7rem;">Custom Form Fields</div>
                             {% for resp in registration.custom_responses %}
                                 <div class="small text-secondary">
                                     <strong>{{ resp.field.field_label }}:</strong> {{ resp.field_value }}
@@ -108,26 +121,34 @@
 
                 <!-- Right QR Code Column -->
                 <div class="col-sm-5 text-center">
-                    <div class="ticket-qr-box mb-2">
+                    <div class="ticket-qr-box mb-3">
                         {% if registration.qr_code_image %}
-                            <img src="{{ url_for('static', filename=registration.qr_code_image) }}" alt="QR Code Ticket" class="img-fluid" style="max-width: 180px;">
+                            <img src="{{ url_for('static', filename=registration.qr_code_image) }}" alt="QR Code Ticket" class="img-fluid rounded" style="max-width: 175px;">
                         {% endif %}
                     </div>
-                    <div class="small fw-bold text-dark font-monospace">{{ registration.registration_code }}</div>
+                    
+                    <!-- Pass Code with 1-click Copy -->
+                    <div class="d-inline-flex align-items-center gap-2 px-3 py-1.5 bg-light rounded-pill border">
+                        <span class="fw-bold text-dark font-monospace" style="letter-spacing: 1px;">{{ registration.registration_code }}</span>
+                        <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2 rounded-pill" data-copy-target="{{ registration.registration_code }}" title="Copy Pass Code">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
+                    </div>
+
                     {% if registration.event.status == 'EVENT_COMPLETED' or registration.event.end_time < now %}
-                        <div class="alert alert-secondary py-1 px-2 small mt-2 mb-0 text-dark" style="font-size: 0.75rem;">
+                        <div class="alert alert-secondary py-1 px-2 small mt-3 mb-0 text-dark" style="font-size: 0.75rem;">
                             <i class="bi bi-info-circle me-1"></i> Event has concluded. Pass is archived for your verification records.
                         </div>
                     {% else %}
-                        <div class="small text-muted mt-1" style="font-size: 0.75rem;">Show this QR code to the event coordinator at the venue entrance.</div>
+                        <div class="small text-muted mt-2" style="font-size: 0.78rem;">Show this QR code at the venue gate for check-in.</div>
                     {% endif %}
                 </div>
             </div>
 
             <!-- Footer instructions -->
-            <div class="border-top pt-3 mt-4 small text-muted d-flex justify-content-between align-items-center">
-                <span>Campus Flow Verified Ticket &bull; Registered on {{ registration.created_at|dateformat }}</span>
-                <span>Carry valid College ID</span>
+            <div class="border-top pt-3 mt-4 small text-muted d-flex flex-wrap justify-content-between align-items-center gap-2">
+                <span><i class="bi bi-patch-check-fill text-primary me-1"></i>Campus Flow Verified Ticket &bull; Registered {{ registration.created_at|dateformat }}</span>
+                <span class="badge bg-light text-secondary border"><i class="bi bi-card-text me-1"></i>Carry valid College ID</span>
             </div>
         </div>
     </div>

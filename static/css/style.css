@@ -1,38 +1,106 @@
-/* Campus Flow - Modern College Event Management System Stylesheet */
+/* ==========================================================================
+   Campus Flow — Futuristic SaaS & College Event Management Platform Stylesheet
+   Modern 3D Depth, Glassmorphism, Micro-Interactions, and Responsive Polish
+   ========================================================================== */
 
 :root {
-  --ff-primary: #1e40af;
+  /* Brand Color Palette */
+  --ff-primary: #2563eb;
   --ff-primary-hover: #1d4ed8;
+  --ff-primary-dark: #1e40af;
   --ff-primary-light: #eff6ff;
+  --ff-primary-glow: rgba(37, 99, 235, 0.35);
+
   --ff-secondary: #0f172a;
   --ff-accent: #f59e0b;
+  --ff-accent-hover: #d97706;
+  --ff-accent-glow: rgba(245, 158, 11, 0.4);
+
   --ff-success: #10b981;
+  --ff-success-light: #d1fae5;
   --ff-danger: #ef4444;
+  --ff-danger-light: #fee2e2;
   --ff-warning: #f59e0b;
   --ff-info: #0ea5e9;
-  --ff-dark: #0f172a;
+  --ff-dark: #090d16;
+  --ff-dark-card: #111827;
   --ff-light: #f8fafc;
   --ff-border: #e2e8f0;
   --ff-card-bg: #ffffff;
-  --ff-text-main: #1e293b;
+  --ff-text-main: #0f172a;
   --ff-text-muted: #64748b;
-  --ff-radius: 0.75rem;
+
+  /* Typography */
+  --ff-font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+
+  /* Radii */
   --ff-radius-sm: 0.5rem;
-  --ff-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
-  --ff-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
-  --ff-shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --ff-radius: 0.85rem;
+  --ff-radius-lg: 1.25rem;
+  --ff-radius-xl: 1.75rem;
+
+  /* Multi-Layered 3D Shadow System */
+  --ff-shadow-sm: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
+  --ff-shadow-md: 0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.04);
+  --ff-shadow-lg: 0 10px 15px -3px rgba(15, 23, 42, 0.1), 0 4px 6px -4px rgba(15, 23, 42, 0.05);
+  --ff-shadow-3d: 0 2px 4px 0 rgba(15, 23, 42, 0.04), 0 8px 20px -3px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.9);
+  --ff-shadow-3d-hover: 0 16px 36px -6px rgba(15, 23, 42, 0.15), 0 8px 16px -4px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 1);
+  --ff-shadow-glow-primary: 0 10px 25px -4px rgba(37, 99, 235, 0.4);
+  --ff-shadow-glow-accent: 0 10px 25px -4px rgba(245, 158, 11, 0.4);
+}
+
+/* Base Setup */
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
 body {
-  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  font-family: var(--ff-font-sans);
   color: var(--ff-text-main);
   background-color: var(--ff-light);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Navbar */
+/* Modern Typography Polish */
+h1, h2, h3, h4, h5, h6 {
+  color: var(--ff-text-main);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.25;
+}
+
+.display-3, .display-4, .display-5 {
+  font-weight: 800;
+  letter-spacing: -0.035em;
+}
+
+/* ==========================================================================
+   Navigation Bar & Frosted Glass Header
+   ========================================================================== */
+.ff-navbar {
+  background-color: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.85);
+  box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.03);
+  padding: 0.75rem 0;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ff-navbar.navbar-scrolled {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border-bottom-color: rgba(203, 213, 225, 0.85);
+  box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.12), 0 4px 6px -2px rgba(15, 23, 42, 0.05) !important;
+  padding: 0.55rem 0;
+}
+
 .navbar-brand-custom {
   font-weight: 800;
   letter-spacing: -0.5px;
@@ -40,189 +108,652 @@ body {
   color: var(--ff-primary);
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
+  transition: transform 0.2s ease;
+}
+
+.navbar-brand-custom:hover {
+  transform: scale(1.02);
+  color: var(--ff-primary-hover);
+}
+
+.navbar-brand-custom i {
+  background: linear-gradient(135deg, var(--ff-primary), #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 4px rgba(37, 99, 235, 0.25));
 }
 
 .navbar-brand-custom span {
   color: var(--ff-accent);
 }
 
-.ff-navbar {
-  background-color: #ffffff;
-  border-bottom: 1px solid var(--ff-border);
-  box-shadow: var(--ff-shadow-sm);
-}
-
 .nav-link {
   font-weight: 500;
-  color: var(--ff-text-main);
-  padding: 0.5rem 0.85rem;
+  font-size: 0.925rem;
+  color: #475569;
+  padding: 0.5rem 0.95rem;
+  border-radius: var(--ff-radius-sm);
   transition: all 0.2s ease;
 }
 
-.nav-link:hover, .nav-link.active {
+.nav-link:hover {
   color: var(--ff-primary);
+  background-color: rgba(37, 99, 235, 0.06);
 }
 
-/* Hero Section */
+.nav-link.active {
+  color: var(--ff-primary);
+  font-weight: 600;
+  background-color: rgba(37, 99, 235, 0.09);
+}
+
+/* ==========================================================================
+   Hero Section & Floating 3D Ambient Orbs
+   ========================================================================== */
 .hero-section {
-  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 100%);
+  background: radial-gradient(circle at 85% 15%, #1e3a8a 0%, #0f172a 70%, #090d16 100%);
   color: #ffffff;
-  padding: 4.5rem 0 4rem;
+  padding: 5.5rem 0 5rem;
   position: relative;
   overflow: hidden;
 }
 
-.hero-section::after {
+.hero-section::before {
   content: '';
   position: absolute;
   top: 0;
   right: 0;
   bottom: 0;
   left: 0;
-  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px);
-  background-size: 24px 24px;
+  background-image: 
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 40px 40px;
   pointer-events: none;
+  z-index: 1;
 }
 
 .hero-badge {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  background: rgba(255, 255, 255, 0.15);
-  backdrop-filter: blur(8px);
+  gap: 0.6rem;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: #ffffff;
-  padding: 0.35rem 0.9rem;
+  padding: 0.45rem 1.15rem;
   border-radius: 9999px;
   font-size: 0.85rem;
   font-weight: 600;
-  margin-bottom: 1rem;
+  letter-spacing: 0.3px;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-/* Custom Cards */
-.ff-card {
-  background: var(--ff-card-bg);
-  border: 1px solid var(--ff-border);
-  border-radius: var(--ff-radius);
-  box-shadow: var(--ff-shadow-sm);
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  overflow: hidden;
-}
-
-.ff-card:hover {
-  box-shadow: var(--ff-shadow);
-}
-
-.ff-card-interactive:hover {
-  transform: translateY(-4px);
-  box-shadow: var(--ff-shadow-lg);
-}
-
-.ff-card-header {
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid var(--ff-border);
-  background-color: #ffffff;
-  font-weight: 600;
-}
-
-.ff-card-body {
+/* Hero Live Stats Bar */
+.hero-stats-bar {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-radius: var(--ff-radius-lg);
   padding: 1.5rem;
+  box-shadow: 0 12px 30px -5px rgba(0, 0, 0, 0.3);
 }
 
-/* Event Card */
+/* ==========================================================================
+   Event Card Architecture & 3D Layering
+   ========================================================================== */
 .event-card {
   display: flex;
   flex-direction: column;
   height: 100%;
+  overflow: hidden;
 }
 
 .event-poster-wrapper {
-  height: 190px;
+  height: 200px;
   position: relative;
   overflow: hidden;
-  background: linear-gradient(135deg, #1e293b, #334155);
+  background: radial-gradient(circle at 50% 50%, #1e293b, #0f172a);
 }
 
 .event-poster-img {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform 0.3s ease;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .event-card:hover .event-poster-img {
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
 
 .event-type-badge {
   position: absolute;
-  top: 12px;
-  left: 12px;
-  background: rgba(15, 23, 42, 0.85);
-  backdrop-filter: blur(4px);
+  top: 14px;
+  left: 14px;
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   color: #ffffff;
   font-size: 0.75rem;
   font-weight: 700;
-  padding: 0.25rem 0.65rem;
+  padding: 0.3rem 0.75rem;
   border-radius: 9999px;
+  box-shadow: 0 4px 10px -1px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  letter-spacing: 0.4px;
+  z-index: 2;
 }
 
 .event-fee-badge {
   position: absolute;
-  top: 12px;
-  right: 12px;
-  background: #ffffff;
+  top: 14px;
+  right: 14px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
   color: var(--ff-primary);
-  font-size: 0.8rem;
+  font-size: 0.825rem;
   font-weight: 800;
-  padding: 0.25rem 0.65rem;
+  padding: 0.3rem 0.75rem;
   border-radius: 9999px;
-  box-shadow: var(--ff-shadow-sm);
+  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  z-index: 2;
 }
 
-/* Metric / Stat Card */
-.metric-card {
+/* Concluded / Past Event Styling */
+.event-card.event-concluded {
+  opacity: 0.75;
+  filter: grayscale(40%);
+}
+
+.event-card.event-concluded .event-poster-wrapper::after {
+  content: 'CONCLUDED';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-8deg);
+  background: rgba(15, 23, 42, 0.85);
+  color: #ffffff;
+  font-weight: 800;
+  letter-spacing: 2px;
+  padding: 0.4rem 1.5rem;
+  border-radius: 0.5rem;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  font-size: 0.9rem;
+  z-index: 3;
+}
+
+/* ==========================================================================
+   Real Digital Event Ticket Design (Perforations, Notches, Depth)
+   ========================================================================== */
+.ticket-container {
+  max-width: 740px;
+  margin: 2rem auto;
+  background: #ffffff;
+  border-radius: 1.25rem;
+  box-shadow: 0 20px 45px -10px rgba(15, 23, 42, 0.2), 0 8px 16px -4px rgba(15, 23, 42, 0.08);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  overflow: hidden;
+  position: relative;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease;
+}
+
+.ticket-container:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 25px 55px -12px rgba(15, 23, 42, 0.25);
+}
+
+.ticket-header {
+  background: linear-gradient(135deg, #090d16 0%, #1e3a8a 55%, #1e1b4b 100%);
+  color: #ffffff;
+  padding: 2.25rem 2.25rem 2rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.ticket-header::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 200%;
+  height: 100%;
+  background: linear-gradient(115deg, transparent 40%, rgba(255, 255, 255, 0.12) 50%, transparent 60%);
+  animation: ticketSheen 9s infinite;
+  pointer-events: none;
+}
+
+@keyframes ticketSheen {
+  0% { transform: translateX(0); }
+  25% { transform: translateX(100%); }
+  100% { transform: translateX(100%); }
+}
+
+.ticket-perforation {
   display: flex;
   align-items: center;
-  padding: 1.25rem;
+  position: relative;
+  margin: 0;
+  height: 24px;
   background: #ffffff;
-  border: 1px solid var(--ff-border);
-  border-radius: var(--ff-radius);
-  box-shadow: var(--ff-shadow-sm);
 }
 
-.metric-icon-box {
-  width: 52px;
-  height: 52px;
-  border-radius: 0.65rem;
+.ticket-notch-left,
+.ticket-notch-right {
+  width: 28px;
+  height: 28px;
+  background-color: var(--ff-light);
+  border-radius: 50%;
+  position: absolute;
+  top: -14px;
+  z-index: 5;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08);
+}
+
+.ticket-notch-left { left: -14px; }
+.ticket-notch-right { right: -14px; }
+
+.ticket-tear-line {
+  width: 100%;
+  border-bottom: 2px dashed #cbd5e1;
+}
+
+.ticket-body {
+  padding: 2.25rem;
+  background: #ffffff;
+}
+
+.ticket-qr-box {
+  background: #ffffff;
+  padding: 1rem;
+  border: 2px solid #e2e8f0;
+  border-radius: var(--ff-radius);
+  display: inline-block;
+  box-shadow: 0 8px 20px -3px rgba(15, 23, 42, 0.12);
+  transition: transform 0.25s ease;
+}
+
+.ticket-qr-box:hover {
+  transform: scale(1.04);
+}
+
+/* ==========================================================================
+   Certificate Vault Gallery Styling
+   ========================================================================== */
+.certificate-vault-card {
+  position: relative;
+  border-radius: var(--ff-radius-lg);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: #ffffff;
+  overflow: hidden;
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease;
+}
+
+.certificate-vault-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #f59e0b, #fbbf24, #d97706);
+  z-index: 2;
+}
+
+.certificate-vault-card:hover {
+  transform: translateY(-6px) scale(1.015);
+  box-shadow: 0 20px 40px -8px rgba(15, 23, 42, 0.16) !important;
+}
+
+.certificate-preview-frame {
+  height: 190px;
+  background: radial-gradient(circle at 50% 50%, #f8fafc, #e2e8f0);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.5rem;
-  margin-right: 1rem;
+  padding: 1rem;
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.certificate-preview-frame img {
+  max-height: 160px;
+  object-fit: contain;
+  transition: transform 0.3s ease;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.12));
+}
+
+.certificate-vault-card:hover .certificate-preview-frame img {
+  transform: scale(1.05);
+}
+
+/* ==========================================================================
+   Dual Approval Workflow & Visualizer
+   ========================================================================== */
+.approval-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  padding: 1rem 0;
+}
+
+.approval-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+  text-align: center;
+}
+
+.approval-step-node {
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 1.1rem;
+  background: #f1f5f9;
+  color: #64748b;
+  border: 3px solid #cbd5e1;
+  transition: all 0.3s ease;
+}
+
+.approval-step.active .approval-step-node {
+  background: var(--ff-primary);
+  color: #ffffff;
+  border-color: #93c5fd;
+  box-shadow: 0 0 0 5px rgba(37, 99, 235, 0.2);
+}
+
+.approval-step.completed .approval-step-node {
+  background: var(--ff-success);
+  color: #ffffff;
+  border-color: #a7f3d0;
+  box-shadow: 0 0 0 5px rgba(16, 185, 129, 0.2);
+}
+
+.approval-step.rejected .approval-step-node {
+  background: var(--ff-danger);
+  color: #ffffff;
+  border-color: #fecaca;
+  box-shadow: 0 0 0 5px rgba(239, 68, 68, 0.2);
+}
+
+.approval-stepper-line {
+  position: absolute;
+  top: 31px;
+  left: 15%;
+  right: 15%;
+  height: 3px;
+  background: #e2e8f0;
+  z-index: 1;
+}
+
+.approval-stepper-progress {
+  height: 100%;
+  background: var(--ff-primary);
+  transition: width 0.4s ease;
+}
+
+/* Pending Approval Action Card */
+.approval-card {
+  border-left: 4px solid var(--ff-warning) !important;
+  background: #ffffff;
+  border-radius: var(--ff-radius);
+  box-shadow: var(--ff-shadow-3d);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.approval-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--ff-shadow-3d-hover);
+}
+
+/* ==========================================================================
+   Universal 3D Card Depth & Layered Shadows
+   ========================================================================== */
+.card,
+.card.shadow-sm,
+.card.shadow,
+.card.shadow-lg,
+.ff-card,
+.event-card,
+.metric-card,
+.tilt-card {
+  background-color: var(--ff-card-bg);
+  border: 1px solid rgba(226, 232, 240, 0.95) !important;
+  border-radius: var(--ff-radius-lg);
+  box-shadow: var(--ff-shadow-3d) !important;
+  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+              box-shadow 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+              border-color 0.25s ease;
+  transform-style: preserve-3d;
+  will-change: transform, box-shadow;
+  position: relative;
+}
+
+/* Tactile Card Hover Elevation */
+.card:hover,
+.card.shadow-sm:hover,
+.card.shadow:hover,
+.card.shadow-lg:hover,
+.ff-card:hover,
+.event-card:hover,
+.metric-card:hover,
+.tilt-card:hover {
+  transform: translateY(-5px);
+  box-shadow: var(--ff-shadow-3d-hover) !important;
+  border-color: rgba(199, 210, 254, 0.9) !important;
+}
+
+/* Exclude static containers from hover lift */
+.modal-content,
+.dropdown-menu,
+.card:has(table):hover,
+.card-static:hover {
+  transform: none !important;
+}
+
+.ff-card-header {
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  background-color: #ffffff;
+  font-weight: 700;
+  border-top-left-radius: var(--ff-radius-lg);
+  border-top-right-radius: var(--ff-radius-lg);
+}
+
+.ff-card-body {
+  padding: 1.5rem;
+}
+
+.ff-card-interactive {
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   Dashboard Stat Cards & Floating 3D Icon Boxes
+   ========================================================================== */
+.metric-card,
+.card.border-start {
+  display: flex;
+  align-items: center;
+  padding: 1.35rem 1.5rem;
+  border-radius: var(--ff-radius-lg);
+  position: relative;
+  overflow: hidden;
+  cursor: default;
+}
+
+.metric-card::before,
+.card.border-start::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, rgba(37, 99, 235, 0.4), transparent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  z-index: 2;
+}
+
+.metric-card:hover::before,
+.card.border-start:hover::before {
+  opacity: 1;
+}
+
+.metric-icon-box {
+  width: 56px;
+  height: 56px;
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.6rem;
+  margin-right: 1.25rem;
   flex-shrink: 0;
+  box-shadow: 0 6px 16px -2px rgba(15, 23, 42, 0.16),
+              inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.card:hover .metric-icon-box,
+.card:hover .rounded-circle i,
+.metric-card:hover .metric-icon-box {
+  transform: scale(1.14) rotate(4deg);
+}
+
+.card:hover [class*="bg-opacity-10"] i {
+  display: inline-block;
+  transform: scale(1.15) rotate(4deg);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.card [class*="bg-opacity-10"] i {
+  display: inline-block;
+  transition: transform 0.25s ease;
 }
 
 .metric-number {
-  font-size: 1.75rem;
+  font-size: 1.85rem;
   font-weight: 800;
   line-height: 1.1;
   color: var(--ff-secondary);
+  letter-spacing: -0.5px;
 }
 
 .metric-label {
   font-size: 0.85rem;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--ff-text-muted);
-  margin-top: 0.15rem;
+  margin-top: 0.2rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
 }
 
-/* Status Badges */
+/* ==========================================================================
+   Tactile 3D Buttons & Micro-Interactions
+   ========================================================================== */
+.btn {
+  font-weight: 600;
+  border-radius: var(--ff-radius-sm);
+  padding: 0.55rem 1.25rem;
+  position: relative;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.18s ease,
+              background-color 0.2s ease,
+              border-color 0.2s ease,
+              color 0.2s ease !important;
+  will-change: transform, box-shadow;
+}
+
+.btn:hover:not(:disabled):not(.disabled) {
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 18px -2px rgba(15, 23, 42, 0.18),
+              0 2px 4px -1px rgba(15, 23, 42, 0.08) !important;
+}
+
+.btn:active:not(:disabled):not(.disabled),
+.btn.active {
+  transform: translateY(1.5px) scale(0.985) !important;
+  box-shadow: 0 2px 4px -1px rgba(15, 23, 42, 0.12) !important;
+}
+
+.btn-primary {
+  background-color: var(--ff-primary);
+  border-color: var(--ff-primary);
+  color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled):not(.disabled) {
+  background-color: var(--ff-primary-hover);
+  border-color: var(--ff-primary-hover);
+  box-shadow: var(--ff-shadow-glow-primary) !important;
+}
+
+.btn-warning,
+.btn-accent {
+  background-color: var(--ff-accent);
+  border-color: var(--ff-accent);
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.btn-warning:hover:not(:disabled):not(.disabled),
+.btn-accent:hover:not(:disabled):not(.disabled) {
+  background-color: var(--ff-accent-hover);
+  border-color: var(--ff-accent-hover);
+  color: #ffffff;
+  box-shadow: var(--ff-shadow-glow-accent) !important;
+}
+
+.btn-success:hover:not(:disabled):not(.disabled) {
+  box-shadow: 0 8px 22px -3px rgba(16, 185, 129, 0.4) !important;
+}
+
+.btn-danger:hover:not(:disabled):not(.disabled) {
+  box-shadow: 0 8px 22px -3px rgba(239, 68, 68, 0.4) !important;
+}
+
+/* ==========================================================================
+   Embossed 3D Badges & Status Pills
+   ========================================================================== */
+.badge,
+.status-pill,
+.event-type-badge,
+.event-fee-badge {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38),
+              inset 0 -1px 0 rgba(0, 0, 0, 0.1),
+              0 2px 6px -1px rgba(15, 23, 42, 0.13) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.badge:hover {
+  transform: translateY(-1px);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.5),
+              0 4px 10px -1px rgba(15, 23, 42, 0.16) !important;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.25rem 0.65rem;
+  gap: 0.4rem;
+  padding: 0.35rem 0.8rem;
   border-radius: 9999px;
   font-size: 0.75rem;
   font-weight: 700;
@@ -233,138 +764,129 @@ body {
 .status-approved, .status-registration-open, .status-confirmed, .status-success {
   background-color: #dcfce7;
   color: #15803d;
+  border-color: rgba(21, 128, 61, 0.2);
 }
 
 .status-pending-approval, .status-pending-payment, .status-pending {
   background-color: #fef3c7;
   color: #b45309;
+  border-color: rgba(180, 83, 9, 0.2);
 }
 
 .status-rejected, .status-cancelled, .status-failed {
   background-color: #fee2e2;
   color: #b91c1c;
+  border-color: rgba(185, 28, 28, 0.2);
 }
 
 .status-event-completed, .status-draft, .status-registration-closed {
   background-color: #f1f5f9;
   color: #475569;
+  border-color: rgba(71, 85, 105, 0.2);
 }
 
-/* Buttons */
-.btn-primary {
-  background-color: var(--ff-primary);
-  border-color: var(--ff-primary);
-  font-weight: 600;
+/* ==========================================================================
+   Interactive Forms & Table Overhaul
+   ========================================================================== */
+.form-control,
+.form-select,
+.input-group-text {
+  border: 1px solid #cbd5e1;
   border-radius: var(--ff-radius-sm);
-  padding: 0.55rem 1.25rem;
-  transition: all 0.2s ease;
+  padding: 0.6rem 0.9rem;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
 
-.btn-primary:hover {
-  background-color: var(--ff-primary-hover);
-  border-color: var(--ff-primary-hover);
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--ff-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16), inset 0 1px 2px rgba(15, 23, 42, 0.03) !important;
 }
 
-.btn-accent {
-  background-color: var(--ff-accent);
-  border-color: var(--ff-accent);
-  color: #0f172a;
-  font-weight: 700;
-}
-
-.btn-accent:hover {
-  background-color: #d97706;
-  border-color: #d97706;
-  color: #ffffff;
-}
-
-/* Digital Ticket Styles */
-.ticket-container {
-  max-width: 680px;
-  margin: 2rem auto;
-  background: #ffffff;
-  border: 2px dashed var(--ff-border);
-  border-radius: 1rem;
-  box-shadow: var(--ff-shadow-lg);
+.table-responsive {
+  border-radius: var(--ff-radius);
   overflow: hidden;
-  position: relative;
 }
 
-.ticket-header {
-  background: linear-gradient(135deg, #0f172a, #1e3a8a);
-  color: #ffffff;
-  padding: 1.75rem 2rem;
+.table {
+  margin-bottom: 0;
 }
 
-.ticket-body {
-  padding: 2rem;
+.table-hover > tbody > tr {
+  transition: background-color 0.18s ease, box-shadow 0.18s ease;
 }
 
-.ticket-qr-box {
-  background: #ffffff;
-  padding: 0.75rem;
-  border: 1px solid var(--ff-border);
-  border-radius: 0.5rem;
-  display: inline-block;
-  box-shadow: var(--ff-shadow-sm);
+.table-hover > tbody > tr:hover {
+  background-color: rgba(239, 246, 255, 0.7) !important;
+  box-shadow: 0 2px 6px -1px rgba(15, 23, 42, 0.06);
 }
 
-/* Camera Scanner Container */
+/* Camera Scanner Viewport */
 .scanner-viewport {
   width: 100%;
   max-width: 480px;
   min-height: 300px;
   margin: 0 auto;
-  border-radius: var(--ff-radius);
+  border-radius: var(--ff-radius-lg);
   overflow: hidden;
   border: 2px solid var(--ff-primary);
-  background: #0f172a;
+  background: #090d16;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.3);
 }
 
-/* Custom Table */
-.ff-table th {
-  background-color: #f8fafc;
-  color: var(--ff-text-muted);
-  font-size: 0.8rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom: 2px solid var(--ff-border);
-  padding: 0.85rem 1rem;
+/* ==========================================================================
+   Scroll Reveal Animation System
+   ========================================================================== */
+.reveal-on-scroll {
+  opacity: 0;
+  transform: translateY(22px);
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
 }
 
-.ff-table td {
-  padding: 0.9rem 1rem;
-  vertical-align: middle;
-  border-bottom: 1px solid var(--ff-border);
+.reveal-on-scroll.is-revealed {
+  opacity: 1;
+  transform: translateY(0);
 }
 
-/* Footer */
+.reveal-delay-1 { transition-delay: 0.08s; }
+.reveal-delay-2 { transition-delay: 0.16s; }
+.reveal-delay-3 { transition-delay: 0.24s; }
+.reveal-delay-4 { transition-delay: 0.32s; }
+
+/* ==========================================================================
+   Footer & Global Accessibility
+   ========================================================================== */
 .ff-footer {
   margin-top: auto;
-  background-color: #0f172a;
+  background: radial-gradient(circle at 10% 10%, #0f172a 0%, #090d16 100%);
   color: #94a3b8;
-  padding: 3rem 0 1.5rem;
+  padding: 4rem 0 2rem;
   border-top: 1px solid #1e293b;
 }
 
-.ff-footer h5 {
+.ff-footer h5,
+.ff-footer h6 {
   color: #ffffff;
   font-weight: 700;
-  margin-bottom: 1.25rem;
+  letter-spacing: -0.2px;
 }
 
 .ff-footer a {
   color: #94a3b8;
   text-decoration: none;
-  transition: color 0.2s ease;
+  transition: color 0.2s ease, transform 0.2s ease;
+  display: inline-block;
 }
 
 .ff-footer a:hover {
   color: #ffffff;
+  transform: translateX(2px);
 }
 
-/* Print styles for tickets & certificates */
+/* Print Styles */
 @media print {
   body * {
     visibility: hidden;
@@ -382,3 +904,23 @@ body {
     display: none !important;
   }
 }
+
+/* Reduced Motion Overrides */
+@media (prefers-reduced-motion: reduce) {
+  .hero-orb {
+    animation: none !important;
+  }
+  .reveal-on-scroll {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .btn, .btn:hover, .btn:active {
+    transform: none !important;
+  }
+  .card, .card:hover, .tilt-card, .event-card, .metric-card, .ff-card {
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
