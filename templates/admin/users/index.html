@@ -146,9 +146,12 @@
                             {% endif %}
                         </td>
                         <td class="text-muted" style="font-size: 0.75rem;">{{ u.created_at.strftime('%b %d, %Y') }}</td>
-                        <td class="text-end pe-4">
-                            <div class="dropdown">
-                                <button class="btn btn-sm btn-light border px-2 py-1" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                        <td class="text-end pe-4 text-nowrap">
+                            <a href="{{ url_for('admin.user_edit', user_id=u.id) }}" class="btn btn-sm btn-outline-primary px-2 py-1 me-1" title="Edit User Details">
+                                <i class="bi bi-pencil-square me-1"></i> Edit
+                            </a>
+                            <div class="dropdown d-inline-block">
+                                <button class="btn btn-sm btn-light border px-2 py-1" type="button" data-bs-toggle="dropdown" data-bs-boundary="viewport" aria-expanded="false">
                                     <i class="bi bi-three-dots-vertical"></i>
                                 </button>
                                 <ul class="dropdown-menu dropdown-menu-end shadow-sm small">

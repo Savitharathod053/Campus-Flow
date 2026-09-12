@@ -491,15 +491,16 @@ def user_edit(user_id):
         name = request.form.get('name', '').strip()
         email = request.form.get('email', '').strip().lower()
         phone = request.form.get('phone', '').strip()
-        role = normalize_role(request.form.get('role', target_user.role))
+        new_role = normalize_role(request.form.get('role', target_user.role))
         is_active = request.form.get('is_active') == 'on'
+        new_password = request.form.get('new_password', '').strip()
 
         if not name or not email:
             flash('Name and Email are required.', 'danger')
             return render_template('admin/users/edit.html', user=user, target_user=target_user, departments=departments, roles=UserRole.CHOICES)
 
-        # Duplicate email check
-        existing_email_user = User.query.filter(User.email == email, User.id != target_user.id).first()
+        # Duplicate email check (case-insensitive across other users)
+        existing_email_user = User.query.filter(func.lower(User.email) == email.lower(), User.id != target_user.id).first()
         if existing_email_user:
             flash(f"Email '{email}' is already taken by another user.", 'danger')
             return render_template('admin/users/edit.html', user=user, target_user=target_user, departments=departments, roles=UserRole.CHOICES)
@@ -511,69 +512,142 @@ def user_edit(user_id):
         if target_user.email != email:
             changes.append(f"Email: '{target_user.email}' -> '{email}'")
             target_user.email = email
-        if target_user.phone != phone:
-            changes.append(f"Phone: '{target_user.phone}' -> '{phone}'")
-            target_user.phone = phone
-        if target_user.role != role:
-            changes.append(f"Role: '{target_user.role}' -> '{role}'")
-            target_user.role = role
+        if (target_user.phone or '') != phone:
+            changes.append(f"Phone: '{target_user.phone or ''}' -> '{phone}'")
+            target_user.phone = phone if phone else None
+        if target_user.role != new_role:
+            changes.append(f"Role: '{target_user.role}' -> '{new_role}'")
+            target_user.role = new_role
         if target_user.is_active != is_active:
             changes.append(f"Status: '{'Active' if target_user.is_active else 'Inactive'}' -> '{'Active' if is_active else 'Inactive'}'")
             target_user.is_active = is_active
 
-        # Update profile attributes
-        if target_user.student_profile:
+        # Optional new password
+        if new_password:
+            if len(new_password) < 6:
+                flash('New password must be at least 6 characters long.', 'danger')
+                return render_template('admin/users/edit.html', user=user, target_user=target_user, departments=departments, roles=UserRole.CHOICES)
+            target_user.set_password(new_password)
+            changes.append("Password updated")
+
+        # Update or provision profile attributes based on target role
+        if new_role == UserRole.STUDENT:
             roll = request.form.get('roll_number', '').strip().upper()
             dept = request.form.get('department', '').strip()
-            year = int(request.form.get('year', target_user.student_profile.year or 1))
-            sec = request.form.get('section', target_user.student_profile.section or 'A').strip().upper()
+            year_val = request.form.get('year', '').strip()
+            sec = request.form.get('section', '').strip().upper()
 
-            if roll and roll != target_user.student_profile.roll_number:
-                dup_roll = StudentProfile.query.filter(StudentProfile.roll_number == roll, StudentProfile.id != target_user.student_profile.id).first()
-                if dup_roll:
-                    flash(f"Roll Number '{roll}' is already in use.", 'danger')
-                    return render_template('admin/users/edit.html', user=user, target_user=target_user, departments=departments, roles=UserRole.CHOICES)
-                changes.append(f"Roll: '{target_user.student_profile.roll_number}' -> '{roll}'")
-                target_user.student_profile.roll_number = roll
+            if not dept:
+                dept = target_user.student_profile.department if target_user.student_profile else (departments[0].code if departments else 'CSE')
+            if not roll:
+                roll = target_user.student_profile.roll_number if target_user.student_profile else f"STU-{target_user.id:04d}"
+            if not sec:
+                sec = target_user.student_profile.section if target_user.student_profile else 'A'
 
-            if dept and dept != target_user.student_profile.department:
-                changes.append(f"Dept: '{target_user.student_profile.department}' -> '{dept}'")
-                target_user.student_profile.department = dept
+            try:
+                year = int(year_val) if year_val else (target_user.student_profile.year if target_user.student_profile and target_user.student_profile.year else 1)
+            except (ValueError, TypeError):
+                year = 1
 
-            target_user.student_profile.year = year
-            target_user.student_profile.section = sec
+            dup_roll = StudentProfile.query.filter(StudentProfile.roll_number == roll, StudentProfile.user_id != target_user.id).first()
+            if dup_roll:
+                flash(f"Roll Number '{roll}' is already in use by another student.", 'danger')
+                return render_template('admin/users/edit.html', user=user, target_user=target_user, departments=departments, roles=UserRole.CHOICES)
 
-        elif target_user.faculty_profile:
+            if not target_user.student_profile:
+                sp = StudentProfile(
+                    user_id=target_user.id,
+                    roll_number=roll,
+                    department=dept,
+                    year=year,
+                    section=sec
+                )
+                db.session.add(sp)
+                changes.append(f"Created StudentProfile: {roll} ({dept})")
+            else:
+                if target_user.student_profile.roll_number != roll:
+                    changes.append(f"Roll: '{target_user.student_profile.roll_number}' -> '{roll}'")
+                    target_user.student_profile.roll_number = roll
+                if target_user.student_profile.department != dept:
+                    changes.append(f"Dept: '{target_user.student_profile.department}' -> '{dept}'")
+                    target_user.student_profile.department = dept
+                target_user.student_profile.year = year
+                target_user.student_profile.section = sec
+
+        elif new_role in (UserRole.HOD, UserRole.FACULTY, UserRole.FACULTY_ADMIN, UserRole.STUDENTS_AFFAIRS_DEAN, UserRole.SUPER_ADMIN):
             empid = request.form.get('employee_id', '').strip().upper()
-            dept = request.form.get('department', '').strip()
+            dept = request.form.get('department', '').strip() or (target_user.faculty_profile.department if target_user.faculty_profile else 'General')
             desig = request.form.get('designation', '').strip()
 
-            if empid and empid != target_user.faculty_profile.employee_id:
-                dup_emp = FacultyProfile.query.filter(FacultyProfile.employee_id == empid, FacultyProfile.id != target_user.faculty_profile.id).first()
-                if dup_emp:
-                    flash(f"Employee ID '{empid}' is already in use.", 'danger')
-                    return render_template('admin/users/edit.html', user=user, target_user=target_user, departments=departments, roles=UserRole.CHOICES)
-                changes.append(f"EmpID: '{target_user.faculty_profile.employee_id}' -> '{empid}'")
-                target_user.faculty_profile.employee_id = empid
+            if not desig:
+                if new_role == UserRole.STUDENTS_AFFAIRS_DEAN:
+                    desig = 'Students Affairs Dean'
+                elif new_role == UserRole.HOD:
+                    desig = 'Head of Department & Professor'
+                elif new_role == UserRole.SUPER_ADMIN:
+                    desig = 'Super Administrator'
+                else:
+                    desig = 'Assistant Professor'
 
-            if dept and dept != target_user.faculty_profile.department:
-                changes.append(f"Dept: '{target_user.faculty_profile.department}' -> '{dept}'")
-                target_user.faculty_profile.department = dept
+            if not empid:
+                empid = target_user.faculty_profile.employee_id if target_user.faculty_profile else f"EMP-{target_user.id:04d}"
 
-            if desig and desig != target_user.faculty_profile.designation:
-                changes.append(f"Designation: '{target_user.faculty_profile.designation}' -> '{desig}'")
-                target_user.faculty_profile.designation = desig
+            dup_emp = FacultyProfile.query.filter(FacultyProfile.employee_id == empid, FacultyProfile.user_id != target_user.id).first()
+            if dup_emp:
+                flash(f"Employee ID '{empid}' is already in use by another faculty member.", 'danger')
+                return render_template('admin/users/edit.html', user=user, target_user=target_user, departments=departments, roles=UserRole.CHOICES)
 
-        elif target_user.organizer_profile:
-            org_name = request.form.get('organization_name', '').strip()
-            dept = request.form.get('department', '').strip()
-            desig = request.form.get('designation', '').strip()
-            if org_name:
+            if not target_user.faculty_profile:
+                fp = FacultyProfile(
+                    user_id=target_user.id,
+                    employee_id=empid,
+                    department=dept,
+                    designation=desig
+                )
+                db.session.add(fp)
+                changes.append(f"Created FacultyProfile: {empid} ({dept})")
+            else:
+                if target_user.faculty_profile.employee_id != empid:
+                    changes.append(f"EmpID: '{target_user.faculty_profile.employee_id}' -> '{empid}'")
+                    target_user.faculty_profile.employee_id = empid
+                if target_user.faculty_profile.department != dept:
+                    changes.append(f"Dept: '{target_user.faculty_profile.department}' -> '{dept}'")
+                    target_user.faculty_profile.department = dept
+                if target_user.faculty_profile.designation != desig:
+                    changes.append(f"Designation: '{target_user.faculty_profile.designation}' -> '{desig}'")
+                    target_user.faculty_profile.designation = desig
+
+            if new_role == UserRole.HOD and dept and dept != 'General':
+                cd = CollegeDepartment.query.filter_by(code=dept).first()
+                if cd:
+                    cd.hod_id = target_user.id
+
+        elif new_role == UserRole.ORGANIZER:
+            org_name = request.form.get('organization_name', '').strip() or (target_user.organizer_profile.organization_name if target_user.organizer_profile else f"{target_user.name}'s Organization")
+            dept = request.form.get('department', '').strip() or (target_user.organizer_profile.department if target_user.organizer_profile else 'General')
+            desig = request.form.get('designation', '').strip() or (target_user.organizer_profile.designation if target_user.organizer_profile else 'Lead Organizer')
+            org_roll = request.form.get('roll_number', '').strip().upper()
+
+            if not target_user.organizer_profile:
+                op = OrganizerProfile(
+                    user_id=target_user.id,
+                    roll_number=org_roll or None,
+                    organization_name=org_name,
+                    department=dept,
+                    designation=desig,
+                    is_verified=True,
+                    status='APPROVED',
+                    approved_by_id=user.id,
+                    approved_at=datetime.utcnow()
+                )
+                db.session.add(op)
+                changes.append(f"Created OrganizerProfile: {org_name}")
+            else:
                 target_user.organizer_profile.organization_name = org_name
-            if dept:
                 target_user.organizer_profile.department = dept
-            if desig:
                 target_user.organizer_profile.designation = desig
+                if org_roll:
+                    target_user.organizer_profile.roll_number = org_roll
 
         db.session.commit()
 

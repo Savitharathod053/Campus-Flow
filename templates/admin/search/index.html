@@ -84,9 +84,12 @@
                                     <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Deactivated</span>
                                 {% endif %}
                             </td>
-                            <td class="text-end pe-4">
+                            <td class="text-end pe-4 text-nowrap">
+                                <a href="{{ url_for('admin.user_edit', user_id=u.id) }}" class="btn btn-sm btn-outline-secondary me-1" title="Edit User">
+                                    <i class="bi bi-pencil-square"></i> Edit
+                                </a>
                                 <a href="{{ url_for('admin.user_detail', user_id=u.id) }}" class="btn btn-sm btn-outline-primary">
-                                    <i class="bi bi-arrow-right-short"></i> View
+                                    <i class="bi bi-eye"></i> View
                                 </a>
                             </td>
                         </tr>
