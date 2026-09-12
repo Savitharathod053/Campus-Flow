@@ -11,7 +11,8 @@ from models import (
     Payment, PaymentStatus, AttendanceRecord, AttendanceStatus, VerificationMethod,
     Certificate, CertificateStatus, Announcement, TargetAudience,
     CollegeDepartment, Department, AuditLog,
-    OrganizerRequest, OrganizerRequestStatus, EventRequest, EventRequestStatus
+    OrganizerRequest, OrganizerRequestStatus, EventRequest, EventRequestStatus,
+    Team, TeamMember, TeamInvitation
 )
 from routes.auth import admin_required, get_current_user
 super_admin_required = admin_required
@@ -711,24 +712,28 @@ def delete_user(user_id):
     name = target_user.name
     email = target_user.email
 
-    # Check for foreign key associations
+    # Check for core participation history (registrations, organized events, student attendance, certificates, payments, teams)
     has_registrations = target_user.registrations.count() > 0
     has_events = target_user.organized_events.count() > 0
     has_attendance = AttendanceRecord.query.filter_by(student_id=target_user.id).count() > 0
     has_certificates = Certificate.query.filter_by(student_id=target_user.id).count() > 0
-    has_payments = Payment.query.filter_by(student_id=target_user.id).count() > 0
+    has_payments = Payment.query.filter((Payment.student_id == target_user.id) | (Payment.organizer_id == target_user.id)).count() > 0
+    has_teams = Team.query.filter_by(team_lead_id=target_user.id).count() > 0
+    has_team_members = TeamMember.query.filter_by(student_id=target_user.id).count() > 0
 
-    if has_registrations or has_events or has_attendance or has_certificates or has_payments:
-        # Soft-deactivation to preserve integrity
+    reasons = []
+    if has_registrations: reasons.append("registrations")
+    if has_events: reasons.append("organized events")
+    if has_attendance: reasons.append("attendance records")
+    if has_certificates: reasons.append("certificates")
+    if has_payments: reasons.append("payments")
+    if has_teams: reasons.append("led teams")
+    if has_team_members: reasons.append("team memberships")
+
+    if reasons:
+        # Soft-deactivation to preserve academic and historical audit integrity
         target_user.is_active = False
         db.session.commit()
-
-        reasons = []
-        if has_registrations: reasons.append("registrations")
-        if has_events: reasons.append("organized events")
-        if has_attendance: reasons.append("attendance records")
-        if has_certificates: reasons.append("certificates")
-        if has_payments: reasons.append("payments")
 
         details_msg = f"Soft-deactivated user '{name}' ({email}) because related college history exists ({', '.join(reasons)})."
         log_audit_action(
@@ -742,20 +747,52 @@ def delete_user(user_id):
 
         flash(f"User '{name}' has existing records ({', '.join(reasons)}). For data integrity, the account has been DEACTIVATED rather than erased.", 'warning')
     else:
-        # Standalone user with no dependencies -> hard delete
-        db.session.delete(target_user)
-        db.session.commit()
+        # Standalone user with no core event dependencies -> safely clean up references & hard delete
+        try:
+            # Nullify referencing columns across reviewer/approver relations
+            OrganizerProfile.query.filter_by(approved_by_id=target_user.id).update({'approved_by_id': None}, synchronize_session=False)
+            OrganizerRequest.query.filter_by(reviewed_by_hod_id=target_user.id).update({'reviewed_by_hod_id': None}, synchronize_session=False)
+            EventRequest.query.filter_by(hod_reviewer_id=target_user.id).update({'hod_reviewer_id': None}, synchronize_session=False)
+            EventRequest.query.filter_by(dean_reviewer_id=target_user.id).update({'dean_reviewer_id': None}, synchronize_session=False)
+            Certificate.query.filter_by(assigned_by_id=target_user.id).update({'assigned_by_id': None}, synchronize_session=False)
+            Payment.query.filter_by(verified_by_id=target_user.id).update({'verified_by_id': None}, synchronize_session=False)
+            AttendanceRecord.query.filter_by(marked_by_id=target_user.id).update({'marked_by_id': None}, synchronize_session=False)
+            AuditLog.query.filter_by(admin_id=target_user.id).update({'admin_id': None}, synchronize_session=False)
+            CollegeDepartment.query.filter_by(hod_id=target_user.id).update({'hod_id': None}, synchronize_session=False)
+            Announcement.query.filter_by(author_id=target_user.id).delete(synchronize_session=False)
+            TeamInvitation.query.filter_by(invited_student_id=target_user.id).delete(synchronize_session=False)
 
-        log_audit_action(
-            admin=current_admin,
-            action="USER_DELETED",
-            target_type="User",
-            target_id=user_id,
-            target_name=name,
-            details=f"Permanently removed standalone user '{name}' ({email})."
-        )
+            db.session.delete(target_user)
+            db.session.commit()
 
-        flash(f"User '{name}' ({email}) has been permanently deleted.", 'success')
+            log_audit_action(
+                admin=current_admin,
+                action="USER_DELETED",
+                target_type="User",
+                target_id=user_id,
+                target_name=name,
+                details=f"Permanently removed user '{name}' ({email})."
+            )
+
+            flash(f"User '{name}' ({email}) has been permanently deleted.", 'success')
+        except Exception as e:
+            db.session.rollback()
+            # Safely fall back to soft-deactivation
+            fallback_user = User.query.get(user_id)
+            if fallback_user:
+                fallback_user.is_active = False
+                db.session.commit()
+                log_audit_action(
+                    admin=current_admin,
+                    action="USER_DEACTIVATED",
+                    target_type="User",
+                    target_id=user_id,
+                    target_name=name,
+                    details=f"Soft-deactivated user '{name}' ({email}) following delete constraint error: {str(e)}"
+                )
+                flash(f"User '{name}' could not be deleted due to database references. The account has been deactivated instead.", 'warning')
+            else:
+                flash(f"User could not be deleted: {str(e)}", 'danger')
 
     return redirect(url_for('admin.users_list'))
 
