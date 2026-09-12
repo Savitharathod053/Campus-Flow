@@ -94,3 +94,5 @@ class Config:
     MAIL_USERNAME = (os.environ.get('MAIL_USERNAME') or '').strip().strip("'\"")
     MAIL_PASSWORD = (os.environ.get('MAIL_PASSWORD') or '').strip().strip("'\"")
     MAIL_DEFAULT_SENDER = (os.environ.get('MAIL_DEFAULT_SENDER') or os.environ.get('MAIL_USERNAME') or '').strip().strip("'\"")
+    MAIL_DEV_REDIRECT_ENABLED = os.environ.get('MAIL_DEV_REDIRECT_ENABLED', 'True').strip().lower() in ('true', '1', 't', 'yes')
+    MAIL_LIVE_TEST_RECIPIENT = (os.environ.get('MAIL_LIVE_TEST_RECIPIENT') or os.environ.get('MAIL_USERNAME') or '').strip().strip("'\"")
