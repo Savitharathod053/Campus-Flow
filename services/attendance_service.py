@@ -268,6 +268,22 @@ def record_session_attendance(event_id, session_id, registration_code, marked_by
 
     db.session.commit()
 
+    # Dispatch in-app notification & email to student
+    try:
+        from services.notification_service import create_notification
+        from models.notification import NotificationType
+        from services.email_service import send_attendance_marked_email
+        create_notification(
+            user_id=student.id,
+            title=f"Attendance Recorded: {event.title}",
+            message=f"You have been marked PRESENT for '{session.session_name}' ({event.title}).",
+            notification_type=NotificationType.SYSTEM,
+            link="/student/events"
+        )
+        send_attendance_marked_email(student, event, session, att_record)
+    except Exception as exc:
+        logger.warning(f"Could not dispatch attendance marked notification/email: {exc}")
+
     # Calculate updated metrics
     attended_count = event.get_student_attended_count(student.id)
     total_sessions = event.total_sessions_count
@@ -333,6 +349,23 @@ def manual_override_attendance(event_id, session_id, student_id, new_status, mar
         record.scanned_at = datetime.utcnow()
 
     db.session.commit()
+
+    if new_status == AttendanceStatus.PRESENT:
+        try:
+            from services.notification_service import create_notification
+            from models.notification import NotificationType
+            from services.email_service import send_attendance_marked_email
+            create_notification(
+                user_id=student.id,
+                title=f"Attendance Updated: {event.title}",
+                message=f"Your attendance for '{session.session_name}' ({event.title}) was marked as {new_status}.",
+                notification_type=NotificationType.SYSTEM,
+                link="/student/events"
+            )
+            send_attendance_marked_email(student, event, session, record)
+        except Exception as exc:
+            logger.warning(f"Could not dispatch manual attendance notification/email: {exc}")
+
     return record
 
 

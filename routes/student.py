@@ -196,7 +196,25 @@ def request_organizer():
             try:
                 send_organizer_request_submitted_email(org_req, user, hod_user, dept_obj)
             except Exception as em_err:
-                pass
+                current_app.logger.warning(f"Could not dispatch HOD organizer request email: {em_err}")
+
+        # Send Confirmation Email & In-App Notification to Student Applicant
+        try:
+            from services.email_service import send_organizer_application_received_email
+            create_notification(
+                user_id=user.id,
+                title="Organizer Application Submitted",
+                message=f"Your application to become an Event Organizer has been submitted to HOD {hod_user.name if hod_user else 'your department'} for review.",
+                notification_type=NotificationType.ORGANIZER_REQUEST,
+                link=url_for('student.dashboard')
+            )
+            send_organizer_application_received_email(
+                user,
+                profile_or_req=org_req,
+                assigned_admin_name=hod_user.name if hod_user else None
+            )
+        except Exception as em_err:
+            current_app.logger.warning(f"Could not dispatch student organizer confirmation email: {em_err}")
 
         flash('Your request to become an Organizer has been submitted to your Department HOD for review!', 'success')
         return redirect(url_for('student.dashboard'))
@@ -366,12 +384,19 @@ def register_event(event_id):
         db.session.commit()
 
         if is_free_event:
-            # Send ticket and registration confirmation email
+            # Send ticket and registration confirmation email & in-app notification
             try:
                 from services.email_service import send_registration_confirmation_email
+                create_notification(
+                    user_id=user.id,
+                    title=f"Registration Confirmed: {event.title}",
+                    message=f"Your pass #{registration.registration_code} for '{event.title}' is confirmed! Your digital ticket and QR pass are ready.",
+                    notification_type=NotificationType.SYSTEM,
+                    link=url_for('student.ticket', code=registration.registration_code)
+                )
                 send_registration_confirmation_email(registration, user, event)
             except Exception as exc:
-                current_app.logger.warning(f"Could not dispatch registration confirmation email: {exc}")
+                current_app.logger.warning(f"Could not dispatch registration confirmation notification/email: {exc}")
 
             flash('Registration successful! Your digital ticket and QR code are ready.', 'success')
             return redirect(url_for('student.ticket', code=registration.registration_code))

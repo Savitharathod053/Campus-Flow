@@ -122,12 +122,46 @@ def submit_proof(registration_id):
     if status == PaymentStatus.REJECTED:
         flash(f"Payment verification failed: {payment.verification_reason}", 'danger')
         return redirect(url_for('payment.checkout', registration_id=registration.id))
-    elif status == PaymentStatus.MANUAL_REVIEW:
-        flash("Payment proof submitted! Your submission has been flagged for manual verification by the organizer.", 'warning')
+    elif status in (PaymentStatus.MANUAL_REVIEW, PaymentStatus.PENDING):
+        # Dispatch in-app notifications and emails to organizer and student
+        try:
+            from services.notification_service import create_notification
+            from models.notification import NotificationType
+            from services.email_service import send_payment_proof_submitted_email
+
+            event_obj = registration.event
+            organizer_obj = event_obj.organizer if event_obj else None
+
+            # 1. Notify Organizer
+            if organizer_obj:
+                create_notification(
+                    user_id=organizer_obj.id,
+                    title=f"Payment Verification Needed: {user.name}",
+                    message=f"Student {user.name} submitted payment proof of ₹{payment.amount:.2f} for '{event_obj.title}'.",
+                    notification_type=NotificationType.SYSTEM,
+                    link=url_for('organizer.payment_verification', event_id=event_obj.id)
+                )
+
+            # 2. Notify Student
+            create_notification(
+                user_id=user.id,
+                title=f"Payment Proof Submitted: {event_obj.title}",
+                message=f"Your payment proof for '{event_obj.title}' was submitted. Ticket will be activated once verified.",
+                notification_type=NotificationType.SYSTEM,
+                link=url_for('student.my_events')
+            )
+
+            # 3. Email both parties
+            send_payment_proof_submitted_email(payment, user, event_obj, organizer_obj)
+        except Exception as exc:
+            current_app.logger.warning(f"Could not dispatch payment submission notifications: {exc}")
+
+        if status == PaymentStatus.MANUAL_REVIEW:
+            flash("Payment proof submitted! Your submission has been flagged for manual verification by the organizer.", 'warning')
+        else:
+            flash("Payment proof submitted successfully! Verification is pending organizer approval. Your ticket will be available once verified.", 'info')
         return redirect(url_for('student.my_events'))
     else:
-        # PENDING
-        flash("Payment proof submitted successfully! Verification is pending organizer approval. Your ticket will be available once verified.", 'info')
         return redirect(url_for('student.my_events'))
 
 

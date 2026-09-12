@@ -1135,6 +1135,24 @@ def event_action(event_id):
 
     db.session.commit()
 
+    # Dispatch in-app notification and email to organizer
+    try:
+        from services.notification_service import create_notification
+        from models.notification import NotificationType
+        from services.email_service import send_event_admin_action_email
+        if event.organizer_id:
+            create_notification(
+                user_id=event.organizer_id,
+                title=f"Event Status: {action.upper()}",
+                message=f"Your event '{event.title}' status was updated to {action.upper()} by Administrator {user.name}.",
+                notification_type=NotificationType.SYSTEM,
+                link=url_for('organizer.manage_event', event_id=event.id) if event.id else url_for('organizer.dashboard')
+            )
+            if event.organizer:
+                send_event_admin_action_email(event, event.organizer, action.upper(), reason=rejection_reason)
+    except Exception as exc:
+        current_app.logger.warning(f"Could not dispatch event admin action notification/email: {exc}")
+
     log_audit_action(
         admin=user,
         action="EVENT_MODIFIED",
@@ -1194,6 +1212,33 @@ def organizer_action(organizer_profile_id):
         flash(f"Organizer '{org_profile.organization_name}' rejected.", 'warning')
 
     db.session.commit()
+
+    # Dispatch in-app notification and email to organizer user
+    try:
+        from services.notification_service import create_notification
+        from models.notification import NotificationType
+        from services.email_service import send_organizer_request_approved_email, send_organizer_request_rejected_email
+        if org_profile.user:
+            if action == 'approve':
+                create_notification(
+                    user_id=org_profile.user.id,
+                    title="Organizer Application Approved",
+                    message=f"Congratulations! Your organizer account for '{org_profile.organization_name}' has been APPROVED by Super Admin {current_admin.name}.",
+                    notification_type=NotificationType.ORGANIZER_APPROVAL,
+                    link=url_for('organizer.dashboard')
+                )
+                send_organizer_request_approved_email(None, org_profile.user, current_admin)
+            elif action == 'reject':
+                create_notification(
+                    user_id=org_profile.user.id,
+                    title="Organizer Application Rejected",
+                    message=f"Your organizer application was rejected by Super Admin {current_admin.name}. Reason: {org_profile.rejection_reason}",
+                    notification_type=NotificationType.ORGANIZER_REJECTION,
+                    link=url_for('student.dashboard')
+                )
+                send_organizer_request_rejected_email(None, org_profile.user, current_admin, reason=org_profile.rejection_reason)
+    except Exception as exc:
+        current_app.logger.warning(f"Could not dispatch admin organizer action notification/email: {exc}")
 
     log_audit_action(
         admin=current_admin,

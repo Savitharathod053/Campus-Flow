@@ -201,11 +201,20 @@ def process_certificate_uploads(event_id, files_list=None, zip_file=None, custom
     # Dispatch certificate ready notifications for successfully matched students
     try:
         from services.email_service import send_certificate_ready_email
+        from services.notification_service import create_notification
+        from models.notification import NotificationType
         for c in created_certs:
             if c.status == CertificateStatus.MATCHED and c.student:
+                create_notification(
+                    user_id=c.student.id,
+                    title=f"Certificate Ready: {event.title}",
+                    message=f"Your certificate for '{event.title}' has been issued and is ready for download in your vault.",
+                    notification_type=NotificationType.SYSTEM,
+                    link="/student/certificates"
+                )
                 send_certificate_ready_email(c, c.student, event)
     except Exception as exc:
-        current_app.logger.warning(f"Could not dispatch certificate ready emails: {exc}")
+        current_app.logger.warning(f"Could not dispatch certificate ready notifications/emails: {exc}")
 
     # Calculate statistics
     matched_count = len([c for c in created_certs if c.status == CertificateStatus.MATCHED])
@@ -251,11 +260,20 @@ def manual_assign_certificate(cert_id, student_id, roll_number=None, assigned_by
     # Dispatch certificate ready notification
     try:
         from services.email_service import send_certificate_ready_email
+        from services.notification_service import create_notification
+        from models.notification import NotificationType
         event = Event.query.get(cert.event_id)
         if event and student:
+            create_notification(
+                user_id=student.id,
+                title=f"Certificate Ready: {event.title}",
+                message=f"Your certificate for '{event.title}' has been issued and is ready for download in your vault.",
+                notification_type=NotificationType.SYSTEM,
+                link="/student/certificates"
+            )
             send_certificate_ready_email(cert, student, event)
     except Exception as exc:
-        current_app.logger.warning(f"Could not dispatch certificate ready email: {exc}")
+        current_app.logger.warning(f"Could not dispatch certificate ready notification/email: {exc}")
 
     return cert
 

@@ -780,3 +780,261 @@ def send_certificate_ready_email(certificate, user, event):
     dispatch_email(user.email, subject, body)
     return True
 
+
+# ==============================================================================
+# ADDITIONAL EXTENDED WORKFLOW EMAIL NOTIFICATIONS
+# ==============================================================================
+
+def send_organizer_application_received_email(user, profile_or_req=None, assigned_admin_name=None):
+    """
+    Sends confirmation to a student/organizer applicant that their organizer application was received.
+    """
+    if not user or not user.email:
+        return False
+
+    reviewer_str = f"your department faculty coordinator ({assigned_admin_name})" if assigned_admin_name else "your department HOD"
+    subject = "Organizer Application Received — Campus Flow"
+    body = (
+        f"Hello {user.name},\n\n"
+        f"We have received your application to become an Event Organizer on Campus Flow.\n\n"
+        f"Your request has been forwarded to {reviewer_str} for review and approval.\n"
+        f"You will receive another notification as soon as a decision is made on your application.\n\n"
+        f"Thank you for taking the initiative to lead campus activities!\n\n"
+        f"— Campus Flow Events Team"
+    )
+
+    email_record = {'to': user.email, 'subject': subject, 'body': body, 'type': 'ORGANIZER_APPLICATION_CONFIRMATION'}
+    SENT_EMAILS.append(email_record)
+    logger.info(f"[EMAIL SENT] Organizer application confirmation to: {user.email}")
+    dispatch_email(user.email, subject, body)
+    return True
+
+
+def send_organizer_registration_faculty_notice_email(applicant_user, faculty_user, department_name, profile=None):
+    """
+    Sends notification to department faculty/HOD that a new organizer registered and is awaiting approval.
+    """
+    if not faculty_user or not faculty_user.email:
+        return False
+
+    roll = profile.roll_number if (profile and profile.roll_number) else 'N/A'
+    org_name = profile.organization_name if (profile and profile.organization_name) else 'Campus Club/Society'
+
+    subject = f"Action Required: New Organizer Registration - {applicant_user.name} ({department_name})"
+    body = (
+        f"Dear {faculty_user.name},\n\n"
+        f"A new student organizer has registered and is awaiting your review and approval:\n\n"
+        f"Applicant Name: {applicant_user.name}\n"
+        f"Roll Number: {roll}\n"
+        f"Email: {applicant_user.email}\n"
+        f"Department: {department_name}\n"
+        f"Organization/Club: {org_name}\n\n"
+        f"Please log in to your Campus Flow dashboard to review and approve or reject this application.\n\n"
+        f"— Campus Flow System"
+    )
+
+    email_record = {'to': faculty_user.email, 'subject': subject, 'body': body, 'type': 'ORGANIZER_REGISTRATION_FACULTY_NOTICE'}
+    SENT_EMAILS.append(email_record)
+    logger.info(f"[EMAIL SENT] Organizer notice to faculty: {faculty_user.email}")
+    dispatch_email(faculty_user.email, subject, body)
+    return True
+
+
+def send_event_request_submitted_organizer_confirm_email(req, organizer, hod, dept):
+    """
+    Sends confirmation to the organizer that their event proposal was submitted and is under HOD review.
+    """
+    if not organizer or not organizer.email:
+        return False
+
+    hod_name = hod.name if hod else "your Department HOD"
+    dept_name = dept.name if dept else (req.category or "Department")
+
+    subject = f"Proposal Submitted: '{req.event_name}' - Pending HOD Review"
+    body = (
+        f"Hello {organizer.name},\n\n"
+        f"Your event proposal '{req.event_name}' has been successfully submitted on Campus Flow!\n\n"
+        f"Event Details:\n"
+        f"Event Name: {req.event_name}\n"
+        f"Category: {req.category}\n"
+        f"Proposed Date: {req.proposed_event_date}\n"
+        f"Venue: {req.venue}\n"
+        f"Department: {dept_name}\n\n"
+        f"Your proposal is currently under review by {hod_name}. "
+        f"Once endorsed, it will be forwarded to the Students Affairs Dean for final college-level publication clearance.\n\n"
+        f"You can track the live status anytime on your Organizer Dashboard.\n\n"
+        f"— Campus Flow Events Team"
+    )
+
+    email_record = {'to': organizer.email, 'subject': subject, 'body': body, 'type': 'EVENT_SUBMISSION_CONFIRMATION_ORGANIZER'}
+    SENT_EMAILS.append(email_record)
+    logger.info(f"[EMAIL SENT] Event submission confirmation to organizer: {organizer.email}")
+    dispatch_email(organizer.email, subject, body)
+    return True
+
+
+def send_payment_proof_submitted_email(payment, student, event, organizer):
+    """
+    Sends notification to event organizer that a student submitted payment proof,
+    and sends acknowledgment to the student.
+    """
+    amount_str = f"₹{payment.amount:.2f}" if payment.amount is not None else "N/A"
+    tx_str = payment.transaction_id or "N/A"
+    roll_str = student.student_profile.roll_number if (student and student.student_profile and student.student_profile.roll_number) else "N/A"
+
+    # 1. Notify Organizer
+    if organizer and organizer.email:
+        subject_org = f"Payment Verification Required: {student.name} - {event.title}"
+        body_org = (
+            f"Hello {organizer.name},\n\n"
+            f"A student has submitted payment proof for your event '{event.title}':\n\n"
+            f"Student: {student.name} (Roll: {roll_str}, Email: {student.email})\n"
+            f"Amount: {amount_str}\n"
+            f"Transaction ID / Ref: {tx_str}\n\n"
+            f"Please log in to your Organizer Dashboard > Payment Verification to verify the receipt and issue the student's entry ticket.\n\n"
+            f"— Campus Flow Events Team"
+        )
+        SENT_EMAILS.append({'to': organizer.email, 'subject': subject_org, 'body': body_org, 'type': 'PAYMENT_PROOF_SUBMITTED_ORGANIZER'})
+        logger.info(f"[EMAIL SENT] Payment proof notice to organizer: {organizer.email}")
+        dispatch_email(organizer.email, subject_org, body_org)
+
+    # 2. Acknowledge Student
+    if student and student.email:
+        subject_std = f"Payment Proof Received: '{event.title}' - Pending Verification"
+        body_std = (
+            f"Hello {student.name},\n\n"
+            f"We have received your payment proof for '{event.title}'.\n\n"
+            f"Payment Summary:\n"
+            f"Event: {event.title}\n"
+            f"Amount Submitted: {amount_str}\n"
+            f"Reference / UTR: {tx_str}\n\n"
+            f"The event organizer will review your payment receipt. "
+            f"Once verified, your confirmed QR ticket will automatically be activated in your dashboard.\n\n"
+            f"— Campus Flow Events Team"
+        )
+        SENT_EMAILS.append({'to': student.email, 'subject': subject_std, 'body': body_std, 'type': 'PAYMENT_PROOF_SUBMITTED_STUDENT'})
+        logger.info(f"[EMAIL SENT] Payment proof acknowledgment to student: {student.email}")
+        dispatch_email(student.email, subject_std, body_std)
+
+    return True
+
+
+def send_payment_rejected_email(payment, student, event, reason=None):
+    """
+    Sends notification to student that their payment proof was rejected by the organizer.
+    """
+    if not student or not student.email:
+        return False
+
+    reason_str = reason or payment.verification_reason or "Payment screenshot could not be validated."
+    amount_str = f"₹{payment.amount:.2f}" if payment.amount is not None else "N/A"
+    tx_str = payment.transaction_id or "N/A"
+
+    subject = f"Payment Verification Update: '{event.title}'"
+    body = (
+        f"Hello {student.name},\n\n"
+        f"Your submitted payment proof for the event '{event.title}' was reviewed by the event organizer and was NOT approved.\n\n"
+        f"Reason for Rejection:\n{reason_str}\n\n"
+        f"Submission Details:\n"
+        f"Amount: {amount_str}\n"
+        f"Transaction Reference: {tx_str}\n\n"
+        f"Your registration remains active in 'Pending Payment' status. "
+        f"Please log in to your Campus Flow dashboard to re-upload a clear, valid payment proof or contact the organizer.\n\n"
+        f"— Campus Flow Events Team"
+    )
+
+    email_record = {'to': student.email, 'subject': subject, 'body': body, 'type': 'PAYMENT_REJECTED'}
+    SENT_EMAILS.append(email_record)
+    logger.info(f"[EMAIL SENT] Payment rejected notification to: {student.email}")
+    dispatch_email(student.email, subject, body)
+    return True
+
+
+def send_member_invitation_response_member_email(recipient_email, recipient_name, team, event, response_type):
+    """
+    Sends confirmation to the invited student when they accept or decline a team invitation.
+    """
+    if not recipient_email:
+        return False
+
+    name = recipient_name or recipient_email
+    if response_type == 'ACCEPTED':
+        subject = f"Team Joined: '{team.team_name}' for '{event.title}'"
+        body = (
+            f"Hello {name},\n\n"
+            f"You have successfully joined the team '{team.team_name}' for '{event.title}'!\n\n"
+            f"Team Lead: {team.lead.name if team.lead else 'Team Lead'}\n"
+            f"Event Date: {event.start_time.strftime('%b %d, %Y %I:%M %p')}\n"
+            f"Venue: {event.venue}\n\n"
+            f"You can view your team details and teammates on your Campus Flow dashboard.\n\n"
+            f"— Campus Flow Events Team"
+        )
+    else:
+        subject = f"Invitation Declined: '{team.team_name}' for '{event.title}'"
+        body = (
+            f"Hello {name},\n\n"
+            f"You have declined the invitation to join team '{team.team_name}' for '{event.title}'.\n\n"
+            f"If this was unintentional, please ask the team lead ({team.lead.name if team.lead else 'lead'}) to send you a new invitation.\n\n"
+            f"— Campus Flow Events Team"
+        )
+
+    email_record = {'to': recipient_email, 'subject': subject, 'body': body, 'type': f'MEMBER_CONFIRMATION_{response_type}'}
+    SENT_EMAILS.append(email_record)
+    logger.info(f"[EMAIL SENT] Member response confirmation to: {recipient_email}")
+    dispatch_email(recipient_email, subject, body)
+    return True
+
+
+def send_attendance_marked_email(student, event, session, att_record):
+    """
+    Sends notification to student confirming that their attendance was recorded.
+    """
+    if not student or not student.email:
+        return False
+
+    session_name = session.session_name if session else "General Session"
+    time_str = att_record.scanned_at.strftime('%b %d, %Y %I:%M %p') if (att_record and att_record.scanned_at) else datetime.utcnow().strftime('%b %d, %Y %I:%M %p')
+    event_title = event.title if event else "Campus Event"
+
+    subject = f"Attendance Confirmed: {event_title} ({session_name})"
+    body = (
+        f"Hello {student.name},\n\n"
+        f"Your attendance has been recorded for '{event_title}'.\n\n"
+        f"Session: {session_name}\n"
+        f"Status: PRESENT\n"
+        f"Recorded At: {time_str}\n"
+        f"Venue: {event.venue if event else 'Campus'}\n\n"
+        f"You can monitor your attendance percentages and track eligibility for certificates "
+        f"in your Campus Flow student dashboard.\n\n"
+        f"— Campus Flow Events Team"
+    )
+
+    email_record = {'to': student.email, 'subject': subject, 'body': body, 'type': 'ATTENDANCE_RECORDED'}
+    SENT_EMAILS.append(email_record)
+    logger.info(f"[EMAIL SENT] Attendance marked confirmation to: {student.email}")
+    dispatch_email(student.email, subject, body)
+    return True
+
+
+def send_event_admin_action_email(event, organizer, action, reason=None):
+    """
+    Sends notification to organizer when Super Admin approves, rejects, or cancels an event.
+    """
+    if not organizer or not organizer.email:
+        return False
+
+    reason_str = f"\nReason: {reason}\n" if reason else ""
+    subject = f"Event Status Update: '{event.title}' has been {action}"
+    body = (
+        f"Hello {organizer.name},\n\n"
+        f"Your event '{event.title}' status has been updated to {action} by the System Administrator.{reason_str}\n"
+        f"You can review your event status and details in your Organizer Dashboard.\n\n"
+        f"— Campus Flow Administration"
+    )
+
+    email_record = {'to': organizer.email, 'subject': subject, 'body': body, 'type': f'EVENT_ADMIN_{action}'}
+    SENT_EMAILS.append(email_record)
+    logger.info(f"[EMAIL SENT] Event admin action to organizer: {organizer.email}")
+    dispatch_email(organizer.email, subject, body)
+    return True
+

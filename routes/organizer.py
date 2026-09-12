@@ -272,7 +272,21 @@ def create_event():
             try:
                 send_event_request_submitted_email(event_req, user, hod_user, dept_obj)
             except Exception as em_err:
-                pass
+                current_app.logger.warning(f"Could not dispatch HOD event request email: {em_err}")
+
+        # Send Confirmation Email & In-App Notification to Organizer
+        try:
+            from services.email_service import send_event_request_submitted_organizer_confirm_email
+            create_notification(
+                user_id=user.id,
+                title=f"Event Proposal Submitted: {title}",
+                message=f"Your event proposal '{title}' was submitted and forwarded to HOD {hod_user.name if hod_user else 'your department'} for initial review.",
+                notification_type=NotificationType.EVENT_REQUEST,
+                link=url_for('organizer.dashboard', tab='requests')
+            )
+            send_event_request_submitted_organizer_confirm_email(event_req, user, hod_user, dept_obj)
+        except Exception as em_err:
+            current_app.logger.warning(f"Could not dispatch organizer proposal submission email: {em_err}")
 
         flash(
             f"Event proposal '{title}' submitted successfully! It has been forwarded to your Department HOD ({dept_obj.name}) for initial review. Once approved, it will proceed to the Students Affairs Dean for final college-level publication clearance.",
@@ -1186,15 +1200,22 @@ def verify_student_payment(payment_id):
 
     db.session.commit()
 
-    # Send payment confirmation and ticket email (safely caught)
+    # Send payment confirmation and ticket email & in-app notification (safely caught)
     try:
         from services.email_service import send_payment_confirmation_email
         target_user = registration.student if (registration and registration.student) else payment.student
         target_event = payment.event or (registration.event if registration else None)
         if target_user and target_event:
+            create_notification(
+                user_id=target_user.id,
+                title=f"Payment Verified: {target_event.title}",
+                message=f"Your payment of ₹{payment.amount:.2f} for '{target_event.title}' was verified! Ticket pass #{registration.registration_code if registration else 'active'} is ready.",
+                notification_type=NotificationType.SYSTEM,
+                link=url_for('student.ticket', code=registration.registration_code) if registration else url_for('student.my_events')
+            )
             send_payment_confirmation_email(payment, target_user, target_event, registration)
     except Exception as exc:
-        current_app.logger.warning(f"Could not dispatch payment confirmation email: {exc}")
+        current_app.logger.warning(f"Could not dispatch payment confirmation notification/email: {exc}")
 
     flash(f"Payment for {registration.student.name if registration and registration.student else 'student'} has been VERIFIED! Event ticket and QR pass generated.", 'success')
     return redirect(request.referrer or url_for('organizer.dashboard'))
@@ -1226,6 +1247,24 @@ def reject_student_payment(payment_id):
         payment.registration.status = RegistrationStatus.PENDING_PAYMENT
 
     db.session.commit()
+
+    # Dispatch in-app notification and email to the student
+    try:
+        from services.email_service import send_payment_rejected_email
+        target_user = payment.registration.student if (payment.registration and payment.registration.student) else payment.student
+        target_event = payment.event or (payment.registration.event if payment.registration else None)
+        if target_user and target_event:
+            create_notification(
+                user_id=target_user.id,
+                title=f"Payment Proof Declined: {target_event.title}",
+                message=f"Your payment proof for '{target_event.title}' was rejected by the organizer. Reason: {reason}",
+                notification_type=NotificationType.SYSTEM,
+                link=url_for('payment.checkout', registration_id=payment.registration_id) if payment.registration_id else url_for('student.my_events')
+            )
+            send_payment_rejected_email(payment, target_user, target_event, reason=reason)
+    except Exception as exc:
+        current_app.logger.warning(f"Could not dispatch payment rejection notification/email: {exc}")
+
     flash(f"Payment proof has been REJECTED. Reason: {reason}", 'warning')
     return redirect(request.referrer or url_for('organizer.dashboard'))
 

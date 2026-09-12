@@ -360,6 +360,52 @@ def register_organizer():
         admin_name = assigned_admin['name'] if assigned_admin else 'Department Faculty Coordinator'
         admin_email = assigned_admin['email'] if assigned_admin else 'admin@college.edu'
 
+        # Dispatch emails & notifications (safely caught)
+        try:
+            from services.email_service import (
+                send_organizer_application_received_email,
+                send_organizer_registration_faculty_notice_email
+            )
+            from services.notification_service import create_notification
+            from models.notification import NotificationType
+            from models import CollegeDepartment
+
+            # Identify HOD / Faculty Admin for department
+            dept_obj = CollegeDepartment.query.filter(
+                (CollegeDepartment.name == department) | (CollegeDepartment.code == department)
+            ).first()
+            hod_user = dept_obj.hod if dept_obj else None
+
+            # Fallback to faculty profile user if no hod
+            faculty_user = hod_user
+            if not faculty_user and assigned_admin:
+                faculty_user = User.query.filter_by(email=assigned_admin['email']).first()
+
+            # 1. Confirmation to applicant
+            send_organizer_application_received_email(
+                user,
+                profile_or_req=profile,
+                assigned_admin_name=faculty_user.name if faculty_user else admin_name
+            )
+
+            # 2. Heads-up to faculty admin / HOD
+            if faculty_user:
+                create_notification(
+                    user_id=faculty_user.id,
+                    title=f"New Organizer Registration: {user.name}",
+                    message=f"Student {user.name} (Roll: {roll_number}) has registered as an organizer for {department} and is waiting for approval.",
+                    notification_type=NotificationType.ORGANIZER_REQUEST,
+                    link=url_for('hod.dashboard', tab='org_pending') if faculty_user.role == UserRole.HOD else url_for('admin.users_organizers')
+                )
+                send_organizer_registration_faculty_notice_email(
+                    applicant_user=user,
+                    faculty_user=faculty_user,
+                    department_name=department,
+                    profile=profile
+                )
+        except Exception as exc:
+            current_app.logger.warning(f"Could not dispatch organizer registration notifications: {exc}")
+
         flash(f"Organizer registration submitted successfully! Your application has been forwarded to your department faculty admin: {admin_name} ({admin_email}) for approval. You can log in once approved.", 'info')
         return redirect(url_for('auth.login'))
 

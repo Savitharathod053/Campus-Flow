@@ -14,8 +14,11 @@ from services.qr_service import generate_ticket_qr
 from services.email_service import (
     send_team_invitation_email,
     send_member_response_email,
-    send_registration_confirmation_email
+    send_registration_confirmation_email,
+    send_member_invitation_response_member_email
 )
+from services.notification_service import create_notification
+from models.notification import NotificationType
 
 
 class TeamValidationError(Exception):
@@ -202,15 +205,36 @@ def create_team(event, lead_user, team_name, member_emails, custom_responses_dat
             )
             db.session.add(member_entry)
 
-        # Dispatch invitation email
-        send_team_invitation_email(invitation, team, event, lead_user)
+        # Dispatch invitation email & in-app notification (if user exists)
+        try:
+            if invited_user:
+                create_notification(
+                    user_id=invited_user.id,
+                    title=f"Team Invitation: {team.team_name}",
+                    message=f"{lead_user.name} invited you to join team '{team.team_name}' for '{event.title}'.",
+                    notification_type=NotificationType.SYSTEM,
+                    link=f"/student/team-invitations/{invitation.token}/accept"
+                )
+            send_team_invitation_email(invitation, team, event, lead_user)
+        except Exception as exc:
+            current_app.logger.warning(f"Could not dispatch team invitation: {exc}")
 
     # 5. Recalculate team status
     team.recalculate_status()
     db.session.commit()
 
     if lead_reg_status == RegistrationStatus.CONFIRMED:
-        send_registration_confirmation_email(lead_registration, lead_user, event, team)
+        try:
+            create_notification(
+                user_id=lead_user.id,
+                title=f"Team Registered: {team.team_name}",
+                message=f"Team '{team.team_name}' for '{event.title}' has been registered. Pass #{lead_registration.registration_code} confirmed.",
+                notification_type=NotificationType.SYSTEM,
+                link=f"/student/ticket/{lead_registration.registration_code}"
+            )
+            send_registration_confirmation_email(lead_registration, lead_user, event, team)
+        except Exception as exc:
+            current_app.logger.warning(f"Could not dispatch lead registration email: {exc}")
 
     return team, lead_registration
 
@@ -317,9 +341,31 @@ def accept_invitation(token, user):
     db.session.commit()
 
     # 5. Send notifications
-    send_member_response_email(invitation, team, event, user, 'ACCEPTED')
-    if is_confirmed_now:
-        send_registration_confirmation_email(registration, user, event, team)
+    try:
+        # Notify Team Lead
+        send_member_response_email(invitation, team, event, user, 'ACCEPTED')
+        if team.team_lead_id:
+            create_notification(
+                user_id=team.team_lead_id,
+                title=f"Team Member Joined: {user.name}",
+                message=f"{user.name} has accepted your invitation to join team '{team.team_name}'.",
+                notification_type=NotificationType.SYSTEM,
+                link=f"/student/teams/{team.id}"
+            )
+        # Notify Accepting Member
+        create_notification(
+            user_id=user.id,
+            title=f"Joined Team: {team.team_name}",
+            message=f"You have joined '{team.team_name}' for '{event.title}'.",
+            notification_type=NotificationType.SYSTEM,
+            link=f"/student/teams/{team.id}"
+        )
+        send_member_invitation_response_member_email(user.email, user.name, team, event, 'ACCEPTED')
+
+        if is_confirmed_now:
+            send_registration_confirmation_email(registration, user, event, team)
+    except Exception as exc:
+        current_app.logger.warning(f"Could not dispatch team acceptance notifications: {exc}")
 
     return team, registration
 
@@ -357,7 +403,30 @@ def decline_invitation(token, user=None):
     db.session.commit()
 
     if team and event:
-        send_member_response_email(invitation, team, event, user, 'DECLINED')
+        try:
+            # Notify Team Lead
+            send_member_response_email(invitation, team, event, user, 'DECLINED')
+            responder_name = user.name if user else invitation.invited_email
+            if team.team_lead_id:
+                create_notification(
+                    user_id=team.team_lead_id,
+                    title="Team Invitation Declined",
+                    message=f"{responder_name} declined your invitation to join team '{team.team_name}'.",
+                    notification_type=NotificationType.SYSTEM,
+                    link=f"/student/teams/{team.id}"
+                )
+            # Notify Declining Member
+            send_member_invitation_response_member_email(invitation.invited_email, responder_name, team, event, 'DECLINED')
+            if user:
+                create_notification(
+                    user_id=user.id,
+                    title=f"Invitation Declined: {team.team_name}",
+                    message=f"You declined the invitation to join team '{team.team_name}' for '{event.title}'.",
+                    notification_type=NotificationType.SYSTEM,
+                    link="/student/my-events"
+                )
+        except Exception as exc:
+            current_app.logger.warning(f"Could not dispatch team decline notifications: {exc}")
 
     return invitation
 
@@ -426,7 +495,18 @@ def invite_member(team, email, lead_user):
             member_entry.status = TeamMemberStatus.PENDING
 
     db.session.commit()
-    send_team_invitation_email(invitation, team, event, lead_user)
+    try:
+        if existing_user:
+            create_notification(
+                user_id=existing_user.id,
+                title=f"Team Invitation: {team.team_name}",
+                message=f"{lead_user.name} invited you to join team '{team.team_name}' for '{event.title}'.",
+                notification_type=NotificationType.SYSTEM,
+                link=f"/student/team-invitations/{invitation.token}/accept"
+            )
+        send_team_invitation_email(invitation, team, event, lead_user)
+    except Exception as exc:
+        current_app.logger.warning(f"Could not dispatch team invitation: {exc}")
     return invitation
 
 
