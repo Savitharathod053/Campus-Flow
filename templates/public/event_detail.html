@@ -152,6 +152,30 @@
                     {% endif %}
                 </div>
 
+                {% if not event.is_free and event.registration_fee > 0 and (event.upi_qr_image or event.upi_id or event.upi_number) %}
+                <!-- Organizer Payment Preview -->
+                <div class="p-3 bg-light rounded-3 mb-3 border text-center">
+                    <div class="small fw-bold text-primary mb-2">
+                        <i class="bi bi-qr-code-scan me-1"></i> ORGANIZER PAYMENT DETAILS
+                    </div>
+                    {% if event.upi_qr_image %}
+                        <div class="p-2 border d-inline-block rounded-3 bg-white shadow-sm mb-2">
+                            <img src="{{ url_for('static', filename=event.upi_qr_image.replace('static/', '').lstrip('/')) }}" 
+                                 alt="Organizer UPI QR Code" 
+                                 class="img-fluid rounded" 
+                                 style="max-width: 140px; max-height: 140px; object-fit: contain;">
+                        </div>
+                        <div class="small text-muted mb-2">Scan with GPay / PhonePe / Paytm</div>
+                    {% endif %}
+                    {% if event.upi_id %}
+                        <div class="small text-muted">UPI ID: <code class="text-dark fw-bold">{{ event.upi_id }}</code></div>
+                    {% endif %}
+                    {% if event.upi_number %}
+                        <div class="small text-muted">UPI Mobile: <strong class="text-dark">{{ event.upi_number }}</strong></div>
+                    {% endif %}
+                </div>
+                {% endif %}
+
                 <!-- Registration Buttons Logic -->
                 {% if is_registered %}
                     <div class="alert alert-success text-center mb-3">

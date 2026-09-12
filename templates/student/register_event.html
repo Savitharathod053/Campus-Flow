@@ -57,6 +57,79 @@
                         </div>
                     </div>
 
+                    {% if not event.is_free and event.registration_fee > 0 %}
+                    <!-- Organizer Payment Details & QR Code Section -->
+                    <div class="card border-primary border-opacity-25 shadow-sm mb-4">
+                        <div class="card-header bg-primary text-white py-2 fw-bold d-flex justify-content-between align-items-center">
+                            <span><i class="bi bi-qr-code-scan me-2"></i> Organizer Payment QR Code & Fee Details</span>
+                            <span class="badge bg-white text-primary fs-6">Fee: ₹{{ "%.2f"|format(event.registration_fee) }}</span>
+                        </div>
+                        <div class="card-body p-4 text-center">
+                            {% if event.upi_qr_image %}
+                                <div class="mb-3">
+                                    <div class="p-2 border d-inline-block rounded-3 bg-white shadow-sm">
+                                        <img src="{{ url_for('static', filename=event.upi_qr_image.replace('static/', '').lstrip('/')) }}" 
+                                             alt="Organizer UPI QR Code" 
+                                             class="img-fluid rounded" 
+                                             style="max-width: 220px; max-height: 220px; object-fit: contain;">
+                                    </div>
+                                    <p class="small text-muted mt-2 mb-0">
+                                        <i class="bi bi-qr-code me-1"></i> Scan with Google Pay, PhonePe, Paytm, or BHIM to pay
+                                    </p>
+                                </div>
+                            {% endif %}
+
+                            <div class="row g-3 text-start justify-content-center">
+                                {% if event.upi_id %}
+                                    <div class="col-sm-6">
+                                        <div class="p-3 bg-light rounded border text-center">
+                                            <span class="small text-muted d-block mb-1"><i class="bi bi-at text-primary"></i> Organizer UPI ID</span>
+                                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                                <code class="fs-6 fw-bold text-dark">{{ event.upi_id }}</code>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="navigator.clipboard.writeText('{{ event.upi_id }}'); alert('UPI ID copied to clipboard!');" title="Copy UPI ID">
+                                                    <i class="bi bi-clipboard"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+
+                                {% if event.upi_number %}
+                                    <div class="col-sm-6">
+                                        <div class="p-3 bg-light rounded border text-center">
+                                            <span class="small text-muted d-block mb-1"><i class="bi bi-phone text-success"></i> UPI Mobile Number</span>
+                                            <div class="d-flex align-items-center justify-content-center gap-2">
+                                                <span class="fs-6 fw-bold text-dark">{{ event.upi_number }}</span>
+                                                <button type="button" class="btn btn-sm btn-outline-secondary py-0 px-2" onclick="navigator.clipboard.writeText('{{ event.upi_number }}'); alert('Mobile number copied to clipboard!');" title="Copy Number">
+                                                    <i class="bi bi-clipboard"></i>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            {% if not event.upi_qr_image and not event.upi_id and not event.upi_number %}
+                                <div class="alert alert-info small text-start mb-0">
+                                    <i class="bi bi-info-circle me-1"></i> Direct payment details will be provided by the event coordinator ({{ event.faculty_coordinator or 'Department Coordinator' }}).
+                                </div>
+                            {% endif %}
+
+                            {% if event.payment_instructions %}
+                                <div class="mt-3 p-3 bg-light border rounded text-start">
+                                    <h6 class="fw-bold mb-1 text-secondary small"><i class="bi bi-card-text me-1"></i> Payment Instructions:</h6>
+                                    <p class="small text-dark mb-0" style="white-space: pre-line;">{{ event.payment_instructions }}</p>
+                                </div>
+                            {% endif %}
+
+                            <div class="alert alert-light border small text-muted text-start mt-3 mb-0">
+                                <i class="bi bi-info-circle text-primary me-1"></i> 
+                                <strong>Payment Process:</strong> You can scan the QR code to complete your payment now. After clicking <strong>"Proceed to Pay"</strong> below, you will upload your payment screenshot &amp; enter the transaction reference (UTR) to generate your verified digital ticket pass.
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
+
                     <!-- Custom Organizer Questions -->
                     {% if custom_fields %}
                         <h5 class="fw-bold mb-3 text-secondary border-top pt-4">
