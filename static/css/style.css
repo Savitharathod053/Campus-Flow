@@ -83,22 +83,25 @@ h1, h2, h3, h4, h5, h6 {
    Navigation Bar & Frosted Glass Header
    ========================================================================== */
 .ff-navbar {
-  background-color: rgba(255, 255, 255, 0.95);
+  position: sticky;
+  top: 0;
+  z-index: 1030 !important;
+  background-color: rgba(255, 255, 255, 0.96);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
   border-bottom: 1px solid rgba(226, 232, 240, 0.85);
   box-shadow: 0 1px 3px 0 rgba(15, 23, 42, 0.03);
-  padding: 0.75rem 0;
+  padding: 0.65rem 0;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .ff-navbar.navbar-scrolled {
-  background-color: rgba(255, 255, 255, 0.88) !important;
+  background-color: rgba(255, 255, 255, 0.92) !important;
   backdrop-filter: blur(20px) saturate(180%);
   -webkit-backdrop-filter: blur(20px) saturate(180%);
   border-bottom-color: rgba(203, 213, 225, 0.85);
   box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.12), 0 4px 6px -2px rgba(15, 23, 42, 0.05) !important;
-  padding: 0.55rem 0;
+  padding: 0.5rem 0;
 }
 
 .navbar-brand-custom {
@@ -110,6 +113,7 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 0.6rem;
   transition: transform 0.2s ease;
+  white-space: nowrap;
 }
 
 .navbar-brand-custom:hover {
@@ -130,11 +134,12 @@ h1, h2, h3, h4, h5, h6 {
 
 .nav-link {
   font-weight: 500;
-  font-size: 0.925rem;
+  font-size: 0.9rem;
   color: #475569;
-  padding: 0.5rem 0.95rem;
+  padding: 0.45rem 0.8rem;
   border-radius: var(--ff-radius-sm);
   transition: all 0.2s ease;
+  white-space: nowrap;
 }
 
 .nav-link:hover {
@@ -154,7 +159,7 @@ h1, h2, h3, h4, h5, h6 {
 .hero-section {
   background: radial-gradient(circle at 85% 15%, #1e3a8a 0%, #0f172a 70%, #090d16 100%);
   color: #ffffff;
-  padding: 5.5rem 0 5rem;
+  padding: 5rem 0 4.5rem;
   position: relative;
   overflow: hidden;
 }
@@ -172,6 +177,39 @@ h1, h2, h3, h4, h5, h6 {
   background-size: 40px 40px;
   pointer-events: none;
   z-index: 1;
+}
+
+/* Ambient Background Floating Orbs */
+.hero-orb {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  filter: blur(55px);
+  z-index: 1;
+}
+
+.hero-orb-1 {
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.4) 0%, rgba(37, 99, 235, 0) 70%);
+  top: -80px;
+  right: 6%;
+}
+
+.hero-orb-2 {
+  width: 260px;
+  height: 260px;
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.35) 0%, rgba(245, 158, 11, 0) 70%);
+  bottom: -60px;
+  left: 5%;
+}
+
+.hero-orb-3 {
+  width: 200px;
+  height: 200px;
+  background: radial-gradient(circle, rgba(16, 185, 129, 0.25) 0%, rgba(16, 185, 129, 0) 70%);
+  top: 35%;
+  right: 32%;
 }
 
 .hero-badge {
@@ -233,8 +271,12 @@ h1, h2, h3, h4, h5, h6 {
 
 .event-type-badge {
   position: absolute;
-  top: 14px;
-  left: 14px;
+  top: 12px;
+  left: 12px;
+  max-width: calc(100% - 95px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   background: rgba(15, 23, 42, 0.82);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
@@ -251,8 +293,9 @@ h1, h2, h3, h4, h5, h6 {
 
 .event-fee-badge {
   position: absolute;
-  top: 14px;
-  right: 14px;
+  top: 12px;
+  right: 12px;
+  white-space: nowrap;
   background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(8px);
   color: var(--ff-primary);
@@ -520,7 +563,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ==========================================================================
-   Universal 3D Card Depth & Layered Shadows
+   Universal Card Depth & Layered Shadows (No 3D Planar Overlap)
    ========================================================================== */
 .card,
 .card.shadow-sm,
@@ -534,15 +577,13 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid rgba(226, 232, 240, 0.95) !important;
   border-radius: var(--ff-radius-lg);
   box-shadow: var(--ff-shadow-3d) !important;
-  transition: transform 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
-              box-shadow 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
-              border-color 0.25s ease;
-  transform-style: preserve-3d;
-  will-change: transform, box-shadow;
+  transition: transform 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+              box-shadow 0.22s cubic-bezier(0.2, 0.8, 0.2, 1),
+              border-color 0.2s ease;
   position: relative;
 }
 
-/* Tactile Card Hover Elevation */
+/* Subtle, Controlled Card Hover Lift */
 .card:hover,
 .card.shadow-sm:hover,
 .card.shadow:hover,
@@ -551,16 +592,23 @@ h1, h2, h3, h4, h5, h6 {
 .event-card:hover,
 .metric-card:hover,
 .tilt-card:hover {
-  transform: translateY(-5px);
+  transform: translateY(-3px);
   box-shadow: var(--ff-shadow-3d-hover) !important;
   border-color: rgba(199, 210, 254, 0.9) !important;
 }
 
-/* Exclude static containers from hover lift */
+/* Exclude static and interactive containers from hover lift to prevent overlapping */
 .modal-content,
 .dropdown-menu,
+.card:has(table),
 .card:has(table):hover,
-.card-static:hover {
+.card:has(form):hover,
+.card-static,
+.card-static:hover,
+.sticky-top,
+.sticky-top:hover,
+.admin-topbar,
+.admin-sidebar {
   transform: none !important;
 }
 
@@ -582,17 +630,18 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ==========================================================================
-   Dashboard Stat Cards & Floating 3D Icon Boxes
+   Dashboard Stat Cards & Resilient Metrics (No text overflow / collision)
    ========================================================================== */
 .metric-card,
 .card.border-start {
   display: flex;
   align-items: center;
-  padding: 1.35rem 1.5rem;
+  padding: 1.15rem 1.25rem;
   border-radius: var(--ff-radius-lg);
   position: relative;
   overflow: hidden;
   cursor: default;
+  min-width: 0;
 }
 
 .metric-card::before,
@@ -615,52 +664,77 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .metric-icon-box {
-  width: 56px;
-  height: 56px;
-  border-radius: 1rem;
+  width: 48px;
+  height: 48px;
+  border-radius: 0.85rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.6rem;
-  margin-right: 1.25rem;
+  font-size: 1.4rem;
+  margin-right: 0.9rem;
   flex-shrink: 0;
-  box-shadow: 0 6px 16px -2px rgba(15, 23, 42, 0.16),
+  box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.14),
               inset 0 1px 0 rgba(255, 255, 255, 0.4);
-  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transition: transform 0.25s ease;
 }
 
 .card:hover .metric-icon-box,
 .card:hover .rounded-circle i,
 .metric-card:hover .metric-icon-box {
-  transform: scale(1.14) rotate(4deg);
+  transform: scale(1.08);
 }
 
 .card:hover [class*="bg-opacity-10"] i {
   display: inline-block;
-  transform: scale(1.15) rotate(4deg);
-  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: scale(1.08);
+  transition: transform 0.2s ease;
 }
 
 .card [class*="bg-opacity-10"] i {
   display: inline-block;
-  transition: transform 0.25s ease;
+  transition: transform 0.2s ease;
 }
 
 .metric-number {
-  font-size: 1.85rem;
+  font-size: 1.55rem;
   font-weight: 800;
   line-height: 1.1;
   color: var(--ff-secondary);
   letter-spacing: -0.5px;
+  white-space: nowrap;
 }
 
 .metric-label {
-  font-size: 0.85rem;
+  font-size: 0.76rem;
   font-weight: 600;
   color: var(--ff-text-muted);
-  margin-top: 0.2rem;
+  margin-top: 0.15rem;
   text-transform: uppercase;
-  letter-spacing: 0.4px;
+  letter-spacing: 0.3px;
+  line-height: 1.25;
+  word-break: break-word;
+}
+
+/* Compact metric cards in hero section to fit columns perfectly */
+.hero-section .metric-card {
+  padding: 0.85rem 1rem !important;
+}
+
+.hero-section .metric-icon-box {
+  width: 40px !important;
+  height: 40px !important;
+  font-size: 1.2rem !important;
+  margin-right: 0.7rem !important;
+  border-radius: 0.65rem !important;
+}
+
+.hero-section .metric-number {
+  font-size: 1.35rem !important;
+}
+
+.hero-section .metric-label {
+  font-size: 0.68rem !important;
+  letter-spacing: 0.2px !important;
 }
 
 /* ==========================================================================
@@ -806,8 +880,27 @@ h1, h2, h3, h4, h5, h6 {
 
 .table-responsive {
   border-radius: var(--ff-radius);
-  overflow: hidden;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
+
+/* Ensure Dropdown Menus Render Cleanly Over Other Elements */
+.dropdown-menu {
+  z-index: 1040 !important;
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.15), 0 4px 6px -2px rgba(15, 23, 42, 0.05) !important;
+}
+
+/* Decimal Spacing Utility Fallbacks for Complete Robustness */
+.p-2\.5 { padding: 0.65rem !important; }
+.p-3\.5 { padding: 1.15rem !important; }
+.px-2\.5 { padding-left: 0.65rem !important; padding-right: 0.65rem !important; }
+.px-3\.5 { padding-left: 1.15rem !important; padding-right: 1.15rem !important; }
+.py-1\.5 { padding-top: 0.4rem !important; padding-bottom: 0.4rem !important; }
+.py-3\.5 { padding-top: 1.15rem !important; padding-bottom: 1.15rem !important; }
+.m-2\.5 { margin: 0.65rem !important; }
+.mt-1\.5 { margin-top: 0.4rem !important; }
+.pt-1\.5 { padding-top: 0.4rem !important; }
+.gap-1\.5 { gap: 0.45rem !important; }
 
 .table {
   margin-bottom: 0;

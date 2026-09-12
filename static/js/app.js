@@ -125,10 +125,8 @@ function initCardTilt() {
     const isFinePointer = window.matchMedia('(pointer: fine)').matches;
     if (prefersReducedMotion || !isFinePointer) return;
 
-    const candidateCards = document.querySelectorAll(
-        '.tilt-card, .event-card, .metric-card, .ff-card-interactive, .card.border-start, ' +
-        '.approval-card, .certificate-vault-card, .ticket-container, .row.g-3 > [class*="col-"] > .card'
-    );
+    // Only apply subtle tilt to cards that explicitly request it
+    const candidateCards = document.querySelectorAll('.tilt-card');
 
     candidateCards.forEach(card => {
         // Exclude cards that contain whole data tables or interactive forms
@@ -138,7 +136,7 @@ function initCardTilt() {
 
         card.addEventListener('mouseenter', () => {
             isHovered = true;
-            card.style.transition = 'transform 0.08s ease-out, box-shadow 0.2s ease, border-color 0.2s ease';
+            card.style.transition = 'transform 0.12s ease-out, box-shadow 0.2s ease, border-color 0.2s ease';
         });
 
         card.addEventListener('mousemove', (e) => {
@@ -149,18 +147,18 @@ function initCardTilt() {
             const centerX = rect.width / 2;
             const centerY = rect.height / 2;
 
-            // Subtle rotation limits: max ~4.5 degrees
-            const maxTilt = 4.5;
+            // Gentle, contained rotation limits (max 2.5 degrees, no translateZ)
+            const maxTilt = 2.5;
             const tiltX = -((y - centerY) / centerY) * maxTilt;
             const tiltY = ((x - centerX) / centerX) * maxTilt;
 
-            card.style.transform = `perspective(1000px) rotateX(${tiltX.toFixed(2)}deg) rotateY(${tiltY.toFixed(2)}deg) translateY(-5px) translateZ(8px)`;
+            card.style.transform = `rotateX(${tiltX.toFixed(2)}deg) rotateY(${tiltY.toFixed(2)}deg) translateY(-3px)`;
         });
 
         card.addEventListener('mouseleave', () => {
             isHovered = false;
-            card.style.transition = 'transform 0.5s cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 0.3s ease, border-color 0.25s ease';
-            card.style.transform = 'perspective(1000px) rotateX(0deg) rotateY(0deg) translateY(0) translateZ(0)';
+            card.style.transition = 'transform 0.28s ease, box-shadow 0.25s ease, border-color 0.2s ease';
+            card.style.transform = '';
         });
     });
 }
@@ -254,7 +252,7 @@ function initScrollReveal() {
     }
 
     document.querySelectorAll(
-        '.event-card, .metric-card, .card.border-start, .approval-card, .certificate-vault-card, .row.g-3 > [class*="col-"] > .card'
+        '.event-card, .certificate-vault-card'
     ).forEach((card, idx) => {
         if (!card.classList.contains('reveal-on-scroll')) {
             card.classList.add('reveal-on-scroll');

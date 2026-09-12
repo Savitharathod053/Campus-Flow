@@ -35,18 +35,18 @@
                                     <div class="d-inline-flex p-3 rounded-circle bg-danger bg-opacity-25 text-danger mb-2">
                                         <i class="bi bi-file-earmark-pdf-fill fs-1"></i>
                                     </div>
-                                    <div><span class="badge bg-danger shadow-sm px-2.5 py-1">Official PDF Credential</span></div>
+                                    <div><span class="badge bg-danger shadow-sm px-3 py-1">Official PDF Credential</span></div>
                                 </div>
                             {% else %}
                                 <img src="{{ url_for('student.preview_certificate', cert_id=cert.id) }}" alt="Certificate Preview" class="img-fluid rounded shadow" style="max-height: 165px; object-fit: contain; border: 2px solid rgba(255,255,255,0.15);">
                             {% endif %}
-                            <div class="position-absolute top-0 end-0 m-2.5" style="z-index: 3;">
+                            <div class="position-absolute top-0 end-0 m-2" style="z-index: 3;">
                                 <span class="badge bg-warning text-dark fw-bold shadow-sm">{{ cert.event.event_type }}</span>
                             </div>
                         </div>
 
                         <!-- Card Body -->
-                        <div class="p-3.5 d-flex flex-column flex-grow-1">
+                        <div class="p-3 d-flex flex-column flex-grow-1">
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <span class="badge bg-light text-secondary border small"><i class="bi bi-calendar3 me-1"></i>{{ cert.created_at|dateformat }}</span>
                                 <span class="badge bg-success-subtle text-success border border-success-subtle"><i class="bi bi-shield-check me-1"></i>Verified</span>
@@ -57,12 +57,12 @@
                                 <i class="bi bi-file-earmark-check me-1 text-primary"></i> {{ cert.original_filename }}
                             </div>
 
-                            <div class="p-2.5 bg-light rounded-3 small mb-3 border">
+                            <div class="p-3 bg-light rounded-3 small mb-3 border">
                                 <div class="d-flex justify-content-between align-items-center">
                                     <span class="text-muted fw-semibold" style="font-size: 0.75rem;">ROLL NUMBER</span>
                                     <strong class="font-monospace text-dark">{{ cert.roll_number or user.student_profile.roll_number if user.student_profile else 'N/A' }}</strong>
                                 </div>
-                                <div class="d-flex justify-content-between align-items-center mt-1.5 pt-1.5 border-top border-light-subtle">
+                                <div class="d-flex justify-content-between align-items-center mt-2 pt-2 border-top border-light-subtle">
                                     <span class="text-muted fw-semibold" style="font-size: 0.75rem;">CREDENTIAL ID</span>
                                     <div class="d-flex align-items-center gap-1">
                                         <code class="text-primary fw-bold font-monospace" style="font-size: 0.75rem;">{{ cert.certificate_code }}</code>

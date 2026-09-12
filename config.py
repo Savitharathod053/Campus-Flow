@@ -84,10 +84,13 @@ class Config:
     PERMANENT_SESSION_LIFETIME = 86400 * 7  # 7 days
 
     # Email / SMTP Configuration
-    MAIL_SERVER = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')
-    MAIL_PORT = int(os.environ.get('MAIL_PORT', 587))
-    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'True').lower() in ('true', '1', 't', 'yes')
-    MAIL_USE_SSL = os.environ.get('MAIL_USE_SSL', 'False').lower() in ('true', '1', 't', 'yes')
-    MAIL_USERNAME = os.environ.get('MAIL_USERNAME', '')
-    MAIL_PASSWORD = os.environ.get('MAIL_PASSWORD', '')
-    MAIL_DEFAULT_SENDER = os.environ.get('MAIL_DEFAULT_SENDER') or os.environ.get('MAIL_USERNAME', '')
+    MAIL_SERVER = (os.environ.get('MAIL_SERVER') or 'smtp.gmail.com').strip().strip("'\"")
+    try:
+        MAIL_PORT = int((os.environ.get('MAIL_PORT') or '587').strip().strip("'\""))
+    except (ValueError, TypeError):
+        MAIL_PORT = 587
+    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'True').strip().lower() in ('true', '1', 't', 'yes')
+    MAIL_USE_SSL = os.environ.get('MAIL_USE_SSL', 'False').strip().lower() in ('true', '1', 't', 'yes')
+    MAIL_USERNAME = (os.environ.get('MAIL_USERNAME') or '').strip().strip("'\"")
+    MAIL_PASSWORD = (os.environ.get('MAIL_PASSWORD') or '').strip().strip("'\"")
+    MAIL_DEFAULT_SENDER = (os.environ.get('MAIL_DEFAULT_SENDER') or os.environ.get('MAIL_USERNAME') or '').strip().strip("'\"")

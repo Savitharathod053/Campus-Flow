@@ -105,10 +105,10 @@
                 </ul>
 
                 <!-- Right Auth & Notification Controls -->
-                <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0 flex-row align-items-center gap-2">
                     {% if current_user %}
                         <!-- In-App Notification Dropdown -->
-                        <li class="nav-item dropdown me-3">
+                        <li class="nav-item dropdown">
                             <a class="nav-link position-relative text-dark px-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications">
                                 <i class="bi bi-bell-fill fs-5"></i>
                                 {% if unread_notifications_count and unread_notifications_count > 0 %}
@@ -117,7 +117,7 @@
                                 </span>
                                 {% endif %}
                             </a>
-                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="min-width: 320px; max-width: 380px;">
+                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="min-width: 300px; max-width: 360px;">
                                 <li class="d-flex justify-content-between align-items-center px-2 py-1 border-bottom mb-2">
                                     <span class="fw-bold fs-6">Notifications</span>
                                     {% if unread_notifications_count and unread_notifications_count > 0 %}
@@ -146,11 +146,11 @@
                         <!-- User Profile Dropdown -->
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle d-flex align-items-center gap-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-weight: 700; font-size: 0.85rem;">
+                                <div class="bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center flex-shrink-0" style="width: 32px; height: 32px; font-weight: 700; font-size: 0.85rem;">
                                     {{ current_user.name[:1].upper() }}
                                 </div>
-                                <span class="d-none d-sm-inline fw-semibold">{{ current_user.name }}</span>
-                                <span class="badge bg-light text-dark border text-uppercase" style="font-size: 0.7rem;">{{ current_user.role.replace('_', ' ') }}</span>
+                                <span class="d-none d-md-inline fw-semibold text-truncate" style="max-width: 130px;">{{ current_user.name }}</span>
+                                <span class="badge bg-light text-dark border text-uppercase d-none d-xl-inline" style="font-size: 0.7rem;">{{ current_user.role.replace('_', ' ') }}</span>
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end shadow border-0">
                                 <li><h6 class="dropdown-header">{{ current_user.email }}</h6></li>

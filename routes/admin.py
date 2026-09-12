@@ -1655,14 +1655,59 @@ def settings_view():
     db_info = get_safe_db_info()
     deans = User.query.filter_by(role=UserRole.STUDENTS_AFFAIRS_DEAN).all()
     all_users = User.query.filter_by(is_active=True).order_by(User.name.asc()).all()
+    from services.email_service import get_mail_config
+    mail_cfg = get_mail_config()
 
     return render_template(
         'admin/settings/index.html',
         user=user,
         db_info=db_info,
         deans=deans,
-        all_users=all_users
+        all_users=all_users,
+        mail_cfg=mail_cfg
     )
+
+
+@admin_bp.route('/test-email', methods=['POST'])
+@super_admin_required
+def test_email():
+    user = get_current_user()
+    target_email = request.form.get('recipient_email', '').strip() or user.email
+
+    from services.email_service import test_smtp_connection, dispatch_email, get_mail_config
+    cfg = get_mail_config()
+
+    if not cfg.get('MAIL_USERNAME') or not cfg.get('MAIL_PASSWORD'):
+        flash(
+            "Live email credentials are not configured! Please configure MAIL_USERNAME and MAIL_PASSWORD in your hosting dashboard (e.g. Render Environment Variables).",
+            "danger"
+        )
+        return redirect(url_for('admin.settings_view'))
+
+    conn_success, conn_msg = test_smtp_connection(cfg)
+    if not conn_success:
+        flash(f"SMTP Connection Failed: {conn_msg}", "danger")
+        return redirect(url_for('admin.settings_view'))
+
+    subject = "Campus Flow - Live Email Delivery Verification"
+    body_text = (
+        f"Hello {user.name},\n\n"
+        f"This is a live test email dispatched from Campus Flow Settings.\n\n"
+        f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+        f"SMTP Server: {cfg.get('MAIL_SERVER')}:{cfg.get('MAIL_PORT')}\n"
+        f"Sender: {cfg.get('MAIL_DEFAULT_SENDER')}\n"
+        f"Recipient: {target_email}\n\n"
+        f"If you received this message, your production email system is 100% operational!\n\n"
+        f"— Campus Flow System"
+    )
+
+    dispatched = dispatch_email(target_email, subject, body_text, sync=True)
+    if dispatched:
+        flash(f"Live test email successfully dispatched to '{target_email}'! Check your inbox.", "success")
+    else:
+        flash(f"SMTP connected, but message transmission to '{target_email}' failed. Check server logs.", "danger")
+
+    return redirect(url_for('admin.settings_view'))
 
 
 # ==============================================================================

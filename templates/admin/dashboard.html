@@ -31,63 +31,75 @@
 <h6 class="text-uppercase text-secondary fw-bold small mb-3 tracking-wide" style="font-size: 0.75rem;"><i class="bi bi-people me-1"></i> Institutional User Directory</h6>
 <div class="row g-3 mb-4">
     <div class="col-6 col-md-4 col-xl-2">
-        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="text-muted small fw-semibold">Total Users</span>
-                <div class="bg-primary bg-opacity-10 text-primary rounded-3 p-2 d-flex"><i class="bi bi-people-fill"></i></div>
+        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative d-flex flex-column justify-content-between">
+            <div class="d-flex align-items-center justify-content-between mb-2 gap-1">
+                <span class="text-muted small fw-semibold text-truncate" style="font-size: 0.78rem;">Total Users</span>
+                <div class="bg-primary bg-opacity-10 text-primary rounded-3 p-1.5 px-2 d-flex flex-shrink-0"><i class="bi bi-people-fill"></i></div>
             </div>
-            <h3 class="fw-bold mb-0 count-up" data-target="{{ total_users }}">{{ total_users }}</h3>
-            <a href="{{ url_for('admin.users_list') }}" class="stretched-link small text-decoration-none mt-2 text-primary fw-semibold">Directory &rarr;</a>
+            <div>
+                <h3 class="fw-bold mb-0 count-up" data-target="{{ total_users }}">{{ total_users }}</h3>
+                <a href="{{ url_for('admin.users_list') }}" class="stretched-link small text-decoration-none mt-2 d-block text-primary fw-semibold">Directory &rarr;</a>
+            </div>
         </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
-        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="text-muted small fw-semibold">Students</span>
-                <div class="bg-info bg-opacity-10 text-info rounded-3 p-2 d-flex"><i class="bi bi-mortarboard-fill"></i></div>
+        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative d-flex flex-column justify-content-between">
+            <div class="d-flex align-items-center justify-content-between mb-2 gap-1">
+                <span class="text-muted small fw-semibold text-truncate" style="font-size: 0.78rem;">Students</span>
+                <div class="bg-info bg-opacity-10 text-info rounded-3 p-1.5 px-2 d-flex flex-shrink-0"><i class="bi bi-mortarboard-fill"></i></div>
             </div>
-            <h3 class="fw-bold mb-0 text-info count-up" data-target="{{ total_students }}">{{ total_students }}</h3>
-            <a href="{{ url_for('admin.users_students') }}" class="stretched-link small text-decoration-none mt-2 text-info fw-semibold">Students &rarr;</a>
+            <div>
+                <h3 class="fw-bold mb-0 text-info count-up" data-target="{{ total_students }}">{{ total_students }}</h3>
+                <a href="{{ url_for('admin.users_students') }}" class="stretched-link small text-decoration-none mt-2 d-block text-info fw-semibold">Students &rarr;</a>
+            </div>
         </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
-        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="text-muted small fw-semibold">Deans</span>
-                <div class="bg-success bg-opacity-10 text-success rounded-3 p-2 d-flex"><i class="bi bi-award-fill"></i></div>
+        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative d-flex flex-column justify-content-between">
+            <div class="d-flex align-items-center justify-content-between mb-2 gap-1">
+                <span class="text-muted small fw-semibold text-truncate" style="font-size: 0.78rem;">Deans</span>
+                <div class="bg-success bg-opacity-10 text-success rounded-3 p-1.5 px-2 d-flex flex-shrink-0"><i class="bi bi-award-fill"></i></div>
             </div>
-            <h3 class="fw-bold mb-0 text-success count-up" data-target="{{ total_deans }}">{{ total_deans }}</h3>
-            <a href="{{ url_for('admin.users_deans') }}" class="stretched-link small text-decoration-none mt-2 text-success fw-semibold">Deans &rarr;</a>
+            <div>
+                <h3 class="fw-bold mb-0 text-success count-up" data-target="{{ total_deans }}">{{ total_deans }}</h3>
+                <a href="{{ url_for('admin.users_deans') }}" class="stretched-link small text-decoration-none mt-2 d-block text-success fw-semibold">Deans &rarr;</a>
+            </div>
         </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
-        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="text-muted small fw-semibold">HODs</span>
-                <div class="bg-warning bg-opacity-10 text-warning rounded-3 p-2 d-flex"><i class="bi bi-building-fill-gear"></i></div>
+        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative d-flex flex-column justify-content-between">
+            <div class="d-flex align-items-center justify-content-between mb-2 gap-1">
+                <span class="text-muted small fw-semibold text-truncate" style="font-size: 0.78rem;">HODs</span>
+                <div class="bg-warning bg-opacity-10 text-warning rounded-3 p-1.5 px-2 d-flex flex-shrink-0"><i class="bi bi-building-fill-gear"></i></div>
             </div>
-            <h3 class="fw-bold mb-0 text-warning count-up" data-target="{{ total_hods }}">{{ total_hods }}</h3>
-            <a href="{{ url_for('admin.users_hods') }}" class="stretched-link small text-decoration-none mt-2 text-warning fw-semibold">HODs &rarr;</a>
+            <div>
+                <h3 class="fw-bold mb-0 text-warning count-up" data-target="{{ total_hods }}">{{ total_hods }}</h3>
+                <a href="{{ url_for('admin.users_hods') }}" class="stretched-link small text-decoration-none mt-2 d-block text-warning fw-semibold">HODs &rarr;</a>
+            </div>
         </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
-        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="text-muted small fw-semibold">Organizers</span>
-                <div class="bg-danger bg-opacity-10 text-danger rounded-3 p-2 d-flex"><i class="bi bi-megaphone-fill"></i></div>
+        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative d-flex flex-column justify-content-between">
+            <div class="d-flex align-items-center justify-content-between mb-2 gap-1">
+                <span class="text-muted small fw-semibold text-truncate" style="font-size: 0.78rem;">Organizers</span>
+                <div class="bg-danger bg-opacity-10 text-danger rounded-3 p-1.5 px-2 d-flex flex-shrink-0"><i class="bi bi-megaphone-fill"></i></div>
             </div>
-            <h3 class="fw-bold mb-0 text-danger count-up" data-target="{{ total_organizers }}">{{ total_organizers }}</h3>
-            <a href="{{ url_for('admin.users_organizers') }}" class="stretched-link small text-decoration-none mt-2 text-danger fw-semibold">Organizers &rarr;</a>
+            <div>
+                <h3 class="fw-bold mb-0 text-danger count-up" data-target="{{ total_organizers }}">{{ total_organizers }}</h3>
+                <a href="{{ url_for('admin.users_organizers') }}" class="stretched-link small text-decoration-none mt-2 d-block text-danger fw-semibold">Organizers &rarr;</a>
+            </div>
         </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
-        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="text-muted small fw-semibold">Admins</span>
-                <div class="bg-dark bg-opacity-10 text-dark rounded-3 p-2 d-flex"><i class="bi bi-shield-shaded"></i></div>
+        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative d-flex flex-column justify-content-between">
+            <div class="d-flex align-items-center justify-content-between mb-2 gap-1">
+                <span class="text-muted small fw-semibold text-truncate" style="font-size: 0.78rem;">Admins</span>
+                <div class="bg-dark bg-opacity-10 text-dark rounded-3 p-1.5 px-2 d-flex flex-shrink-0"><i class="bi bi-shield-shaded"></i></div>
             </div>
-            <h3 class="fw-bold mb-0 text-dark count-up" data-target="{{ total_admins }}">{{ total_admins }}</h3>
-            <a href="{{ url_for('admin.users_admins') }}" class="stretched-link small text-decoration-none mt-2 text-dark fw-semibold">Admins &rarr;</a>
+            <div>
+                <h3 class="fw-bold mb-0 text-dark count-up" data-target="{{ total_admins }}">{{ total_admins }}</h3>
+                <a href="{{ url_for('admin.users_admins') }}" class="stretched-link small text-decoration-none mt-2 d-block text-dark fw-semibold">Admins &rarr;</a>
+            </div>
         </div>
     </div>
 </div>
@@ -96,21 +108,21 @@
 <h6 class="text-uppercase text-secondary fw-bold small mb-3 tracking-wide" style="font-size: 0.75rem;"><i class="bi bi-activity me-1"></i> Campus Operations & Registrations</h6>
 <div class="row g-3 mb-4">
     <div class="col-md-3 col-sm-6">
-        <div class="card border-0 shadow-3d rounded-4 p-3.5 bg-white">
+        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 d-flex flex-column justify-content-between">
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="text-muted small fw-semibold">Events Managed</span>
                 <i class="bi bi-calendar-check text-primary fs-5"></i>
             </div>
             <h3 class="fw-bold mb-1 count-up" data-target="{{ total_events }}">{{ total_events }}</h3>
-            <div class="small text-muted mt-2">
+            <div class="small text-muted mt-2 d-flex flex-wrap gap-1">
                 <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">{{ pending_events }} Pending</span>
-                <span class="badge bg-success-subtle text-success border border-success-subtle ms-1">{{ active_events }} Active</span>
-                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle ms-1">{{ completed_events }} Done</span>
+                <span class="badge bg-success-subtle text-success border border-success-subtle">{{ active_events }} Active</span>
+                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle">{{ completed_events }} Done</span>
             </div>
         </div>
     </div>
     <div class="col-md-3 col-sm-6">
-        <div class="card border-0 shadow-3d rounded-4 p-3.5 bg-white">
+        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 d-flex flex-column justify-content-between">
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="text-muted small fw-semibold">Registrations</span>
                 <i class="bi bi-ticket-perforated text-info fs-5"></i>
@@ -122,7 +134,7 @@
         </div>
     </div>
     <div class="col-md-3 col-sm-6">
-        <div class="card border-0 shadow-3d rounded-4 p-3.5 bg-white">
+        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 d-flex flex-column justify-content-between">
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="text-muted small fw-semibold">Revenue Processed</span>
                 <i class="bi bi-currency-rupee text-success fs-5"></i>
@@ -132,7 +144,7 @@
         </div>
     </div>
     <div class="col-md-3 col-sm-6">
-        <div class="card border-0 shadow-3d rounded-4 p-3.5 bg-white">
+        <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 d-flex flex-column justify-content-between">
             <div class="d-flex justify-content-between align-items-center mb-1">
                 <span class="text-muted small fw-semibold">Certificates & Attendance</span>
                 <i class="bi bi-patch-check text-warning fs-5"></i>
@@ -186,7 +198,7 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            <a href="{{ url_for('admin.event_requests_list') }}" class="btn btn-xs btn-outline-primary btn-sm py-0 px-2">
+                            <a href="{{ url_for('admin.event_requests_list') }}" class="btn btn-outline-primary btn-sm py-1 px-2">
                                 <i class="bi bi-eye"></i> View
                             </a>
                         </li>
@@ -199,7 +211,7 @@
                                 <span class="fw-semibold text-dark">{{ org.student.name|truncate(22) if org.student else 'Student' }}</span>
                                 <div class="text-muted" style="font-size: 0.75rem;">Dept: {{ org.department.code if org.department else 'N/A' }} &bull; Pending HOD</div>
                             </div>
-                            <a href="{{ url_for('admin.organizer_requests_list') }}" class="btn btn-xs btn-outline-primary btn-sm py-0 px-2">
+                            <a href="{{ url_for('admin.organizer_requests_list') }}" class="btn btn-outline-primary btn-sm py-1 px-2">
                                 <i class="bi bi-eye"></i> View
                             </a>
                         </li>

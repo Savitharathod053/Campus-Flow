@@ -32,7 +32,7 @@
             position: fixed;
             top: 0;
             left: 0;
-            z-index: 1040;
+            z-index: 1050;
             background: #0f172a;
             color: #e2e8f0;
             display: flex;
@@ -212,7 +212,7 @@
                 <form action="{{ url_for('admin.global_search') }}" method="GET" class="d-flex align-items-center" style="max-width: 420px;">
                     <div class="input-group input-group-sm">
                         <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-                        <input type="text" name="q" class="form-control bg-light border-start-0 ps-0" placeholder="Search name, email, roll no, event, ticket..." value="{{ request.args.get('q', '') }}" style="width: 260px;">
+                        <input type="text" name="q" class="form-control bg-light border-start-0 ps-0" placeholder="Search name, email, roll no, event, ticket..." value="{{ request.args.get('q', '') }}" style="max-width: 260px; width: 100%;">
                     </div>
                 </form>
             </div>

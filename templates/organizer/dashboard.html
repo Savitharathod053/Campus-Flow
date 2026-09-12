@@ -28,7 +28,7 @@
                         <span class="badge bg-danger ms-1">{{ pending_payments|length }}</span>
                     {% endif %}
                 </a>
-                <a href="{{ url_for('organizer.create_event') }}" class="btn btn-warning btn-sm fw-bold px-3.5 py-2 rounded-pill shadow-sm text-dark">
+                <a href="{{ url_for('organizer.create_event') }}" class="btn btn-warning btn-sm fw-bold px-3 py-2 rounded-pill shadow-sm text-dark">
                     <i class="bi bi-plus-circle-fill me-1"></i> Create New Event
                 </a>
             </div>
@@ -87,7 +87,7 @@
 
     <!-- Event Proposals & Dual Approval Pipeline Tracker -->
     <div class="card border-0 shadow-3d rounded-4 mb-4 overflow-hidden">
-        <div class="card-header bg-white border-bottom py-3.5 px-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="card-header bg-white border-bottom py-3 px-4 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div>
                 <h5 class="fw-bold text-dark mb-1">
                     <i class="bi bi-shield-check text-primary me-2"></i> Event Proposals & Dual Approval Workflow
@@ -127,28 +127,28 @@
                                     </td>
                                     <td>
                                         {% if req.overall_status.value == 'pending_hod_approval' %}
-                                            <div class="d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle small fw-bold">
+                                            <div class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill bg-warning-subtle text-warning-emphasis border border-warning-subtle small fw-bold">
                                                 <i class="bi bi-hourglass-top"></i> Step 1: Pending HOD Endorsement
                                             </div>
                                             <div class="small text-muted mt-1">Awaiting review from Department Head</div>
                                         {% elif req.overall_status.value == 'pending_dean_approval' %}
-                                            <div class="d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill bg-info-subtle text-info-emphasis border border-info-subtle small fw-bold">
+                                            <div class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill bg-info-subtle text-info-emphasis border border-info-subtle small fw-bold">
                                                 <i class="bi bi-send-check"></i> Step 2: Pending Dean Clearance
                                             </div>
                                             <div class="small text-success mt-1">
                                                 <i class="bi bi-check-circle-fill me-1"></i> HOD Endorsed ({{ req.hod_decision_at.strftime('%b %d') if req.hod_decision_at else '' }})
                                             </div>
                                         {% elif req.overall_status.value == 'approved' %}
-                                            <div class="d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill bg-success-subtle text-success border border-success-subtle small fw-bold">
+                                            <div class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill bg-success-subtle text-success border border-success-subtle small fw-bold">
                                                 <i class="bi bi-check-circle-fill"></i> Fully Cleared & Published
                                             </div>
                                             <div class="small text-muted mt-1">Dean Cleared ({{ req.dean_decision_at.strftime('%b %d') if req.dean_decision_at else '' }})</div>
                                         {% elif req.overall_status.value == 'rejected_by_hod' %}
-                                            <div class="d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill bg-danger-subtle text-danger border border-danger-subtle small fw-bold">
+                                            <div class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill bg-danger-subtle text-danger border border-danger-subtle small fw-bold">
                                                 <i class="bi bi-x-circle-fill"></i> Declined by HOD
                                             </div>
                                         {% elif req.overall_status.value == 'rejected_by_dean' %}
-                                            <div class="d-inline-flex align-items-center gap-1.5 px-2.5 py-1 rounded-pill bg-danger-subtle text-danger border border-danger-subtle small fw-bold">
+                                            <div class="d-inline-flex align-items-center gap-1 px-3 py-1 rounded-pill bg-danger-subtle text-danger border border-danger-subtle small fw-bold">
                                                 <i class="bi bi-x-circle-fill"></i> Declined by Dean
                                             </div>
                                         {% endif %}
