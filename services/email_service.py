@@ -67,6 +67,10 @@ def get_mail_config():
             'noreply@campusflow.edu'
         ).strip().strip("'\"")
         testing = app_cfg.get('TESTING', False)
+        dev_redirect = app_cfg.get('MAIL_DEV_REDIRECT_ENABLED')
+        if dev_redirect is None:
+            dev_redirect = os.environ.get('MAIL_DEV_REDIRECT_ENABLED', 'True').strip().lower() in ('true', '1', 't', 'yes')
+        live_recipient = (app_cfg.get('MAIL_LIVE_TEST_RECIPIENT') or os.environ.get('MAIL_LIVE_TEST_RECIPIENT') or username or 'savitharathod053@gmail.com').strip().strip("'\"")
     else:
         server = (os.environ.get('MAIL_SERVER') or 'smtp.gmail.com').strip().strip("'\"")
         port = _parse_port(os.environ.get('MAIL_PORT'), 587)
@@ -80,6 +84,8 @@ def get_mail_config():
             'noreply@campusflow.edu'
         ).strip().strip("'\"")
         testing = os.environ.get('TESTING', 'False').strip().lower() in ('true', '1')
+        dev_redirect = os.environ.get('MAIL_DEV_REDIRECT_ENABLED', 'True').strip().lower() in ('true', '1', 't', 'yes')
+        live_recipient = (os.environ.get('MAIL_LIVE_TEST_RECIPIENT') or username or 'savitharathod053@gmail.com').strip().strip("'\"")
 
     # For Gmail accounts, Google App Passwords are 16 characters (often copied with spaces).
     # Removing internal spaces ensures clean authentication across all deployment environments.
@@ -96,6 +102,8 @@ def get_mail_config():
     config['MAIL_PASSWORD'] = password
     config['MAIL_DEFAULT_SENDER'] = sender
     config['TESTING'] = testing
+    config['MAIL_DEV_REDIRECT_ENABLED'] = dev_redirect
+    config['MAIL_LIVE_TEST_RECIPIENT'] = live_recipient
 
     return config
 
@@ -230,14 +238,26 @@ def _send_smtp_worker(to_email, subject, body_text, body_html=None, config=None)
 
 def dispatch_email(to_email, subject, body_text, body_html=None, sync=False):
     """
-    Dispatches email. In test mode, bypasses network I/O.
+    Dispatches email. In test mode, records to SENT_EMAILS and bypasses network I/O.
     In live mode with credentials, transmits via SMTP (using a non-daemon thread to ensure WSGI
     lifecycle does not prematurely terminate socket I/O before completion).
+    Supports live routing for development and demo environments so emails to @college.edu
+    are delivered directly to the configured live email inbox.
     """
     if not to_email:
         return False
 
     cfg = get_mail_config()
+
+    # Record to in-memory store for bare dispatch_email calls if not already recorded
+    if not SENT_EMAILS or (SENT_EMAILS[-1].get('to') != to_email or SENT_EMAILS[-1].get('subject') != subject):
+        SENT_EMAILS.append({
+            'to': to_email,
+            'subject': subject,
+            'body': body_text,
+            'html': body_html
+        })
+
     if cfg.get('TESTING', False):
         return True
 
@@ -248,12 +268,53 @@ def dispatch_email(to_email, subject, body_text, body_html=None, sync=False):
         )
         return True
 
+    # Live routing / forward to real mailbox
+    live_target = (
+        cfg.get('MAIL_OVERRIDE_RECIPIENT') or 
+        cfg.get('MAIL_LIVE_TEST_RECIPIENT') or 
+        cfg.get('MAIL_USERNAME') or 
+        'savitharathod053@gmail.com'
+    ).strip()
+
+    route_to_live = (
+        cfg.get('MAIL_DEV_REDIRECT_ENABLED', True) or
+        os.environ.get('MAIL_DEV_REDIRECT_ENABLED', 'True').strip().lower() in ('true', '1', 't', 'yes')
+    )
+
+    delivery_target = to_email
+    delivery_subject = subject
+    delivery_body_text = body_text
+    delivery_body_html = body_html
+
+    # Check if target is a dummy or non-routable domain (e.g. @college.edu, @example.com)
+    is_dummy_domain = any(to_email.lower().endswith(dom) for dom in ('@college.edu', '@example.com', '@test.com', '.local', '.invalid'))
+    
+    if route_to_live and (is_dummy_domain or os.environ.get('MAIL_ROUTE_ALL_TO_LIVE', 'False').strip().lower() in ('true', '1', 'yes')):
+        delivery_target = live_target
+        delivery_subject = f"[{to_email}] {subject}"
+        banner_text = (
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"CAMPUS FLOW - LIVE EMAIL ROUTING\n"
+            f"Intended Recipient: {to_email}\n"
+            f"Delivered To Live Inbox: {live_target}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+        )
+        delivery_body_text = banner_text + (body_text or '')
+        if delivery_body_html:
+            banner_html = (
+                f"<div style='background:#f8fafc;border-left:4px solid #4f46e5;padding:12px 16px;margin-bottom:18px;border-radius:6px;font-family:sans-serif;font-size:13px;color:#334155;'>"
+                f"<strong style='color:#4f46e5;'>[Campus Flow Live Routing]</strong> "
+                f"Intended for <code>{to_email}</code> &bull; Delivered to Live Inbox: <strong style='color:#059669;'>{live_target}</strong>"
+                f"</div>"
+            )
+            delivery_body_html = banner_html + delivery_body_html
+
     if sync:
-        return _send_smtp_worker(to_email, subject, body_text, body_html, config=cfg)
+        return _send_smtp_worker(delivery_target, delivery_subject, delivery_body_text, delivery_body_html, config=cfg)
     else:
         thread = threading.Thread(
             target=_send_smtp_worker,
-            args=(to_email, subject, body_text, body_html, cfg),
+            args=(delivery_target, delivery_subject, delivery_body_text, delivery_body_html, cfg),
             daemon=False
         )
         thread.start()
