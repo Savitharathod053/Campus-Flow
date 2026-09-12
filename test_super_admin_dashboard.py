@@ -35,8 +35,8 @@ class SuperAdminDashboardTestCase(unittest.TestCase):
 
     def test_02_unauthorized_roles_blocked(self):
         """Students and Organizers should receive 403 Forbidden or redirect when trying to access /admin."""
-        # Login as student
-        res = self.login('student1@college.edu', 'Pass@123')
+        # Login as student (using roll number as required for students)
+        res = self.login('21CS001', 'Pass@123')
         self.assertEqual(res.status_code, 200)
 
         # Attempt to access /admin/dashboard

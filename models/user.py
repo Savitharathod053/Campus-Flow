@@ -81,6 +81,11 @@ class User(db.Model):
     def is_admin(self):
         """Backward compatibility helper."""
         return self.is_super_admin or (self.role or '').upper() in ('FACULTY_ADMIN', 'ADMIN')
+
+    @property
+    def events_organized(self):
+        """Convenience alias for organized_events."""
+        return self.organized_events
         
     def __repr__(self):
         return f'<User {self.email} ({self.role})>'
@@ -108,7 +113,7 @@ class OrganizerProfile(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), unique=True, nullable=False)
-    roll_number = db.Column(db.String(50), unique=True, nullable=True, index=True)
+    roll_number = db.Column(db.String(50), nullable=True, index=True)
     organization_name = db.Column(db.String(150), nullable=False)  # e.g., "Google Developer Student Club", "CSI Student Chapter"
     department = db.Column(db.String(100), nullable=False)        # Department: CSE, IT, CSD, CSM, ECE, EEE, MECH, CIVILS, General
     designation = db.Column(db.String(100), nullable=True)        # e.g., "Lead Organizer", "President"

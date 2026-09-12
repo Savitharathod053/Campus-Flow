@@ -35,7 +35,11 @@ class EventRegistration(db.Model):
     custom_responses = db.relationship('CustomFieldResponse', back_populates='registration', cascade='all, delete-orphan')
     payment = db.relationship('Payment', back_populates='registration', uselist=False, cascade='all, delete-orphan')
     attendance_records = db.relationship('AttendanceRecord', back_populates='registration', cascade='all, delete-orphan')
-    certificate = db.relationship('Certificate', back_populates='registration', uselist=False, cascade='all, delete-orphan')
+    certificates = db.relationship('Certificate', back_populates='registration', cascade='all, delete-orphan')
+
+    @property
+    def certificate(self):
+        return self.certificates[0] if self.certificates else None
 
     @property
     def is_confirmed(self):

@@ -197,8 +197,9 @@ def run_test():
         print(f"PASS: EventRequest #{ev_req.id} created with status 'pending_hod_approval'")
 
         # CRITICAL TEST: Event MUST NOT be published or visible in student catalog
+        other_student = User.query.filter_by(role=UserRole.STUDENT).first()
         with client.session_transaction() as sess:
-            sess['user_id'] = test_student.id
+            sess['user_id'] = other_student.id if other_student else None
         resp = client.get('/events')
         assert event_title not in resp.get_data(as_text=True), "UNAPPROVED EVENT LEAKED TO STUDENT EVENTS CATALOG!"
         print("PASS: Event is strictly invisible to students / public before dual approval.")

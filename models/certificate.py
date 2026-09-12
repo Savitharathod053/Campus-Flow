@@ -37,7 +37,7 @@ class Certificate(db.Model):
     # Relationships
     event = db.relationship('Event', back_populates='certificates')
     student = db.relationship('User', foreign_keys=[student_id])
-    registration = db.relationship('EventRegistration', back_populates='certificate')
+    registration = db.relationship('EventRegistration', back_populates='certificates')
     assigned_by = db.relationship('User', foreign_keys=[assigned_by_id])
 
     @property

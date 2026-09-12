@@ -81,7 +81,7 @@
                                         <small class="text-muted">{{ org.organizer_profile.designation if org.organizer_profile else 'Student Leader' }}</small>
                                     </td>
                                     <td>
-                                        <span class="badge bg-light text-dark border">{{ org.events_organized.count() }} events</span>
+                                        <span class="badge bg-light text-dark border">{{ org.organized_events.count() }} events</span>
                                     </td>
                                     <td>
                                         {% if org.is_active %}
