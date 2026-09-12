@@ -13,7 +13,19 @@
     <div class="row justify-content-center">
         <div class="col-lg-8 col-xl-7">
             
-            {% if payment and payment.is_rejected %}
+            {% if payment and (payment.is_verification_failed or payment.status == 'PAYMENT_VERIFICATION_FAILED') %}
+            <!-- Verification Failed Notice -->
+            <div class="alert alert-danger shadow-sm border-danger mb-4 p-4 rounded-3">
+                <div class="d-flex align-items-start gap-3">
+                    <i class="bi bi-exclamation-octagon-fill fs-2 text-danger flex-shrink-0"></i>
+                    <div>
+                        <h5 class="fw-bold mb-1">Payment Verification Failed</h5>
+                        <p class="mb-2">Transaction ID does not match the payment screenshot. Please check your Transaction ID and upload the correct payment screenshot.</p>
+                        <p class="small text-muted mb-0">Please double-check the UTR or Reference Number on your receipt, ensure the screenshot is clear and uncropped, and re-submit below.</p>
+                    </div>
+                </div>
+            </div>
+            {% elif payment and payment.is_rejected %}
             <!-- Rejection Notice -->
             <div class="alert alert-danger shadow-sm border-danger mb-4 p-4 rounded-3">
                 <div class="d-flex align-items-start gap-3">
@@ -22,6 +34,26 @@
                         <h5 class="fw-bold mb-1">Payment Verification Rejected</h5>
                         <p class="mb-2"><strong>Reason:</strong> {{ payment.verification_reason or "Payment amount or details did not match." }}</p>
                         <p class="small text-muted mb-0">Please review the event registration fee, make sure your transaction ID and receipt screenshot match, and submit a new payment proof below.</p>
+                    </div>
+                </div>
+            </div>
+            {% elif payment and (payment.is_transaction_id_verified or payment.status == 'TRANSACTION_ID_VERIFIED') %}
+            <!-- Transaction ID Verified Notice -->
+            <div class="alert alert-info shadow-sm border-info mb-4 p-4 rounded-3">
+                <div class="d-flex align-items-start gap-3">
+                    <i class="bi bi-shield-check fs-2 text-info flex-shrink-0"></i>
+                    <div>
+                        <h5 class="fw-bold mb-1">Transaction ID Verified</h5>
+                        <p class="mb-2">Your Transaction ID (<code>{{ payment.transaction_id }}</code>) was successfully verified against your payment screenshot! Your payment is now awaiting organizer review and approval.</p>
+                        <p class="small text-muted mb-3">Once approved by the organizer, your entry pass ticket with QR code will be issued automatically.</p>
+                        <div class="d-flex gap-2">
+                            <a href="{{ url_for('payment.view_proof', payment_id=payment.id) }}" target="_blank" class="btn btn-sm btn-outline-dark fw-semibold">
+                                <i class="bi bi-file-earmark-image me-1"></i> View Uploaded Proof
+                            </a>
+                            <a href="{{ url_for('student.my_events') }}" class="btn btn-sm btn-outline-primary fw-semibold">
+                                <i class="bi bi-arrow-left me-1"></i> My Registrations
+                            </a>
+                        </div>
                     </div>
                 </div>
             </div>

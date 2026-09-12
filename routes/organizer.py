@@ -876,10 +876,14 @@ def certificates(event_id):
     all_certs = Certificate.query.filter_by(event_id=event.id).order_by(Certificate.created_at.desc()).all()
 
     # Filter by status tab if requested
-    if tab_filter == 'matched':
-        certs_list = [c for c in all_certs if c.status in (CertificateStatus.MATCHED, CertificateStatus.MANUALLY_ASSIGNED)]
+    if tab_filter in ('matched', 'matched_automatically'):
+        certs_list = [c for c in all_certs if c.status in (CertificateStatus.MATCHED_AUTOMATICALLY, 'MATCHED')]
+    elif tab_filter in ('pending', 'pending_manual_review'):
+        certs_list = [c for c in all_certs if c.status == CertificateStatus.PENDING_MANUAL_REVIEW]
     elif tab_filter == 'unmatched':
         certs_list = [c for c in all_certs if c.status == CertificateStatus.UNMATCHED]
+    elif tab_filter in ('assigned_manually', 'manual', 'manually_assigned'):
+        certs_list = [c for c in all_certs if c.status in (CertificateStatus.ASSIGNED_MANUALLY, 'MANUALLY_ASSIGNED')]
     elif tab_filter == 'duplicate':
         certs_list = [c for c in all_certs if c.status == CertificateStatus.DUPLICATE]
     elif tab_filter == 'invalid':
@@ -889,8 +893,10 @@ def certificates(event_id):
 
     # Statistics
     total_uploaded = len(all_certs)
-    matched_count = len([c for c in all_certs if c.status in (CertificateStatus.MATCHED, CertificateStatus.MANUALLY_ASSIGNED)])
+    matched_count = len([c for c in all_certs if c.status in (CertificateStatus.MATCHED_AUTOMATICALLY, 'MATCHED')])
+    pending_count = len([c for c in all_certs if c.status == CertificateStatus.PENDING_MANUAL_REVIEW])
     unmatched_count = len([c for c in all_certs if c.status == CertificateStatus.UNMATCHED])
+    assigned_manually_count = len([c for c in all_certs if c.status in (CertificateStatus.ASSIGNED_MANUALLY, 'MANUALLY_ASSIGNED')])
     duplicate_count = len([c for c in all_certs if c.status == CertificateStatus.DUPLICATE])
     invalid_count = len([c for c in all_certs if c.status == CertificateStatus.INVALID])
 
@@ -905,7 +911,9 @@ def certificates(event_id):
         certificates=certs_list,
         total_uploaded=total_uploaded,
         matched_count=matched_count,
+        pending_count=pending_count,
         unmatched_count=unmatched_count,
+        assigned_manually_count=assigned_manually_count,
         duplicate_count=duplicate_count,
         invalid_count=invalid_count,
         tab_filter=tab_filter,
@@ -941,12 +949,15 @@ def upload_certificates(event_id):
 
     total = report['total_uploaded']
     matched = report['matched']
+    pending = report.get('pending', 0)
     unmatched = report['unmatched']
     dup = report['duplicate']
     inv = report['invalid']
 
     if total > 0:
-        msg = f"Processed {total} certificate(s): {matched} automatically matched with students"
+        msg = f"Processed {total} certificate(s): {matched} automatically matched with registered students"
+        if pending > 0:
+            msg += f", {pending} pending manual review"
         if unmatched > 0:
             msg += f", {unmatched} unmatched"
         if dup > 0:
@@ -954,7 +965,7 @@ def upload_certificates(event_id):
         if inv > 0:
             msg += f", {inv} invalid"
         msg += "."
-        flash(msg, 'success' if unmatched == 0 and dup == 0 else 'info')
+        flash(msg, 'success' if unmatched == 0 and dup == 0 and pending == 0 else 'info')
     else:
         flash("No valid certificate files found in the upload.", 'warning')
 
@@ -1158,13 +1169,31 @@ def payment_verification():
                 pass
         payments = query.order_by(Payment.submitted_at.desc()).all()
 
+    # Detect duplicate transaction IDs within the same event
+    from services.payment_verification_service import normalize_transaction_id
+    txn_counts = {}
+    for p in payments:
+        norm_id = normalize_transaction_id(p.transaction_id)
+        if norm_id and len(norm_id) >= 5:
+            key = (p.event_id, norm_id)
+            txn_counts[key] = txn_counts.get(key, 0) + 1
+
+    duplicate_payment_ids = set()
+    for p in payments:
+        norm_id = normalize_transaction_id(p.transaction_id)
+        if norm_id and len(norm_id) >= 5:
+            key = (p.event_id, norm_id)
+            if txn_counts.get(key, 0) > 1:
+                duplicate_payment_ids.add(p.id)
+
     return render_template(
         'organizer/payment_verification.html',
         user=user,
         payments=payments,
         filter_status=filter_status,
         filter_event_id=filter_event_id,
-        my_events=my_events
+        my_events=my_events,
+        duplicate_payment_ids=duplicate_payment_ids
     )
 
 

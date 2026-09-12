@@ -90,8 +90,14 @@
                             <div class="text-muted small">{{ cert.event.department if cert.event else '' }}</div>
                         </td>
                         <td>
-                            {% if cert.status == 'ISSUED' %}
-                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="bi bi-patch-check-fill me-1"></i> ISSUED</span>
+                            {% if cert.status in ('MATCHED_AUTOMATICALLY', 'MATCHED', 'ISSUED') %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="bi bi-patch-check-fill me-1"></i> Matched Automatically</span>
+                            {% elif cert.status == 'PENDING_MANUAL_REVIEW' %}
+                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1"><i class="bi bi-hourglass-split me-1"></i> Pending Review</span>
+                            {% elif cert.status in ('ASSIGNED_MANUALLY', 'MANUALLY_ASSIGNED') %}
+                                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1"><i class="bi bi-person-check-fill me-1"></i> Assigned Manually</span>
+                            {% elif cert.status == 'UNMATCHED' %}
+                                <span class="badge bg-secondary-subtle text-secondary border px-2 py-1"><i class="bi bi-question-circle me-1"></i> Unmatched</span>
                             {% elif cert.status == 'REVOKED' %}
                                 <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1"><i class="bi bi-x-octagon-fill me-1"></i> REVOKED</span>
                             {% else %}

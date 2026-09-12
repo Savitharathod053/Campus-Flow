@@ -119,10 +119,13 @@ def submit_proof(registration_id):
     # 4. Handle Status
     # IMPORTANT: Ticket is NEVER generated here. Ticket is ONLY generated upon organizer VERIFIED.
     status = payment.status
-    if status == PaymentStatus.REJECTED:
+    if status == PaymentStatus.PAYMENT_VERIFICATION_FAILED:
+        flash("Transaction ID does not match the payment screenshot. Please check your Transaction ID and upload the correct payment screenshot.", 'danger')
+        return redirect(url_for('payment.checkout', registration_id=registration.id))
+    elif status == PaymentStatus.REJECTED:
         flash(f"Payment verification failed: {payment.verification_reason}", 'danger')
         return redirect(url_for('payment.checkout', registration_id=registration.id))
-    elif status in (PaymentStatus.MANUAL_REVIEW, PaymentStatus.PENDING):
+    elif status in (PaymentStatus.TRANSACTION_ID_VERIFIED, PaymentStatus.MANUAL_REVIEW, PaymentStatus.PENDING):
         # Dispatch in-app notifications and emails to organizer and student
         try:
             from services.notification_service import create_notification
@@ -134,10 +137,11 @@ def submit_proof(registration_id):
 
             # 1. Notify Organizer
             if organizer_obj:
+                msg_text = f"Student {user.name} submitted payment proof of ₹{payment.amount:.2f} for '{event_obj.title}' (Txn: {payment.transaction_id}). Status: {payment.status_label}."
                 create_notification(
                     user_id=organizer_obj.id,
-                    title=f"Payment Verification Needed: {user.name}",
-                    message=f"Student {user.name} submitted payment proof of ₹{payment.amount:.2f} for '{event_obj.title}'.",
+                    title=f"Payment Verification: {user.name}",
+                    message=msg_text,
                     notification_type=NotificationType.SYSTEM,
                     link=url_for('organizer.payment_verification', event_id=event_obj.id)
                 )
@@ -146,7 +150,7 @@ def submit_proof(registration_id):
             create_notification(
                 user_id=user.id,
                 title=f"Payment Proof Submitted: {event_obj.title}",
-                message=f"Your payment proof for '{event_obj.title}' was submitted. Ticket will be activated once verified.",
+                message=f"Your payment proof for '{event_obj.title}' was submitted. Status: {payment.status_label}. Ticket will be activated once verified.",
                 notification_type=NotificationType.SYSTEM,
                 link=url_for('student.my_events')
             )
@@ -156,7 +160,9 @@ def submit_proof(registration_id):
         except Exception as exc:
             current_app.logger.warning(f"Could not dispatch payment submission notifications: {exc}")
 
-        if status == PaymentStatus.MANUAL_REVIEW:
+        if status == PaymentStatus.TRANSACTION_ID_VERIFIED:
+            flash("Transaction ID verified! Your payment proof has been submitted and is awaiting organizer approval before your ticket is issued.", 'success')
+        elif status == PaymentStatus.MANUAL_REVIEW:
             flash("Payment proof submitted! Your submission has been flagged for manual verification by the organizer.", 'warning')
         else:
             flash("Payment proof submitted successfully! Verification is pending organizer approval. Your ticket will be available once verified.", 'info')

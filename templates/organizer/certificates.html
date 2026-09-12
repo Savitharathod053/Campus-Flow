@@ -22,6 +22,7 @@
 
 <div class="container pb-5">
     <!-- Status Metrics Grid -->
+    <!-- Status Metrics Grid -->
     <div class="row g-3 mb-4">
         <div class="col-6 col-md-4 col-lg">
             <div class="metric-card shadow-sm p-3">
@@ -41,18 +42,40 @@
                 </div>
                 <div>
                     <div class="metric-number text-success">{{ matched_count }}</div>
-                    <div class="metric-label">Matched & Ready</div>
+                    <div class="metric-label">Matched Automatically</div>
                 </div>
             </div>
         </div>
         <div class="col-6 col-md-4 col-lg">
             <div class="metric-card shadow-sm p-3 border-start border-warning border-4">
                 <div class="metric-icon-box bg-warning text-dark">
+                    <i class="bi bi-hourglass-split"></i>
+                </div>
+                <div>
+                    <div class="metric-number text-warning">{{ pending_count }}</div>
+                    <div class="metric-label">Pending Review</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <div class="metric-card shadow-sm p-3 border-start border-secondary border-4">
+                <div class="metric-icon-box bg-secondary text-white">
                     <i class="bi bi-question-circle-fill"></i>
                 </div>
                 <div>
-                    <div class="metric-number text-warning">{{ unmatched_count }}</div>
+                    <div class="metric-number text-secondary">{{ unmatched_count }}</div>
                     <div class="metric-label">Unmatched</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-4 col-lg">
+            <div class="metric-card shadow-sm p-3 border-start border-primary border-4">
+                <div class="metric-icon-box bg-primary text-white">
+                    <i class="bi bi-person-check-fill"></i>
+                </div>
+                <div>
+                    <div class="metric-number text-primary">{{ assigned_manually_count }}</div>
+                    <div class="metric-label">Assigned Manually</div>
                 </div>
             </div>
         </div>
@@ -64,17 +87,6 @@
                 <div>
                     <div class="metric-number text-info">{{ duplicate_count }}</div>
                     <div class="metric-label">Duplicates</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-6 col-md-4 col-lg">
-            <div class="metric-card shadow-sm p-3 border-start border-danger border-4">
-                <div class="metric-icon-box bg-danger text-white">
-                    <i class="bi bi-exclamation-triangle-fill"></i>
-                </div>
-                <div>
-                    <div class="metric-number text-danger">{{ invalid_count }}</div>
-                    <div class="metric-label">Invalid Files</div>
                 </div>
             </div>
         </div>
@@ -95,19 +107,19 @@
                     <label class="form-label fw-semibold small">Select Certificate Files (Multiple Allowed) or ZIP Archive:</label>
                     <input type="file" name="certificates" class="form-control" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.zip" id="certFileInput">
                     <div class="form-text small text-muted">
-                        You can upload individual PDF/Image certificates or a single <code>.zip</code> file containing all certificates.
+                        Upload individual certificates or a ZIP file. The system extracts participant names via OCR and automatically matches them with registered students.
                     </div>
                 </div>
                 <div class="col-md-5">
-                    <label class="form-label fw-semibold small">Roll Number Regex Pattern (Optional / Configurable):</label>
+                    <label class="form-label fw-semibold small">Roll Number Regex Pattern (Fallback / Optional):</label>
                     <input type="text" name="custom_pattern" class="form-control font-monospace small" placeholder="e.g. Roll No:\s*([A-Za-z0-9]+)" value="{{ config.ROLL_NUMBER_REGEX_PATTERN }}">
                     <div class="form-text small text-muted">
-                        Pattern used to extract roll numbers from certificates. Leave default or customize.
+                        Secondary fallback pattern used if name matching requires additional confirmation.
                     </div>
                 </div>
                 <div class="col-12 text-end">
                     <button type="submit" class="btn btn-primary fw-bold px-4 shadow-sm" id="uploadBtn">
-                        <i class="bi bi-cpu me-1"></i> Upload & Auto-Identify Roll Numbers
+                        <i class="bi bi-cpu me-1"></i> Upload & Match by Student Name
                     </button>
                 </div>
             </div>
@@ -116,7 +128,7 @@
         <!-- Progress overlay (hidden by default) -->
         <div id="uploadProgressBox" class="mt-3 d-none p-3 bg-light rounded text-center border">
             <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
-            <span class="fw-semibold text-dark">Uploading and analyzing certificates with OCR/Text extraction engine... Please wait.</span>
+            <span class="fw-semibold text-dark">Extracting text & matching student names via OCR... Please wait.</span>
         </div>
     </div>
 
@@ -124,20 +136,30 @@
     <div class="ff-card shadow-sm overflow-hidden">
         <!-- Filter Navigation Tabs -->
         <div class="bg-light border-bottom p-3">
-            <ul class="nav nav-pills gap-2">
+            <ul class="nav nav-pills gap-2 flex-wrap">
                 <li class="nav-item">
                     <a class="nav-link btn-sm py-1 px-3 {% if tab_filter == 'all' or not tab_filter %}active fw-bold{% endif %}" href="{{ url_for('organizer.certificates', event_id=event.id, tab='all') }}">
                         All Certificates ({{ total_uploaded }})
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn-sm py-1 px-3 text-success {% if tab_filter == 'matched' %}active bg-success text-white fw-bold{% endif %}" href="{{ url_for('organizer.certificates', event_id=event.id, tab='matched') }}">
-                        <i class="bi bi-check2-circle me-1"></i> Matched ({{ matched_count }})
+                    <a class="nav-link btn-sm py-1 px-3 text-success {% if tab_filter in ('matched', 'matched_automatically') %}active bg-success text-white fw-bold{% endif %}" href="{{ url_for('organizer.certificates', event_id=event.id, tab='matched') }}">
+                        <i class="bi bi-check2-circle me-1"></i> Matched Automatically ({{ matched_count }})
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link btn-sm py-1 px-3 text-warning {% if tab_filter == 'unmatched' %}active bg-warning text-dark fw-bold{% endif %}" href="{{ url_for('organizer.certificates', event_id=event.id, tab='unmatched') }}">
+                    <a class="nav-link btn-sm py-1 px-3 text-warning {% if tab_filter in ('pending', 'pending_manual_review') %}active bg-warning text-dark fw-bold{% endif %}" href="{{ url_for('organizer.certificates', event_id=event.id, tab='pending') }}">
+                        <i class="bi bi-hourglass-split me-1"></i> Pending Manual Review ({{ pending_count }})
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link btn-sm py-1 px-3 text-secondary {% if tab_filter == 'unmatched' %}active bg-secondary text-white fw-bold{% endif %}" href="{{ url_for('organizer.certificates', event_id=event.id, tab='unmatched') }}">
                         <i class="bi bi-question-circle me-1"></i> Unmatched ({{ unmatched_count }})
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link btn-sm py-1 px-3 text-primary {% if tab_filter in ('assigned_manually', 'manual', 'manually_assigned') %}active bg-primary text-white fw-bold{% endif %}" href="{{ url_for('organizer.certificates', event_id=event.id, tab='assigned_manually') }}">
+                        <i class="bi bi-person-check me-1"></i> Assigned Manually ({{ assigned_manually_count }})
                     </a>
                 </li>
                 <li class="nav-item">
@@ -159,8 +181,9 @@
                     <thead>
                         <tr>
                             <th>Certificate File</th>
-                            <th>Extracted Roll No</th>
-                            <th>Matched Student</th>
+                            <th>Extracted Name & Confidence</th>
+                            <th>Roll No</th>
+                            <th>Assigned Student</th>
                             <th>Status</th>
                             <th>Uploaded</th>
                             <th class="text-end">Actions</th>
@@ -177,7 +200,7 @@
                                             <span class="badge bg-primary p-2"><i class="bi bi-file-earmark-image fs-6"></i></span>
                                         {% endif %}
                                         <div>
-                                            <div class="fw-bold text-dark text-truncate" style="max-width: 260px;" title="{{ cert.original_filename }}">
+                                            <div class="fw-bold text-dark text-truncate" style="max-width: 240px;" title="{{ cert.original_filename }}">
                                                 {{ cert.original_filename }}
                                             </div>
                                             <small class="text-muted font-monospace">{{ cert.certificate_code }}</small>
@@ -185,10 +208,24 @@
                                     </div>
                                 </td>
                                 <td>
+                                    {% if cert.extracted_name %}
+                                        <div class="fw-bold text-dark">{{ cert.extracted_name }}</div>
+                                        {% if cert.confidence_score is not none and cert.confidence_score > 0 %}
+                                            <div>
+                                                <span class="badge {% if cert.confidence_score >= 0.85 %}bg-success-subtle text-success border border-success-subtle{% elif cert.confidence_score >= 0.50 %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% else %}bg-secondary-subtle text-secondary border{% endif %}">
+                                                    {{ "%.0f"|format(cert.confidence_score * 100) }}% Confidence
+                                                </span>
+                                            </div>
+                                        {% endif %}
+                                    {% else %}
+                                        <span class="badge bg-light text-muted border">No Name Detected</span>
+                                    {% endif %}
+                                </td>
+                                <td>
                                     {% if cert.roll_number %}
                                         <span class="badge bg-dark font-monospace fs-7 px-2 py-1">{{ cert.roll_number }}</span>
                                     {% else %}
-                                        <span class="badge bg-light text-muted border">Not Detected</span>
+                                        <span class="badge bg-light text-muted border">&mdash;</span>
                                     {% endif %}
                                 </td>
                                 <td>
@@ -203,12 +240,14 @@
                                     {% endif %}
                                 </td>
                                 <td>
-                                    {% if cert.status == 'MATCHED' %}
-                                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Matched</span>
-                                    {% elif cert.status == 'MANUALLY_ASSIGNED' %}
-                                        <span class="badge bg-success bg-opacity-75"><i class="bi bi-person-check me-1"></i> Manually Assigned</span>
+                                    {% if cert.status in ('MATCHED', 'MATCHED_AUTOMATICALLY') %}
+                                        <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i> Matched Automatically</span>
+                                    {% elif cert.status == 'PENDING_MANUAL_REVIEW' %}
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i> Pending Manual Review</span>
+                                    {% elif cert.status in ('MANUALLY_ASSIGNED', 'ASSIGNED_MANUALLY') %}
+                                        <span class="badge bg-primary"><i class="bi bi-person-check me-1"></i> Assigned Manually</span>
                                     {% elif cert.status == 'UNMATCHED' %}
-                                        <span class="badge bg-warning text-dark"><i class="bi bi-question-circle me-1"></i> Unmatched</span>
+                                        <span class="badge bg-secondary"><i class="bi bi-question-circle me-1"></i> Unmatched</span>
                                     {% elif cert.status == 'DUPLICATE' %}
                                         <span class="badge bg-info text-dark"><i class="bi bi-copy me-1"></i> Duplicate</span>
                                     {% elif cert.status == 'INVALID' %}
@@ -230,10 +269,10 @@
                                             <i class="bi bi-download"></i>
                                         </a>
 
-                                        <!-- Unmatched / Fix Action -->
-                                        {% if cert.status in ['UNMATCHED', 'INVALID'] %}
-                                            <button type="button" class="btn btn-warning text-dark fw-bold" data-bs-toggle="modal" data-bs-target="#assignModal{{ cert.id }}" title="Manually match to a registered student">
-                                                <i class="bi bi-wrench-adjustable me-1"></i> Fix
+                                        <!-- Pending Review / Unmatched / Fix Action -->
+                                        {% if cert.status in ['PENDING_MANUAL_REVIEW', 'UNMATCHED', 'INVALID'] %}
+                                            <button type="button" class="btn btn-warning text-dark fw-bold" data-bs-toggle="modal" data-bs-target="#assignModal{{ cert.id }}" title="Review & Manually match to registered student">
+                                                <i class="bi bi-person-check me-1"></i> Assign
                                             </button>
                                         {% endif %}
 
@@ -276,9 +315,11 @@
                                                     <div class="p-3 bg-light rounded border">
                                                         <h6 class="fw-bold small mb-2 text-primary"><i class="bi bi-search me-1"></i> Detected Certificate Text & Metadata</h6>
                                                         <div class="row g-2 small mb-2">
+                                                            <div class="col-sm-6"><strong>Extracted Student Name:</strong> {{ cert.extracted_name or 'None identified' }}</div>
+                                                            <div class="col-sm-6"><strong>Match Confidence Score:</strong> {{ "%.0f"|format(cert.confidence_score * 100) if cert.confidence_score else '0' }}%</div>
                                                             <div class="col-sm-6"><strong>Extracted Roll No:</strong> {{ cert.roll_number or 'None identified' }}</div>
-                                                            <div class="col-sm-6"><strong>Status:</strong> <span class="badge bg-secondary">{{ cert.status }}</span></div>
-                                                            <div class="col-sm-6"><strong>Student:</strong> {{ cert.student.name if cert.student else 'Unassigned' }}</div>
+                                                            <div class="col-sm-6"><strong>Status:</strong> <span class="badge bg-secondary">{{ cert.status_label }}</span></div>
+                                                            <div class="col-sm-6"><strong>Assigned Student:</strong> {{ cert.student.name if cert.student else 'Unassigned' }}</div>
                                                             <div class="col-sm-6"><strong>Verification ID:</strong> <code>{{ cert.certificate_code }}</code></div>
                                                         </div>
                                                         <details>
@@ -297,37 +338,56 @@
                                         </div>
                                     </div>
 
-                                    <!-- MANUAL ASSIGNMENT MODAL -->
-                                    {% if cert.status in ['UNMATCHED', 'INVALID'] %}
+                                    <!-- MANUAL ASSIGNMENT MODAL (For Pending Manual Review, Unmatched, or Invalid) -->
+                                    {% if cert.status in ['PENDING_MANUAL_REVIEW', 'UNMATCHED', 'INVALID'] %}
                                         <div class="modal fade text-start" id="assignModal{{ cert.id }}" tabindex="-1" aria-hidden="true">
                                             <div class="modal-dialog modal-dialog-centered">
                                                 <div class="modal-content">
                                                     <form method="POST" action="{{ url_for('organizer.assign_certificate', event_id=event.id, cert_id=cert.id) }}">
                                                         <div class="modal-header bg-warning bg-opacity-25">
                                                             <h6 class="modal-title fw-bold">
-                                                                <i class="bi bi-person-check-fill text-warning me-2"></i> Assign Certificate to Student
+                                                                <i class="bi bi-person-check-fill text-warning me-2"></i> Review & Assign Certificate to Student
                                                             </h6>
                                                             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                                                         </div>
                                                         <div class="modal-body">
-                                                            <p class="small text-muted mb-3">
-                                                                Select the registered student who should receive <strong>{{ cert.original_filename }}</strong>.
-                                                            </p>
+                                                            <!-- Certificate Preview in Modal -->
+                                                            <div class="text-center bg-dark p-2 rounded mb-3" style="max-height: 220px; overflow: auto;">
+                                                                {% if cert.is_pdf %}
+                                                                    <iframe src="{{ url_for('organizer.preview_certificate', cert_id=cert.id) }}" width="100%" height="200px" style="border: none;"></iframe>
+                                                                {% else %}
+                                                                    <img src="{{ url_for('organizer.preview_certificate', cert_id=cert.id) }}" class="img-fluid rounded" style="max-height: 200px;">
+                                                                {% endif %}
+                                                            </div>
+
+                                                            <!-- OCR Extraction Details -->
+                                                            <div class="p-3 bg-light rounded border mb-3 small">
+                                                                <div class="mb-1"><strong>Extracted Name (OCR):</strong> <span class="text-primary fw-bold">{{ cert.extracted_name or 'None identified' }}</span></div>
+                                                                {% if cert.confidence_score is not none and cert.confidence_score > 0 %}
+                                                                    <div class="mb-1"><strong>Match Confidence:</strong> <span class="badge {% if cert.confidence_score >= 0.85 %}bg-success{% elif cert.confidence_score >= 0.50 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ "%.0f"|format(cert.confidence_score * 100) }}%</span></div>
+                                                                {% endif %}
+                                                                {% if cert.roll_number %}
+                                                                    <div><strong>Detected Roll No:</strong> <code>{{ cert.roll_number }}</code></div>
+                                                                {% endif %}
+                                                            </div>
 
                                                             <div class="mb-3">
-                                                                <label class="form-label fw-semibold small">Registered Student:</label>
+                                                                <label class="form-label fw-semibold small">Registered Student for {{ event.title }} *:</label>
                                                                 <select name="student_id" class="form-select form-select-sm" required>
-                                                                    <option value="">-- Choose Registered Student --</option>
+                                                                    <option value="">-- Select Registered Student --</option>
                                                                     {% for st in registered_students %}
                                                                         <option value="{{ st.id }}">
                                                                             {{ st.name }} ({{ st.student_profile.roll_number if st.student_profile else 'No Roll' }}) - {{ st.email }}
                                                                         </option>
                                                                     {% endfor %}
                                                                 </select>
+                                                                <div class="form-text small">
+                                                                    Assigning this certificate will update its status to <strong>Assigned Manually</strong> and immediately make it available in the student's Certificate Vault.
+                                                                </div>
                                                             </div>
 
                                                             <div class="mb-3">
-                                                                <label class="form-label fw-semibold small">Roll Number Override (Optional):</label>
+                                                                <label class="form-label fw-semibold small">Roll Number (Optional):</label>
                                                                 <input type="text" name="roll_number" class="form-control form-control-sm" placeholder="e.g. 23DS001" value="{{ cert.roll_number or '' }}">
                                                             </div>
                                                         </div>

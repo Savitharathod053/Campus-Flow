@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 from flask import current_app
 from models import db, Event, User, StudentProfile, EventRegistration, Certificate, CertificateStatus
 from services.ocr_service import extract_text_from_file, extract_roll_number
+from services.name_matching_service import match_certificate_to_student
 
 ALLOWED_CERT_EXTENSIONS = {'pdf', 'png', 'jpg', 'jpeg', 'webp'}
 
@@ -28,15 +29,30 @@ def process_single_certificate_file(event, file_path, original_filename, registe
     """
     Processes one certificate file (PDF or Image):
     - Reads and extracts text using PDF parser or OCR.
-    - Identifies the roll number.
-    - Matches student from registered students map.
-    - Determines status (MATCHED, UNMATCHED, DUPLICATE, INVALID).
-    - Saves Certificate record in DB.
+    - Matches student primarily by Student Name from OCR text using name_matching_service.
+    - Falls back to roll number if name matching is inconclusive.
+    - Sets status (MATCHED_AUTOMATICALLY, PENDING_MANUAL_REVIEW, UNMATCHED, DUPLICATE, INVALID).
+    - Saves Certificate record in DB with extracted_name and confidence_score.
     """
     ext = Path(original_filename).suffix.lower().lstrip('.')
     file_type = 'pdf' if ext == 'pdf' else 'image'
     
-    # 1. Extract text from the certificate file
+    # 1. Normalize registered students list
+    if isinstance(registered_students_map, dict):
+        registered_students_list = []
+        for roll, (s_user, s_reg) in registered_students_map.items():
+            registered_students_list.append({
+                'student_id': s_user.id,
+                'name': s_user.name,
+                'roll_number': roll,
+                'registration_id': s_reg.id if s_reg else None,
+                'user': s_user,
+                'registration': s_reg
+            })
+    else:
+        registered_students_list = registered_students_map or []
+
+    # 2. Extract text from the certificate file
     extracted_text = extract_text_from_file(file_path)
     
     if extracted_text and extracted_text.startswith('[') and 'Error:' in extracted_text:
@@ -44,41 +60,59 @@ def process_single_certificate_file(event, file_path, original_filename, registe
     else:
         is_invalid = False
 
-    # 2. Extract roll number
-    candidate_roll_numbers = list(registered_students_map.keys())
-    extracted_roll = extract_roll_number(
-        text=extracted_text,
-        custom_pattern=custom_pattern,
-        candidate_roll_numbers=candidate_roll_numbers,
-        filename=original_filename
-    )
-
-    # 3. Match against registered students
+    # 3. Match against registered students by Student Name (primary)
     student = None
     registration = None
-    status = CertificateStatus.UNMATCHED
+    extracted_roll = None
+    extracted_name = None
+    confidence_score = 0.0
 
     if is_invalid:
         status = CertificateStatus.INVALID
-    elif extracted_roll:
-        roll_key = extracted_roll.upper()
-        if roll_key in registered_students_map:
-            student, registration = registered_students_map[roll_key]
-            
+    else:
+        match_result = match_certificate_to_student(extracted_text, registered_students_list)
+        status = match_result.get('status', CertificateStatus.UNMATCHED)
+        matched_student_id = match_result.get('matched_student_id')
+        matched_reg_id = match_result.get('matched_registration_id')
+        extracted_name = match_result.get('extracted_name')
+        confidence_score = match_result.get('confidence_score', 0.0)
+
+        # Fallback roll number extraction for record-keeping
+        candidate_rolls = [s.get('roll_number') for s in registered_students_list if s.get('roll_number')]
+        extracted_roll = extract_roll_number(
+            text=extracted_text,
+            custom_pattern=custom_pattern,
+            candidate_roll_numbers=candidate_rolls,
+            filename=original_filename
+        )
+
+        if status == CertificateStatus.MATCHED_AUTOMATICALLY and matched_student_id:
+            # Find matched student & registration objects
+            for s_info in registered_students_list:
+                if s_info['student_id'] == matched_student_id:
+                    student = s_info.get('user') or User.query.get(matched_student_id)
+                    registration = s_info.get('registration') or (EventRegistration.query.get(matched_reg_id) if matched_reg_id else None)
+                    if not extracted_roll and s_info.get('roll_number'):
+                        extracted_roll = s_info.get('roll_number')
+                    break
+
             # Check for existing certificate for this student in this event
             existing_cert = Certificate.query.filter_by(
                 event_id=event.id,
-                student_id=student.id
-            ).filter(Certificate.status.in_([CertificateStatus.MATCHED, CertificateStatus.MANUALLY_ASSIGNED])).first()
+                student_id=matched_student_id
+            ).filter(Certificate.status.in_([
+                CertificateStatus.MATCHED_AUTOMATICALLY,
+                CertificateStatus.ASSIGNED_MANUALLY,
+                'MATCHED',
+                'MANUALLY_ASSIGNED'
+            ])).first()
 
             if existing_cert:
                 status = CertificateStatus.DUPLICATE
-            else:
-                status = CertificateStatus.MATCHED
-        else:
-            status = CertificateStatus.UNMATCHED
-    else:
-        status = CertificateStatus.UNMATCHED
+        elif status == CertificateStatus.PENDING_MANUAL_REVIEW:
+            # For pending manual review, do NOT automatically attach to student vault
+            student = None
+            registration = None
 
     # 4. Generate unique relative path for storage
     relative_path = f"uploads/certificates/event_{event.id}/{Path(file_path).name}"
@@ -86,10 +120,12 @@ def process_single_certificate_file(event, file_path, original_filename, registe
 
     cert = Certificate(
         event_id=event.id,
-        student_id=student.id if student else None,
-        registration_id=registration.id if registration else None,
+        student_id=student.id if (student and status == CertificateStatus.MATCHED_AUTOMATICALLY) else None,
+        registration_id=registration.id if (registration and status == CertificateStatus.MATCHED_AUTOMATICALLY) else None,
         certificate_code=cert_code,
         roll_number=extracted_roll,
+        extracted_name=extracted_name,
+        confidence_score=confidence_score,
         file_path=relative_path,
         original_filename=original_filename,
         file_type=file_type,
@@ -112,13 +148,24 @@ def process_certificate_uploads(event_id, files_list=None, zip_file=None, custom
     event = Event.query.get_or_404(event_id)
     dest_dir = _get_event_cert_dir(event.id)
 
-    # Build registered students lookup map: {ROLL_NUMBER_UPPER: (User, EventRegistration)}
+    # Build registered students list and lookup map:
     registrations = EventRegistration.query.filter_by(event_id=event.id).all()
+    registered_students_list = []
     registered_students_map = {}
     for r in registrations:
-        if r.student and r.student.student_profile and r.student.student_profile.roll_number:
-            roll = r.student.student_profile.roll_number.strip().upper()
-            registered_students_map[roll] = (r.student, r)
+        if r.student:
+            roll = r.student.student_profile.roll_number.strip().upper() if r.student.student_profile and r.student.student_profile.roll_number else None
+            student_entry = {
+                'student_id': r.student.id,
+                'name': r.student.name,
+                'roll_number': roll,
+                'registration_id': r.id,
+                'user': r.student,
+                'registration': r
+            }
+            registered_students_list.append(student_entry)
+            if roll:
+                registered_students_map[roll] = (r.student, r)
 
     created_certs = []
     files_to_process = []  # List of tuples: (local_file_path, original_filename)
@@ -175,7 +222,7 @@ def process_certificate_uploads(event_id, files_list=None, zip_file=None, custom
                 event=event,
                 file_path=local_path,
                 original_filename=original_name,
-                registered_students_map=registered_students_map,
+                registered_students_map=registered_students_list,
                 custom_pattern=custom_pattern,
                 uploader_user=uploader_user
             )
@@ -204,7 +251,7 @@ def process_certificate_uploads(event_id, files_list=None, zip_file=None, custom
         from services.notification_service import create_notification
         from models.notification import NotificationType
         for c in created_certs:
-            if c.status == CertificateStatus.MATCHED and c.student:
+            if c.status in (CertificateStatus.MATCHED_AUTOMATICALLY, 'MATCHED') and c.student:
                 create_notification(
                     user_id=c.student.id,
                     title=f"Certificate Ready: {event.title}",
@@ -217,7 +264,8 @@ def process_certificate_uploads(event_id, files_list=None, zip_file=None, custom
         current_app.logger.warning(f"Could not dispatch certificate ready notifications/emails: {exc}")
 
     # Calculate statistics
-    matched_count = len([c for c in created_certs if c.status == CertificateStatus.MATCHED])
+    matched_count = len([c for c in created_certs if c.status in (CertificateStatus.MATCHED_AUTOMATICALLY, 'MATCHED')])
+    pending_count = len([c for c in created_certs if c.status == CertificateStatus.PENDING_MANUAL_REVIEW])
     unmatched_count = len([c for c in created_certs if c.status == CertificateStatus.UNMATCHED])
     duplicate_count = len([c for c in created_certs if c.status == CertificateStatus.DUPLICATE])
     invalid_count = len([c for c in created_certs if c.status == CertificateStatus.INVALID])
@@ -225,6 +273,7 @@ def process_certificate_uploads(event_id, files_list=None, zip_file=None, custom
     return {
         'total_uploaded': len(created_certs),
         'matched': matched_count,
+        'pending': pending_count,
         'unmatched': unmatched_count,
         'duplicate': duplicate_count,
         'invalid': invalid_count,
@@ -252,7 +301,7 @@ def manual_assign_certificate(cert_id, student_id, roll_number=None, assigned_by
     cert.student_id = student.id
     cert.registration_id = registration.id if registration else None
     cert.roll_number = effective_roll
-    cert.status = CertificateStatus.MANUALLY_ASSIGNED
+    cert.status = CertificateStatus.ASSIGNED_MANUALLY
     cert.assigned_by_id = assigned_by_user.id if assigned_by_user else None
 
     db.session.commit()

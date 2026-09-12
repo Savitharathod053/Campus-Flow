@@ -95,8 +95,12 @@
                             <span class="fw-bold text-dark fs-6">₹{{ "%.2f"|format(p.amount) }}</span>
                         </td>
                         <td>
-                            {% if p.status in ['VERIFIED', 'SUCCESS'] %}
-                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="bi bi-check-circle-fill me-1"></i> {{ p.status }}</span>
+                            {% if p.status in ['VERIFIED', 'SUCCESS', 'APPROVED'] %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="bi bi-check-circle-fill me-1"></i> APPROVED</span>
+                            {% elif p.status == 'TRANSACTION_ID_VERIFIED' %}
+                                <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1"><i class="bi bi-shield-check me-1"></i> TXN VERIFIED</span>
+                            {% elif p.status == 'PAYMENT_VERIFICATION_FAILED' %}
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1"><i class="bi bi-exclamation-octagon-fill me-1"></i> VERIF FAILED</span>
                             {% elif p.status == 'PENDING' %}
                                 <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1"><i class="bi bi-clock-history me-1"></i> PENDING</span>
                             {% elif p.status == 'REJECTED' %}

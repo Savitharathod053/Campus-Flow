@@ -3,13 +3,25 @@ import uuid
 from .user import db
 
 class CertificateStatus:
-    MATCHED = 'MATCHED'
+    MATCHED_AUTOMATICALLY = 'MATCHED_AUTOMATICALLY'
+    PENDING_MANUAL_REVIEW = 'PENDING_MANUAL_REVIEW'
+    ASSIGNED_MANUALLY = 'ASSIGNED_MANUALLY'
     UNMATCHED = 'UNMATCHED'
     DUPLICATE = 'DUPLICATE'
     INVALID = 'INVALID'
-    MANUALLY_ASSIGNED = 'MANUALLY_ASSIGNED'
 
-    CHOICES = [MATCHED, UNMATCHED, DUPLICATE, INVALID, MANUALLY_ASSIGNED]
+    # Aliases
+    MATCHED = 'MATCHED_AUTOMATICALLY'
+    MANUALLY_ASSIGNED = 'ASSIGNED_MANUALLY'
+
+    CHOICES = [
+        MATCHED_AUTOMATICALLY,
+        PENDING_MANUAL_REVIEW,
+        ASSIGNED_MANUALLY,
+        UNMATCHED,
+        DUPLICATE,
+        INVALID
+    ]
 
 
 class Certificate(db.Model):
@@ -22,12 +34,14 @@ class Certificate(db.Model):
     
     certificate_code = db.Column(db.String(64), unique=True, nullable=False, index=True)
     roll_number = db.Column(db.String(50), nullable=True, index=True)
+    extracted_name = db.Column(db.String(150), nullable=True)
+    confidence_score = db.Column(db.Float, default=0.0, nullable=True)
     file_path = db.Column(db.String(255), nullable=False)
     original_filename = db.Column(db.String(255), nullable=False)
     file_type = db.Column(db.String(20), default='pdf', nullable=False)  # 'pdf' or 'image'
     extracted_text = db.Column(db.Text, nullable=True)
     
-    status = db.Column(db.String(30), default=CertificateStatus.UNMATCHED, nullable=False, index=True)
+    status = db.Column(db.String(50), default=CertificateStatus.UNMATCHED, nullable=False, index=True)
     assigned_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     
     upload_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
@@ -41,8 +55,33 @@ class Certificate(db.Model):
     assigned_by = db.relationship('User', foreign_keys=[assigned_by_id])
 
     @property
+    def student_name(self):
+        return self.student.name if self.student else None
+
+    @property
+    def event_name(self):
+        return self.event.title if self.event else None
+
+    @property
     def is_assigned(self):
-        return self.status in (CertificateStatus.MATCHED, CertificateStatus.MANUALLY_ASSIGNED) and self.student_id is not None
+        return self.status in (
+            CertificateStatus.MATCHED_AUTOMATICALLY,
+            CertificateStatus.ASSIGNED_MANUALLY,
+            'MATCHED',
+            'MANUALLY_ASSIGNED'
+        ) and self.student_id is not None
+
+    @property
+    def status_label(self):
+        labels = {
+            CertificateStatus.MATCHED_AUTOMATICALLY: 'Matched Automatically',
+            CertificateStatus.PENDING_MANUAL_REVIEW: 'Pending Manual Review',
+            CertificateStatus.ASSIGNED_MANUALLY: 'Assigned Manually',
+            CertificateStatus.UNMATCHED: 'Unmatched',
+            CertificateStatus.DUPLICATE: 'Duplicate',
+            CertificateStatus.INVALID: 'Invalid'
+        }
+        return labels.get(self.status, self.status)
 
     @property
     def is_pdf(self):

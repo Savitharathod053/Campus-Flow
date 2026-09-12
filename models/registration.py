@@ -39,7 +39,10 @@ class EventRegistration(db.Model):
 
     @property
     def certificate(self):
-        return self.certificates[0] if self.certificates else None
+        for c in self.certificates:
+            if getattr(c, 'is_assigned', False):
+                return c
+        return None
 
     @property
     def is_confirmed(self):
@@ -72,10 +75,26 @@ class EventRegistration(db.Model):
             if st in ('VERIFIED', 'SUCCESS'):
                 return {
                     'code': 'VERIFIED',
-                    'label': 'Payment Verified',
+                    'label': 'Payment Approved',
                     'badge_class': 'bg-success',
                     'icon': 'bi-check2-circle',
                     'message': 'Ticket Available'
+                }
+            elif st == 'TRANSACTION_ID_VERIFIED':
+                return {
+                    'code': 'TRANSACTION_ID_VERIFIED',
+                    'label': 'Transaction ID Verified',
+                    'badge_class': 'bg-info text-dark',
+                    'icon': 'bi-shield-check',
+                    'message': 'Awaiting organizer confirmation'
+                }
+            elif st == 'PAYMENT_VERIFICATION_FAILED':
+                return {
+                    'code': 'PAYMENT_VERIFICATION_FAILED',
+                    'label': 'Payment Verification Failed',
+                    'badge_class': 'bg-danger',
+                    'icon': 'bi-exclamation-octagon-fill',
+                    'message': 'Transaction ID mismatch. Please check and re-upload.'
                 }
             elif st == 'MANUAL_REVIEW':
                 return {
@@ -96,7 +115,7 @@ class EventRegistration(db.Model):
             else:
                 return {
                     'code': 'PENDING',
-                    'label': 'Payment Verification Pending',
+                    'label': 'Payment Pending',
                     'badge_class': 'bg-warning text-dark',
                     'icon': 'bi-hourglass-split',
                     'message': 'Verification pending organizer approval'
@@ -116,13 +135,17 @@ class EventRegistration(db.Model):
             return 'Free'
         if self.payment:
             if self.payment.status in ('VERIFIED', 'SUCCESS'):
-                return 'Verified'
+                return 'Payment Approved'
+            elif self.payment.status == 'TRANSACTION_ID_VERIFIED':
+                return 'Transaction ID Verified'
+            elif self.payment.status == 'PAYMENT_VERIFICATION_FAILED':
+                return 'Payment Verification Failed'
             elif self.payment.status == 'MANUAL_REVIEW':
                 return 'Under Review'
             elif self.payment.status in ('REJECTED', 'FAILED'):
-                return 'Rejected'
+                return 'Payment Rejected'
             elif self.payment.status == 'PENDING':
-                return 'Pending Verification'
+                return 'Payment Pending'
         if self.is_paid:
             return 'Paid'
         return 'Pending'

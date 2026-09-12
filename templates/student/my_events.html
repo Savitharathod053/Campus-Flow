@@ -72,13 +72,24 @@
                                     {% if badge.code == 'FREE' %}
                                         <span class="badge bg-light text-success border"><i class="bi bi-gift me-1"></i> FREE</span>
                                     {% elif badge.code == 'VERIFIED' %}
-                                        <div><span class="badge bg-success mb-1"><i class="bi bi-check-circle-fill me-1"></i> 🟢 Payment Verified</span></div>
+                                        <div><span class="badge bg-success mb-1"><i class="bi bi-check-circle-fill me-1"></i> 🟢 Payment Approved</span></div>
                                         <div class="small text-success fw-bold">🎟 Ticket Available</div>
+                                    {% elif badge.code == 'TRANSACTION_ID_VERIFIED' %}
+                                        <div><span class="badge bg-info text-dark mb-1"><i class="bi bi-shield-check me-1"></i> 🔵 Transaction ID Verified</span></div>
+                                        <div class="small text-muted">Awaiting organizer approval</div>
+                                    {% elif badge.code == 'PAYMENT_VERIFICATION_FAILED' %}
+                                        <div><span class="badge bg-danger mb-1"><i class="bi bi-exclamation-octagon-fill me-1"></i> 🔴 Payment Verification Failed</span></div>
+                                        <div class="small text-danger fw-semibold" style="max-width: 220px;">Transaction ID mismatch</div>
+                                        {% if not reg.event.is_completed %}
+                                            <a href="{{ url_for('payment.checkout', registration_id=reg.id) }}" class="btn btn-outline-danger btn-sm py-0 px-2 fw-bold mt-1">
+                                                Resubmit Proof
+                                            </a>
+                                        {% endif %}
                                     {% elif badge.code == 'PENDING' %}
-                                        <div><span class="badge bg-warning text-dark mb-1"><i class="bi bi-hourglass-split me-1"></i> 🟡 Payment Verification Pending</span></div>
+                                        <div><span class="badge bg-warning text-dark mb-1"><i class="bi bi-hourglass-split me-1"></i> 🟡 Payment Pending</span></div>
                                         <div class="small text-muted">Awaiting organizer review</div>
                                     {% elif badge.code == 'MANUAL_REVIEW' %}
-                                        <div><span class="badge bg-warning text-dark mb-1"><i class="bi bi-shield-exclamation me-1"></i> 🟠 Payment Under Manual Review</span></div>
+                                        <div><span class="badge bg-warning text-dark mb-1"><i class="bi bi-shield-exclamation me-1"></i> 🟠 Under Manual Review</span></div>
                                         <div class="small text-muted">Organizer manual review</div>
                                     {% elif badge.code == 'REJECTED' %}
                                         <div><span class="badge bg-danger mb-1"><i class="bi bi-x-circle-fill me-1"></i> 🔴 Payment Rejected</span></div>

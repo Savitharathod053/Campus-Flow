@@ -290,7 +290,7 @@ class TestPaymentVerificationFlow(unittest.TestCase):
 
         payment = Payment.query.filter_by(registration_id=reg.id).first()
         self.assertIsNotNone(payment)
-        self.assertEqual(payment.status, PaymentStatus.REJECTED)
+        self.assertEqual(payment.status, PaymentStatus.PAYMENT_VERIFICATION_FAILED)
         self.assertIn("transaction id does not match", payment.verification_reason.lower())
 
         # No ticket generated

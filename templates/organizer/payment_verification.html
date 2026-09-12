@@ -33,10 +33,12 @@
                 <label class="form-label small text-muted mb-0">Filter by Status</label>
                 <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
                     <option value="">All Statuses</option>
-                    <option value="PENDING" {% if filter_status == 'PENDING' %}selected{% endif %}>PENDING</option>
-                    <option value="MANUAL_REVIEW" {% if filter_status == 'MANUAL_REVIEW' %}selected{% endif %}>MANUAL REVIEW</option>
-                    <option value="VERIFIED" {% if filter_status == 'VERIFIED' %}selected{% endif %}>VERIFIED</option>
-                    <option value="REJECTED" {% if filter_status == 'REJECTED' %}selected{% endif %}>REJECTED</option>
+                    <option value="PENDING" {% if filter_status == 'PENDING' %}selected{% endif %}>Payment Pending</option>
+                    <option value="TRANSACTION_ID_VERIFIED" {% if filter_status == 'TRANSACTION_ID_VERIFIED' %}selected{% endif %}>Transaction ID Verified</option>
+                    <option value="PAYMENT_VERIFICATION_FAILED" {% if filter_status == 'PAYMENT_VERIFICATION_FAILED' %}selected{% endif %}>Payment Verification Failed</option>
+                    <option value="VERIFIED" {% if filter_status in ('VERIFIED', 'APPROVED') %}selected{% endif %}>Payment Approved</option>
+                    <option value="REJECTED" {% if filter_status == 'REJECTED' %}selected{% endif %}>Payment Rejected</option>
+                    <option value="MANUAL_REVIEW" {% if filter_status == 'MANUAL_REVIEW' %}selected{% endif %}>Under Manual Review</option>
                 </select>
             </div>
             <div class="col-md-4 text-md-end mt-md-4">
@@ -54,10 +56,10 @@
                 <thead>
                     <tr>
                         <th>Student & Roll No</th>
-                        <th>Event</th>
-                        <th>Amount (Req / Det)</th>
-                        <th>Transaction ID</th>
-                        <th>Fraud Risk</th>
+                        <th>Event & Fee</th>
+                        <th>Entered Transaction ID</th>
+                        <th>OCR-Extracted ID</th>
+                        <th>Verification Match</th>
                         <th>Status</th>
                         <th>Proof</th>
                         <th class="text-end">Actions</th>
@@ -74,47 +76,61 @@
                         </td>
                         <td>
                             <div class="fw-semibold text-dark">{{ p.event.title|truncate(25) if p.event else 'Event' }}</div>
+                            <div class="small text-primary fw-bold">Fee: ₹{{ "%.2f"|format(p.expected_amount or p.amount) }}</div>
                             <small class="text-muted">{{ p.submitted_at|datetimeformat if p.submitted_at else '' }}</small>
                         </td>
                         <td>
-                            <div class="fw-bold text-dark">Req: ₹{{ "%.0f"|format(p.expected_amount or p.amount) }}</div>
-                            <div class="small {% if p.detected_amount and p.detected_amount != p.expected_amount %}text-danger fw-bold{% else %}text-muted{% endif %}">
-                                Det: {% if p.detected_amount %}₹{{ "%.0f"|format(p.detected_amount) }}{% else %}N/A{% endif %}
-                            </div>
+                            <code class="fw-bold fs-7">{{ p.transaction_id or 'Not provided' }}</code>
                         </td>
                         <td>
-                            <code class="fw-bold">{{ p.transaction_id or 'Not provided' }}</code>
-                        </td>
-                        <td>
-                            {% if p.fraud_risk == 'LOW' %}
-                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
-                                    <i class="bi bi-shield-check me-1"></i> LOW RISK
-                                </span>
-                            {% elif p.fraud_risk == 'MEDIUM' %}
-                                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle px-2 py-1">
-                                    <i class="bi bi-shield-exclamation me-1"></i> MEDIUM RISK
-                                </span>
+                            {% if p.extracted_transaction_id %}
+                                <code class="text-success fw-bold fs-7">{{ p.extracted_transaction_id }}</code>
                             {% else %}
-                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
-                                    <i class="bi bi-shield-slash-fill me-1"></i> HIGH RISK
-                                </span>
+                                <span class="badge bg-light text-muted border">Not detected</span>
                             {% endif %}
                         </td>
                         <td>
-                            {% if p.status == 'VERIFIED' %}
-                                <span class="badge bg-success">VERIFIED</span>
-                            {% elif p.status == 'REJECTED' %}
-                                <span class="badge bg-danger">REJECTED</span>
-                            {% elif p.status == 'MANUAL_REVIEW' %}
-                                <span class="badge bg-warning text-dark">MANUAL REVIEW</span>
+                            {% if p.status == 'TRANSACTION_ID_VERIFIED' or (p.extracted_transaction_id and p.transaction_id and p.extracted_transaction_id|upper == p.transaction_id|upper) %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                    <i class="bi bi-check-circle-fill me-1"></i> Matched
+                                </span>
+                            {% elif p.status == 'PAYMENT_VERIFICATION_FAILED' %}
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+                                    <i class="bi bi-x-circle-fill me-1"></i> Mismatched
+                                </span>
                             {% else %}
-                                <span class="badge bg-secondary">PENDING</span>
+                                <span class="badge bg-secondary-subtle text-secondary border px-2 py-1">
+                                    Pending Match
+                                </span>
+                            {% endif %}
+
+                            {% if p.id in duplicate_payment_ids %}
+                                <div class="mt-1">
+                                    <span class="badge bg-danger text-white px-2 py-1 shadow-sm" title="Warning: This Transaction ID was used by multiple students for this event!">
+                                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Duplicate Warning
+                                    </span>
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if p.status in ('VERIFIED', 'APPROVED') %}
+                                <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i> Payment Approved</span>
+                            {% elif p.status == 'TRANSACTION_ID_VERIFIED' %}
+                                <span class="badge bg-info text-dark"><i class="bi bi-shield-check me-1"></i> Transaction ID Verified</span>
+                            {% elif p.status == 'PAYMENT_VERIFICATION_FAILED' %}
+                                <span class="badge bg-danger"><i class="bi bi-x-octagon-fill me-1"></i> Verification Failed</span>
+                            {% elif p.status in ('REJECTED', 'FAILED') %}
+                                <span class="badge bg-secondary"><i class="bi bi-x-circle me-1"></i> Payment Rejected</span>
+                            {% elif p.status == 'MANUAL_REVIEW' %}
+                                <span class="badge bg-warning text-dark"><i class="bi bi-shield-exclamation me-1"></i> Manual Review</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split me-1"></i> Payment Pending</span>
                             {% endif %}
                         </td>
                         <td>
                             {% if p.payment_screenshot %}
-                                <a href="{{ url_for('payment.view_proof', payment_id=p.id) }}" target="_blank" class="btn btn-outline-primary btn-sm py-0 px-2 fw-semibold" title="View Full Payment Screenshot">
-                                    <i class="bi bi-image me-1"></i> VIEW
+                                <a href="{{ url_for('payment.view_proof', payment_id=p.id) }}" target="_blank" class="btn btn-outline-primary btn-sm py-1 px-2 fw-semibold" title="View Full Payment Screenshot">
+                                    <i class="bi bi-image me-1"></i> View Proof
                                 </a>
                             {% else %}
                                 <span class="text-muted small">None</span>
@@ -122,18 +138,18 @@
                         </td>
                         <td class="text-end">
                             <div class="d-flex justify-content-end gap-1">
-                                {% if p.status != 'VERIFIED' %}
-                                    <form method="POST" action="{{ url_for('organizer.verify_student_payment', payment_id=p.id) }}" onsubmit="return confirm('Verify this payment of ₹{{ p.expected_amount or p.amount }} for {{ p.student.name if p.student else '' }}? This will confirm the registration and issue the event ticket.');">
-                                        <button type="submit" class="btn btn-success btn-sm fw-bold">
-                                            <i class="bi bi-check-lg me-1"></i> VERIFY PAYMENT
+                                {% if p.status not in ('VERIFIED', 'APPROVED') %}
+                                    <form method="POST" action="{{ url_for('organizer.verify_student_payment', payment_id=p.id) }}" onsubmit="return confirm('Approve this payment of ₹{{ p.expected_amount or p.amount }} for {{ p.student.name if p.student else '' }}? This will confirm registration and generate the ticket.');">
+                                        <button type="submit" class="btn btn-success btn-sm fw-bold" title="Confirm Payment and Generate Entry Ticket">
+                                            <i class="bi bi-check-lg me-1"></i> Approve
                                         </button>
                                     </form>
                                 {% endif %}
 
                                 {% if p.status != 'REJECTED' %}
                                     <!-- Reject Button Trigger Modal -->
-                                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#rejectModal{{ p.id }}">
-                                        <i class="bi bi-x-lg me-1"></i> REJECT PAYMENT
+                                    <button type="button" class="btn btn-outline-danger btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#rejectModal{{ p.id }}" title="Reject proof and allow student re-upload">
+                                        <i class="bi bi-x-lg me-1"></i> Reject
                                     </button>
 
                                     <!-- Reject Modal -->
