@@ -82,8 +82,8 @@ def extract_candidate_names_from_text(raw_text):
 
     # Pattern 1: Certificate context headers
     header_patterns = [
-        r'(?:presented\s+to|certify\s+that|awarded\s+to|conferred\s+upon|certifies\s+that|given\s+to)\s+([A-Za-z\s.\-]{3,50}?)(?:\s+(?:for|has|in|of|on|during|who|\n|,|\.))',
-        r'(?:this\s+is\s+to\s+certify\s+that)\s+([A-Za-z\s.\-]{3,50}?)(?:\s+(?:for|has|in|of|on|\n|,))',
+        r'(?:presented\s+to|certify\s+that|awarded\s+to|conferred\s+upon|certifies\s+that|given\s+to)\s+([A-Za-z\s.\-]{3,50}?)(?:\s+(?:for|has|in|of|on|during|who|\n|,)|[.,\n]|$)',
+        r'(?:this\s+is\s+to\s+certify\s+that)\s+([A-Za-z\s.\-]{3,50}?)(?:\s+(?:for|has|in|of|on|\n|,)|[.,\n]|$)',
         r'(?:name\s*[:\-]\s*)([A-Za-z\s.\-]{3,50})(?:\n|$|,)',
     ]
 
