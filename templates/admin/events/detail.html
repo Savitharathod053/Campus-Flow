@@ -137,7 +137,7 @@
                             <tr>
                                 <td class="fw-semibold">{{ att.student.name if att.student else 'Unknown' }}</td>
                                 <td>{{ att.session.session_name if att.session else 'Main Session' }}</td>
-                                <td>{{ att.scanned_at.strftime('%b %d, %H:%M') }}</td>
+                                <td>{{ att.scanned_at.strftime('%b %d, %H:%M') if att.scanned_at else '—' }}</td>
                                 <td><span class="badge bg-light text-dark border">{{ att.verification_method }}</span></td>
                                 <td><span class="badge bg-success">{{ att.status }}</span></td>
                             </tr>
@@ -168,7 +168,7 @@
                                 <td><code>{{ c.certificate_code }}</code></td>
                                 <td>{{ c.student.name if c.student else 'N/A' }}</td>
                                 <td><code>{{ c.roll_number or '—' }}</code></td>
-                                <td>{{ c.upload_date.strftime('%b %d, %Y') }}</td>
+                                <td>{{ c.upload_date.strftime('%b %d, %Y') if c.upload_date else '—' }}</td>
                                 <td><span class="badge bg-success">{{ c.status }}</span></td>
                             </tr>
                         {% else %}

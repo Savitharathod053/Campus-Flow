@@ -1094,9 +1094,9 @@ def event_detail(event_id):
     user = get_current_user()
     event = Event.query.get_or_404(event_id)
 
-    registrations = event.registrations.all()
-    attendance_records = event.attendance_records.all()
-    revenue = sum([r.payment.amount for r in registrations if r.payment and r.payment.status in (PaymentStatus.VERIFIED, 'SUCCESS')])
+    registrations = event.registrations.all() if hasattr(event.registrations, 'all') else event.registrations
+    attendance_records = event.attendance_records if isinstance(event.attendance_records, list) else event.attendance_records.all()
+    revenue = sum([(r.payment.amount or 0.0) for r in registrations if r.payment and r.payment.status in (PaymentStatus.VERIFIED, 'SUCCESS')])
     certificates = Certificate.query.filter_by(event_id=event.id).all()
 
     return render_template(
