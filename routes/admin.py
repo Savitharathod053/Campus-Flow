@@ -54,15 +54,15 @@ def dashboard():
 
     # User Counts (Exact 5 Canonical Roles)
     total_users = User.query.count()
-    total_super_admins = User.query.filter_by(role=UserRole.SUPER_ADMIN).count()
-    total_deans = User.query.filter_by(role=UserRole.STUDENTS_AFFAIRS_DEAN).count()
-    total_hods = User.query.filter_by(role=UserRole.HOD).count()
-    total_organizers = User.query.filter_by(role=UserRole.ORGANIZER).count()
-    total_students = User.query.filter_by(role=UserRole.STUDENT).count()
+    total_super_admins = User.query.filter(User.role.in_([UserRole.SUPER_ADMIN, 'super_admin', 'ADMIN', 'admin'])).count()
+    total_deans = User.query.filter(User.role.in_([UserRole.STUDENTS_AFFAIRS_DEAN, 'students_affairs_dean', 'dean', 'DEAN'])).count()
+    total_hods = User.query.filter(User.role.in_([UserRole.HOD, 'hod', 'HOD'])).count()
+    total_organizers = User.query.filter(User.role.in_([UserRole.ORGANIZER, 'organizer', 'ORGANIZER'])).count()
+    total_students = User.query.filter(User.role.in_([UserRole.STUDENT, 'student', 'STUDENT'])).count()
 
-    # Backward compatibility display variables
+    # Display variables
     total_faculty = total_hods
-    total_admins = total_super_admins + total_deans
+    total_admins = total_super_admins
 
     # Operations Counts
     total_events = Event.query.count()
@@ -299,6 +299,12 @@ def users_list():
 @super_admin_required
 def users_students():
     return redirect(url_for('admin.users_list', role='STUDENT'))
+
+
+@admin_bp.route('/users/deans')
+@super_admin_required
+def users_deans():
+    return redirect(url_for('admin.users_list', role='STUDENTS_AFFAIRS_DEAN'))
 
 
 @admin_bp.route('/users/faculty')

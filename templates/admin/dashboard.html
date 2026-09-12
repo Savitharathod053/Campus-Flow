@@ -53,18 +53,18 @@
     <div class="col-6 col-md-4 col-xl-2">
         <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative">
             <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="text-muted small fw-semibold">Faculty</span>
-                <div class="bg-success bg-opacity-10 text-success rounded-3 p-2 d-flex"><i class="bi bi-person-badge-fill"></i></div>
+                <span class="text-muted small fw-semibold">Deans</span>
+                <div class="bg-success bg-opacity-10 text-success rounded-3 p-2 d-flex"><i class="bi bi-award-fill"></i></div>
             </div>
-            <h3 class="fw-bold mb-0 text-success count-up" data-target="{{ total_faculty }}">{{ total_faculty }}</h3>
-            <a href="{{ url_for('admin.users_faculty') }}" class="stretched-link small text-decoration-none mt-2 text-success fw-semibold">Faculty &rarr;</a>
+            <h3 class="fw-bold mb-0 text-success count-up" data-target="{{ total_deans }}">{{ total_deans }}</h3>
+            <a href="{{ url_for('admin.users_deans') }}" class="stretched-link small text-decoration-none mt-2 text-success fw-semibold">Deans &rarr;</a>
         </div>
     </div>
     <div class="col-6 col-md-4 col-xl-2">
         <div class="card border-0 shadow-3d rounded-4 p-3 bg-white h-100 position-relative">
             <div class="d-flex align-items-center justify-content-between mb-2">
                 <span class="text-muted small fw-semibold">HODs</span>
-                <div class="bg-warning bg-opacity-10 text-warning rounded-3 p-2 d-flex"><i class="bi bi-award-fill"></i></div>
+                <div class="bg-warning bg-opacity-10 text-warning rounded-3 p-2 d-flex"><i class="bi bi-building-fill-gear"></i></div>
             </div>
             <h3 class="fw-bold mb-0 text-warning count-up" data-target="{{ total_hods }}">{{ total_hods }}</h3>
             <a href="{{ url_for('admin.users_hods') }}" class="stretched-link small text-decoration-none mt-2 text-warning fw-semibold">HODs &rarr;</a>

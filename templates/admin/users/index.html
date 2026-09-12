@@ -36,7 +36,7 @@
             <select name="role" class="form-select form-select-sm" onchange="this.form.submit()">
                 <option value="ALL" {% if role_filter == 'ALL' %}selected{% endif %}>All Roles</option>
                 <option value="STUDENT" {% if role_filter == 'STUDENT' %}selected{% endif %}>Students</option>
-                <option value="FACULTY" {% if role_filter == 'FACULTY' %}selected{% endif %}>Faculty</option>
+                <option value="STUDENTS_AFFAIRS_DEAN" {% if role_filter in ('STUDENTS_AFFAIRS_DEAN', 'DEAN') %}selected{% endif %}>Deans</option>
                 <option value="HOD" {% if role_filter == 'HOD' %}selected{% endif %}>HODs</option>
                 <option value="ORGANIZER" {% if role_filter == 'ORGANIZER' %}selected{% endif %}>Organizers</option>
                 <option value="ADMIN" {% if role_filter == 'ADMIN' %}selected{% endif %}>Admins</option>
@@ -112,17 +112,15 @@
                         </td>
                         <td>
                             {% if u.is_super_admin %}
-                                <span class="badge bg-warning text-dark"><i class="bi bi-shield-lock-fill me-1"></i> SUPER ADMIN</span>
-                            {% elif u.role == 'FACULTY_ADMIN' %}
-                                <span class="badge bg-dark">ADMIN</span>
-                            {% elif u.role == 'HOD' %}
-                                <span class="badge bg-danger">HOD</span>
-                            {% elif u.role == 'FACULTY' %}
-                                <span class="badge bg-success">FACULTY</span>
-                            {% elif u.role == 'ORGANIZER' %}
-                                <span class="badge bg-primary">ORGANIZER</span>
+                                <span class="badge bg-dark"><i class="bi bi-shield-shaded me-1"></i> SUPER ADMIN</span>
+                            {% elif u.is_dean %}
+                                <span class="badge bg-success"><i class="bi bi-award-fill me-1"></i> DEAN</span>
+                            {% elif u.is_hod %}
+                                <span class="badge bg-warning text-dark"><i class="bi bi-building-fill-gear me-1"></i> HOD</span>
+                            {% elif u.is_organizer %}
+                                <span class="badge bg-primary"><i class="bi bi-megaphone-fill me-1"></i> ORGANIZER</span>
                             {% else %}
-                                <span class="badge bg-info text-dark">STUDENT</span>
+                                <span class="badge bg-info text-dark"><i class="bi bi-mortarboard-fill me-1"></i> STUDENT</span>
                             {% endif %}
                         </td>
                         <td>

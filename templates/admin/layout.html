@@ -133,17 +133,17 @@
             </a>
 
             <div class="nav-header">Users & Access</div>
-            <a class="nav-link {% if request.endpoint == 'admin.users_list' and request.args.get('role') in ('ALL', None) and not request.path.endswith('/students') and not request.path.endswith('/faculty') and not request.path.endswith('/hods') and not request.path.endswith('/organizers') and not request.path.endswith('/admins') %}active{% endif %}" href="{{ url_for('admin.users_list') }}">
+            <a class="nav-link {% if request.endpoint == 'admin.users_list' and request.args.get('role') in ('ALL', None) and not request.path.endswith('/students') and not request.path.endswith('/deans') and not request.path.endswith('/faculty') and not request.path.endswith('/hods') and not request.path.endswith('/organizers') and not request.path.endswith('/admins') %}active{% endif %}" href="{{ url_for('admin.users_list') }}">
                 <i class="bi bi-people-fill"></i> All Users
             </a>
             <a class="nav-link {% if request.args.get('role') == 'STUDENT' %}active{% endif %}" href="{{ url_for('admin.users_students') }}">
                 <i class="bi bi-mortarboard-fill"></i> Students
             </a>
-            <a class="nav-link {% if request.args.get('role') == 'FACULTY' %}active{% endif %}" href="{{ url_for('admin.users_faculty') }}">
-                <i class="bi bi-person-badge-fill"></i> Faculty
+            <a class="nav-link {% if request.args.get('role') in ('STUDENTS_AFFAIRS_DEAN', 'DEAN') or request.path.endswith('/deans') %}active{% endif %}" href="{{ url_for('admin.users_deans') }}">
+                <i class="bi bi-award-fill"></i> Deans
             </a>
             <a class="nav-link {% if request.args.get('role') == 'HOD' %}active{% endif %}" href="{{ url_for('admin.users_hods') }}">
-                <i class="bi bi-award-fill"></i> HODs
+                <i class="bi bi-building-fill-gear"></i> HODs
             </a>
             <a class="nav-link {% if request.args.get('role') == 'ORGANIZER' %}active{% endif %}" href="{{ url_for('admin.users_organizers') }}">
                 <i class="bi bi-megaphone-fill"></i> Organizers

@@ -29,12 +29,13 @@
                     <div class="col-md-6">
                         <label class="form-label small fw-bold text-dark">System Role</label>
                         <select name="role" class="form-select fw-semibold">
-                            <option value="STUDENT" {% if target_user.role == 'STUDENT' %}selected{% endif %}>Student</option>
+                            <option value="STUDENT" {% if target_user.role == 'STUDENT' or target_user.is_student %}selected{% endif %}>Student</option>
+                            <option value="STUDENTS_AFFAIRS_DEAN" {% if target_user.is_dean %}selected{% endif %}>Students Affairs Dean</option>
+                            <option value="HOD" {% if target_user.role == 'HOD' or target_user.is_hod %}selected{% endif %}>HOD</option>
+                            <option value="ORGANIZER" {% if target_user.role == 'ORGANIZER' or target_user.is_organizer %}selected{% endif %}>Organizer</option>
                             <option value="FACULTY" {% if target_user.role == 'FACULTY' %}selected{% endif %}>Faculty</option>
-                            <option value="HOD" {% if target_user.role == 'HOD' %}selected{% endif %}>HOD</option>
-                            <option value="ORGANIZER" {% if target_user.role == 'ORGANIZER' %}selected{% endif %}>Organizer</option>
                             <option value="FACULTY_ADMIN" {% if target_user.role == 'FACULTY_ADMIN' %}selected{% endif %}>Faculty Admin</option>
-                            <option value="SUPER_ADMIN" {% if target_user.role == 'SUPER_ADMIN' %}selected{% endif %}>Super Admin</option>
+                            <option value="SUPER_ADMIN" {% if target_user.is_super_admin %}selected{% endif %}>Super Admin</option>
                         </select>
                     </div>
                     <div class="col-md-6">
