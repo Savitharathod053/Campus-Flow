@@ -332,6 +332,39 @@ def users_admins():
     return redirect(url_for('admin.users_list', role='ADMIN'))
 
 
+@admin_bp.route('/faculty-directory')
+@super_admin_required
+def faculty_list():
+    return redirect(url_for('admin.users_list', role='HOD'))
+
+
+@admin_bp.route('/students-directory')
+@super_admin_required
+def students_list():
+    return redirect(url_for('admin.users_list', role='STUDENT'))
+
+
+@admin_bp.route('/pending-approvals')
+@super_admin_required
+def pending_approvals():
+    tab = request.args.get('tab', 'events')
+    if tab == 'organizers':
+        return redirect(url_for('admin.organizer_requests_list'))
+    return redirect(url_for('admin.event_requests_list'))
+
+
+@admin_bp.route('/import-faculty', methods=['GET', 'POST'])
+@super_admin_required
+def import_faculty():
+    return redirect(url_for('admin.import_users'))
+
+
+@admin_bp.route('/import-students', methods=['GET', 'POST'])
+@super_admin_required
+def import_students():
+    return redirect(url_for('admin.import_users'))
+
+
 # Add User
 @admin_bp.route('/users/add', methods=['GET', 'POST'])
 @super_admin_required
@@ -1222,6 +1255,31 @@ def delete_event(event_id):
     )
 
     flash(f"Event '{title}' and associated records were permanently deleted.", 'success')
+    return redirect(url_for('admin.events_list'))
+
+
+@admin_bp.route('/events/delete-expired', methods=['POST'])
+@super_admin_required
+def delete_expired():
+    admin_user = get_current_user()
+    now = datetime.utcnow()
+    count, deleted_titles, skipped_titles = delete_expired_events(now, require_certificates_done=True)
+    if count > 0:
+        log_audit_action(
+            admin=admin_user,
+            action="EVENTS_DELETED_EXPIRED",
+            target_type="Event",
+            target_id=0,
+            target_name=f"{count} expired events",
+            details=f"Deleted expired events: {', '.join(deleted_titles)}"
+        )
+        flash(f"Successfully deleted {count} expired event(s) whose certificates were issued.", 'success')
+    else:
+        flash("No eligible expired events found for deletion.", 'info')
+
+    if skipped_titles:
+        flash(f"Skipped {len(skipped_titles)} event(s) because certificate issuance is pending: {', '.join(skipped_titles)}", 'warning')
+
     return redirect(url_for('admin.events_list'))
 
 

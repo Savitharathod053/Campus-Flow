@@ -58,7 +58,15 @@ def delete_event_with_cleanup(event):
     except Exception:
         pass
 
-    # 4. Delete event entity from database
+    # 4. Safely disassociate referencing foreign keys before deletion
+    try:
+        from models import EventRequest, Payment
+        EventRequest.query.filter_by(event_id=event.id).update({'event_id': None}, synchronize_session=False)
+        Payment.query.filter_by(event_id=event.id).update({'event_id': None}, synchronize_session=False)
+    except Exception:
+        pass
+
+    # 5. Delete event entity from database
     db.session.delete(event)
 
 

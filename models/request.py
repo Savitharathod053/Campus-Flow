@@ -149,7 +149,7 @@ class EventRequest(db.Model):
 
     # General & Linkage Fields
     overall_status = db.Column(db.String(30), default=EventRequestStatus.PENDING_HOD_APPROVAL, nullable=False, index=True)
-    event_id = db.Column(db.Integer, db.ForeignKey('events.id'), nullable=True)
+    event_id = db.Column(db.Integer, db.ForeignKey('events.id', use_alter=True), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

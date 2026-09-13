@@ -316,11 +316,11 @@ def check_duplicate_payment(transaction_id, screenshot_hash, current_payment_id=
     """
     Checks if this transaction ID or screenshot has already been used for another payment.
     """
-    # 1. Transaction ID check
+    # 1. Transaction ID check (exact and normalized match)
     if transaction_id and transaction_id.strip():
         clean_txn = transaction_id.strip()
+        norm_txn = normalize_transaction_id(clean_txn)
         query = Payment.query.filter(
-            Payment.transaction_id == clean_txn,
             Payment.status.in_([
                 PaymentStatus.VERIFIED,
                 PaymentStatus.PENDING,
@@ -330,9 +330,17 @@ def check_duplicate_payment(transaction_id, screenshot_hash, current_payment_id=
         )
         if current_payment_id:
             query = query.filter(Payment.id != current_payment_id)
-        existing_txn = query.first()
-        if existing_txn:
-            return True, "This transaction has already been used."
+        
+        existing_txns = query.all()
+        for p in existing_txns:
+            if p.transaction_id:
+                if p.transaction_id.strip() == clean_txn:
+                    return True, "This transaction has already been used."
+                if norm_txn and len(norm_txn) >= 6 and normalize_transaction_id(p.transaction_id) == norm_txn:
+                    return True, "This transaction has already been used."
+            if p.extracted_transaction_id:
+                if norm_txn and len(norm_txn) >= 6 and normalize_transaction_id(p.extracted_transaction_id) == norm_txn:
+                    return True, "This transaction has already been used."
 
     # 2. Screenshot Hash check
     if screenshot_hash and screenshot_hash.strip():

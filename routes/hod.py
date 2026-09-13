@@ -422,6 +422,43 @@ def events():
     )
 
 
+@hod_bp.route('/events/<int:event_id>/endorse', methods=['POST'])
+@hod_required
+def endorse_event(event_id):
+    user = get_current_user()
+    dept_obj = get_hod_department(user)
+    event = Event.query.get_or_404(event_id)
+
+    # Department Access Guard
+    if not dept_obj or (event.department_id != dept_obj.id and event.department != dept_obj.code):
+        flash("Unauthorized: You can only review events belonging to your department.", 'danger')
+        return redirect(url_for('hod.events'))
+
+    action = request.form.get('action', 'approve').strip().lower()
+
+    # If linked to an EventRequest, use standard workflow
+    req = EventRequest.query.filter_by(event_id=event.id).first()
+    if req:
+        if action == 'approve':
+            return approve_event_request(req.id)
+        else:
+            return reject_event_request(req.id)
+
+    # Direct event moderation
+    if action == 'approve':
+        event.hod_approved = True
+        event.status = EventStatus.PENDING_APPROVAL
+        db.session.commit()
+        flash(f"Event '{event.title}' endorsed. Awaiting Students Affairs Dean final clearance.", 'success')
+    else:
+        event.hod_approved = False
+        event.status = EventStatus.REJECTED
+        db.session.commit()
+        flash(f"Event '{event.title}' rejected.", 'warning')
+
+    return redirect(url_for('hod.events'))
+
+
 @hod_bp.route('/faculty')
 @hod_required
 def faculty():

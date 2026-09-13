@@ -84,12 +84,12 @@ def dashboard():
     pending_registrations = len([r for r in all_registrations if r.status == RegistrationStatus.PENDING_PAYMENT])
     attended_count = len([r for r in all_registrations if r.attendance is not None])
 
-    # Pending payment verifications for organizer's events
+    # Pending payment verifications for organizer's events (including verified transaction IDs awaiting organizer approval)
     pending_payments = []
     if event_ids:
         pending_payments = Payment.query.filter(
             Payment.event_id.in_(event_ids),
-            Payment.status.in_([PaymentStatus.PENDING, PaymentStatus.MANUAL_REVIEW])
+            Payment.status.in_([PaymentStatus.PENDING, PaymentStatus.MANUAL_REVIEW, PaymentStatus.TRANSACTION_ID_VERIFIED])
         ).order_by(Payment.submitted_at.desc()).all()
 
     # Recent 10 registrations

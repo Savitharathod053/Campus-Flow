@@ -37,10 +37,13 @@ def create_app(config_class=Config):
         app.config['UPLOAD_FOLDER'],
         app.config['POSTER_FOLDER'],
         app.config['QRCODE_FOLDER'],
-        app.config['CERTIFICATE_FOLDER']
+        app.config['CERTIFICATE_FOLDER'],
+        app.config.get('PAYMENT_PROOF_FOLDER'),
+        app.config.get('ORGANIZER_QR_FOLDER')
     ]
     for d in upload_dirs:
-        Path(d).mkdir(parents=True, exist_ok=True)
+        if d:
+            Path(d).mkdir(parents=True, exist_ok=True)
 
     # Register Blueprints
     app.register_blueprint(public_bp)

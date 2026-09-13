@@ -52,8 +52,11 @@ def dashboard():
         if r.is_confirmed and (r.event.is_completed or r.event.is_expired)
     ]
 
-    # Certificates count
-    certificates = Certificate.query.filter_by(student_id=user.id).all()
+    # Certificates count (strictly matched or manually assigned in student vault)
+    certificates = Certificate.query.filter(
+        Certificate.student_id == user.id,
+        Certificate.status.in_([CertificateStatus.MATCHED, CertificateStatus.MANUALLY_ASSIGNED])
+    ).all()
 
     # Recommended events (only active, dual-approved, published, upcoming, non-expired events)
     registered_event_ids = {r.event_id for r in registrations}
@@ -625,6 +628,29 @@ def team_checkout(team_id):
         return redirect(url_for('payment.checkout', registration_id=lead_reg.id))
 
     flash("Team registration record not found for payment.", 'danger')
+    return redirect(url_for('student.team_detail', team_id=team.id))
+
+
+@student_bp.route('/teams/<int:team_id>/simulate-payment', methods=['POST'])
+@student_required
+def simulate_team_payment(team_id):
+    user = get_current_user()
+    team = Team.query.get_or_404(team_id)
+
+    if team.team_lead_id != user.id and not user.is_admin:
+        flash("Only the team lead can make the team fee payment.", 'warning')
+        return redirect(url_for('student.team_detail', team_id=team.id))
+
+    if team.payment_status == TeamPaymentStatus.PAID:
+        flash("Team payment has already been completed.", 'info')
+        return redirect(url_for('student.team_detail', team_id=team.id))
+
+    process_team_payment_success(
+        team=team,
+        payment_method='SIMULATION',
+        transaction_id=f"SIM-{int(datetime.utcnow().timestamp())}"
+    )
+    flash(f"Payment successful! Entry passes and tickets generated for all confirmed members of team '{team.team_name}'.", 'success')
     return redirect(url_for('student.team_detail', team_id=team.id))
 
 
