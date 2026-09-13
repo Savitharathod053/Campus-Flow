@@ -8,24 +8,33 @@ load_dotenv(BASE_DIR / '.env')
 def get_database_uri():
     """
     Retrieve and normalize the relational database connection URI.
-    Supports Render PostgreSQL, Microsoft SQL Server (local SSMS / MSSQL), MySQL, and SQLite.
-    Automatically handles driver and connection parameters for Render PostgreSQL and SQL Server.
+    Supports Render PostgreSQL (internal & external), Microsoft SQL Server (local SSMS / MSSQL), MySQL, and SQLite.
+    Automatically handles driver, SSL negotiation, and connection parameters.
     """
-    raw_uri = os.environ.get('DATABASE_URL')
+    # Check all standard environment variable names used by cloud providers (Render, Supabase, Neon, Railway)
+    raw_uri = (
+        os.environ.get('DATABASE_URL') or
+        os.environ.get('DATABASE_INTERNAL_URL') or
+        os.environ.get('DATABASE_EXTERNAL_URL') or
+        os.environ.get('POSTGRES_URL') or
+        os.environ.get('POSTGRESQL_URL') or
+        os.environ.get('SQLALCHEMY_DATABASE_URI') or
+        os.environ.get('DATABASE_URI') or
+        os.environ.get('DB_URI')
+    )
+    
     if not raw_uri or not raw_uri.strip():
-        # If running on Windows with local SQL Server:
-        if os.name == 'nt':
+        # If running locally on Windows without cloud DATABASE_URL, use local SQL Server
+        if os.name == 'nt' and not os.environ.get('RENDER'):
             return 'mssql+pyodbc://@localhost/fastfest?driver=ODBC+Driver+18+for+SQL+Server&trusted_connection=yes&TrustServerCertificate=yes'
-        # On Linux / Cloud fallback to SQLite instance database
+        # On Linux / Cloud container fallback to SQLite instance database
         db_path = BASE_DIR / 'instance' / 'fastfest.db'
         db_path.parent.mkdir(parents=True, exist_ok=True)
         return f'sqlite:///{db_path}'
     
     uri = raw_uri.strip().strip("'\"")
     
-    # Render / Heroku provides postgres:// or postgresql:// scheme.
-    # In SQLAlchemy 2.0+, 'postgres://' is not recognized; 'postgresql+psycopg2://' explicitly
-    # targets the psycopg2-binary driver installed in requirements.txt.
+    # Normalize PostgreSQL schemes to target psycopg2-binary
     if uri.startswith("postgres://"):
         uri = uri.replace("postgres://", "postgresql+psycopg2://", 1)
     elif uri.startswith("postgresql://") and not uri.startswith("postgresql+"):
@@ -37,13 +46,38 @@ def get_database_uri():
     elif uri.startswith("mysql://"):
         uri = uri.replace("mysql://", "mysql+pymysql://", 1)
 
-    # If connecting to a remote PostgreSQL instance (e.g. Render external database URL)
-    # and sslmode is not specified, append sslmode=require for secure TLS connectivity.
-    if uri.startswith("postgresql") and "@localhost" not in uri and "@127.0.0.1" not in uri and "sslmode=" not in uri:
-        delimiter = "&" if "?" in uri else "?"
-        uri = f"{uri}{delimiter}sslmode=require"
+    # SSL Mode handling for PostgreSQL:
+    # Render internal database connections (e.g. dpg-xxxx:5432) do NOT support SSL and will fail with
+    # "psycopg2.OperationalError: server does not support SSL, but SSL was required" if sslmode=require is set.
+    # External hosts (e.g. *.render.com, *.neon.tech, *.supabase.co) require SSL.
+    if uri.startswith("postgresql") and "sslmode=" not in uri:
+        from urllib.parse import urlparse
+        try:
+            cleaned_target = uri.replace("postgresql+psycopg2://", "http://", 1).replace("postgresql://", "http://", 1)
+            parsed = urlparse(cleaned_target)
+            host = (parsed.hostname or '').lower()
+            
+            # An internal host on Render/Docker has no dots in hostname (e.g. 'dpg-cxxxxxx-a') or is localhost
+            is_internal_network = (
+                host in ('localhost', '127.0.0.1') or
+                ('.' not in host and host != '') or
+                host.endswith('.internal') or
+                host.endswith('.local')
+            )
+            
+            delimiter = "&" if "?" in uri else "?"
+            if is_internal_network:
+                # Internal private network: use prefer so connection succeeds whether SSL is present or not
+                uri = f"{uri}{delimiter}sslmode=prefer"
+            else:
+                # External remote host across public internet: enforce TLS
+                uri = f"{uri}{delimiter}sslmode=require"
+        except Exception:
+            delimiter = "&" if "?" in uri else "?"
+            uri = f"{uri}{delimiter}sslmode=prefer"
     
     return uri
+
 
 
 class Config:

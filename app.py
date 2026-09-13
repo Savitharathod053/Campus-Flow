@@ -57,10 +57,35 @@ def create_app(config_class=Config):
     app.register_blueprint(hod_bp)
     app.register_blueprint(dean_bp)
 
-    # Health Check Endpoint
+    # Health Check Endpoints
     @app.route('/health')
     def health():
         return jsonify({"status": "healthy"}), 200
+
+    @app.route('/health/db')
+    def health_db():
+        from services.db_diagnostic import get_safe_db_info
+        info = get_safe_db_info()
+        status_code = 200 if info.get('connected') else 503
+        return jsonify({
+            "status": "connected" if info.get('connected') else "disconnected",
+            "dialect": info.get('dialect'),
+            "database": info.get('database'),
+            "server": info.get('server')
+        }), status_code
+
+    # Pre-request schema assurance (idempotent, ensures tables exist on first request)
+    @app.before_request
+    def ensure_database_ready():
+        from flask import request
+        if request.endpoint == 'static':
+            return
+        from services.db_init import ensure_db_initialized
+        try:
+            ensure_db_initialized(app)
+        except Exception as e:
+            app.logger.warning(f"Database readiness check note: {e}")
+
 
     # Notification API Endpoints
     @app.route('/notifications/read/<int:notification_id>', methods=['POST'])
@@ -212,4 +237,6 @@ app = create_app()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    app.run(host='127.0.0.1', port=port, debug=False)
+    host = '0.0.0.0' if (os.environ.get('PORT') or os.environ.get('RENDER')) else '127.0.0.1'
+    app.run(host=host, port=port, debug=False)
+

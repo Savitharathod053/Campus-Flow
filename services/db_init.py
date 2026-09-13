@@ -16,6 +16,17 @@ logger = logging.getLogger("CampusFlow.DBInit")
 _DB_INITIALIZED = False
 
 
+def ensure_db_initialized(app):
+    """
+    Guarantees database schema tables exist before serving any request.
+    If already initialized, returns immediately in sub-millisecond time.
+    """
+    global _DB_INITIALIZED
+    if _DB_INITIALIZED:
+        return True
+    return init_db_and_seed(app)
+
+
 def init_db_and_seed(app, force=False):
     """
     Initializes all database tables and seeds the essential baseline.
@@ -49,6 +60,7 @@ def init_db_and_seed(app, force=False):
             logger.error(f"Database initialization encountered an error: {e}", exc_info=True)
             db.session.rollback()
             return False
+
 
 
 def _seed_departments():

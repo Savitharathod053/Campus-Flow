@@ -38,5 +38,6 @@ COPY . /app/
 # Expose port
 EXPOSE 5000
 
-# Run with Gunicorn WSGI server
-CMD ["gunicorn", "wsgi:app", "--bind", "0.0.0.0:5000", "--workers", "4", "--threads", "2", "--timeout", "120"]
+# Run with Gunicorn WSGI server (binds dynamically to deployment platform's assigned $PORT)
+CMD exec gunicorn wsgi:app --bind 0.0.0.0:${PORT:-5000} --workers 4 --threads 2 --timeout 120
+
