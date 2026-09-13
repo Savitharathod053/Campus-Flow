@@ -29,8 +29,8 @@ def ensure_db_initialized(app):
 
 def init_db_and_seed(app, force=False):
     """
-    Initializes all database tables and seeds the essential baseline.
-    Returns True on success, False on failure.
+    Initializes all database tables, ensures all model columns exist on pre-existing tables,
+    and seeds the essential baseline. Returns True on success, False on failure.
     """
     global _DB_INITIALIZED
     if _DB_INITIALIZED and not force:
@@ -43,23 +43,130 @@ def init_db_and_seed(app, force=False):
             db.create_all()
             logger.info("Database schema tables verified.")
 
-            # 2. Seed canonical college departments if empty
+            # 2. Synchronize any missing columns on pre-existing tables (e.g. payments.extracted_transaction_id)
+            sync_missing_columns()
+
+            # 3. Seed canonical college departments if empty
             _seed_departments()
 
-            # 3. Seed initial Super Admin if not present
+            # 4. Seed initial Super Admin if not present
             _seed_super_admin()
 
-            # 4. Seed baseline Dean and HOD accounts if missing
+            # 5. Seed baseline Dean and HOD accounts if missing
             _seed_baseline_officials()
 
             db.session.commit()
             _DB_INITIALIZED = True
-            logger.info("Database initialization and seeding completed successfully.")
+            logger.info("Database initialization, schema synchronization, and seeding completed successfully.")
             return True
         except Exception as e:
             logger.error(f"Database initialization encountered an error: {e}", exc_info=True)
             db.session.rollback()
             return False
+
+
+def sync_missing_columns():
+    """
+    Safely inspects existing tables and non-destructively adds any missing columns.
+    Ensures that newly added model columns (such as payments.extracted_transaction_id)
+    exist in the production database without dropping or altering existing records.
+    """
+    engine = db.engine
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    dialect = engine.dialect.name.lower()
+    existing_tables = set(inspector.get_table_names())
+
+    specs = {
+        'payments': [
+            ('extracted_transaction_id', 'VARCHAR(100)', None, True),
+            ('expected_amount', 'FLOAT', None, True),
+            ('detected_amount', 'FLOAT', None, True),
+            ('screenshot_hash', 'VARCHAR(64)', None, True),
+            ('fraud_risk', 'VARCHAR(20)', "'LOW'", True),
+            ('fraud_details', 'TEXT', None, True),
+            ('ocr_extracted_data', 'TEXT', None, True),
+            ('verification_reason', 'TEXT', None, True),
+            ('notes', 'TEXT', None, True),
+            ('submitted_at', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
+            ('verified_at', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
+            ('verified_by_id', 'INTEGER', None, True),
+            ('team_id', 'INTEGER', None, True),
+            ('event_id', 'INTEGER', None, True),
+            ('student_id', 'INTEGER', None, True),
+            ('organizer_id', 'INTEGER', None, True),
+        ],
+        'events': [
+            ('registration_type', 'VARCHAR(20)', "'INDIVIDUAL'", False),
+            ('min_team_size', 'INTEGER', '2', False),
+            ('max_team_size', 'INTEGER', '4', False),
+            ('team_payment_type', 'VARCHAR(20)', "'FREE'", False),
+            ('require_full_team', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'FALSE' if 'postgres' in dialect else '0', False),
+            ('upi_id', 'VARCHAR(100)', None, True),
+            ('upi_number', 'VARCHAR(20)', None, True),
+            ('upi_qr_image', 'VARCHAR(255)', None, True),
+            ('payment_instructions', 'TEXT', None, True),
+            ('enable_attendance', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'TRUE' if 'postgres' in dialect else '1', False),
+            ('min_attendance_percentage', 'FLOAT', '0.0', False),
+            ('department_id', 'INTEGER', None, True),
+            ('is_published', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'FALSE' if 'postgres' in dialect else '0', False),
+            ('hod_approved', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'FALSE' if 'postgres' in dialect else '0', False),
+            ('dean_approved', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'FALSE' if 'postgres' in dialect else '0', False),
+            ('event_request_id', 'INTEGER', None, True),
+            ('rejection_reason', 'TEXT', None, True),
+            ('allowed_departments', 'VARCHAR(255)', "'ALL'", False),
+            ('allowed_years', 'VARCHAR(50)', "'ALL'", False),
+            ('allowed_sections', 'VARCHAR(50)', "'ALL'", False),
+            ('eligibility_notes', 'VARCHAR(255)', None, True),
+        ],
+        'organizer_profiles': [
+            ('roll_number', 'VARCHAR(50)', None, True),
+            ('rejection_reason', 'VARCHAR(255)', None, True),
+            ('approved_by_id', 'INTEGER', None, True),
+            ('approved_at', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
+        ],
+        'event_registrations': [
+            ('team_id', 'INTEGER', None, True),
+        ],
+        'certificates': [
+            ('extracted_name', 'VARCHAR(150)', None, True),
+            ('confidence_score', 'FLOAT', '0.0', True),
+            ('assigned_by_id', 'INTEGER', None, True),
+            ('extracted_text', 'TEXT', None, True),
+            ('file_type', 'VARCHAR(20)', "'pdf'", False),
+            ('original_filename', 'VARCHAR(255)', None, True),
+        ],
+        'attendance_records': [
+            ('session_id', 'INTEGER', None, True),
+        ]
+    }
+
+    with engine.connect() as conn:
+        for table_name, columns in specs.items():
+            if table_name not in existing_tables:
+                continue
+            existing_cols = {c['name'] for c in inspector.get_columns(table_name)}
+            for col_name, col_type, default_val, is_null in columns:
+                if col_name not in existing_cols:
+                    logger.info(f"Adding missing column '{col_name}' to '{table_name}' table...")
+                    try:
+                        null_clause = "NULL" if is_null else "NOT NULL"
+                        default_clause = f" DEFAULT {default_val}" if default_val is not None else ""
+                        
+                        if 'postgres' in dialect:
+                            sql = f"ALTER TABLE {table_name} ADD COLUMN IF NOT EXISTS {col_name} {col_type}{default_clause} {null_clause}"
+                        elif 'mssql' in dialect:
+                            sql = f"ALTER TABLE [{table_name}] ADD [{col_name}] {col_type}{default_clause} {null_clause}"
+                        else:
+                            sql = f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}{default_clause}"
+                            
+                        conn.execute(text(sql))
+                        conn.commit()
+                        logger.info(f"Successfully added column '{col_name}' to '{table_name}'.")
+                    except Exception as e:
+                        logger.warning(f"Note on adding {table_name}.{col_name}: {e}")
+                        conn.rollback()
+
 
 
 

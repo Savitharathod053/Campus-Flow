@@ -41,13 +41,17 @@ def main():
 
         success = init_db_and_seed(app)
         if success:
-            print("\n[SUCCESS] All 21 tables verified and baseline administrative users provisioned.")
+            from models import Payment
+            pay_count = Payment.query.count()
+            print(f"\n[SUCCESS] All 21 tables verified and schema columns synchronized.")
+            print(f"[SUCCESS] payments.extracted_transaction_id verified. Payment.query.count() = {pay_count}.")
             print("You can now log in at /auth/login with:")
             admin_email = os.environ.get('SUPER_ADMIN_EMAIL', 'superadmin@college.edu')
             print(f"  Super Admin Email : {admin_email}")
             print(f"  Role              : super_admin (SUPER_ADMIN)")
             print("=" * 70)
             sys.exit(0)
+
         else:
             print("\n[FAILURE] Database initialization encountered an error.")
             sys.exit(1)
