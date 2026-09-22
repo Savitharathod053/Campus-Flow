@@ -156,7 +156,11 @@ class Event(db.Model):
         """Strict dual approval check. Allows backwards compatibility for direct fixture events."""
         if self.is_published and self.hod_approved and self.dean_approved:
             return True
-        if self.event_request_id is None and self.status in (EventStatus.APPROVED, EventStatus.REGISTRATION_OPEN, EventStatus.COMPLETED, 'EVENT_COMPLETED'):
+        if self.event_request_id is None and self.status in (
+            EventStatus.APPROVED, EventStatus.REGISTRATION_OPEN,
+            EventStatus.STARTED, EventStatus.ONGOING, 'Started',
+            EventStatus.COMPLETED, 'EVENT_COMPLETED'
+        ):
             return True
         return False
 
@@ -296,23 +300,38 @@ class Event(db.Model):
         Priority:
         1. Explicit event.responsible_hod
         2. event.responsible_hod_id lookup
-        3. CollegeDepartment via event.department_id -> department_rel.hod
-        4. CollegeDepartment lookup by department code/name -> hod
-        5. User with role 'hod' whose faculty_profile.department matches event.department
+        3. Creation request hod_reviewer (the specific HOD who approved the event)
+        4. CollegeDepartment via event.department_rel.hod
+        5. CollegeDepartment via event.department_id -> hod
+        6. CollegeDepartment lookup by department code/name/alias -> hod
+        7. User with role 'hod' whose faculty_profile.department matches event.department
         """
+        from .user import User, UserRole, FacultyProfile
+        from .department import CollegeDepartment, Department
+
         if self.responsible_hod:
             return self.responsible_hod
         if self.responsible_hod_id:
-            from .user import User
             hod = User.query.get(self.responsible_hod_id)
             if hod:
                 return hod
 
+        # 3. Check Creation Request HOD reviewer if linked
+        if hasattr(self, 'creation_request') and self.creation_request and getattr(self.creation_request, 'hod_reviewer', None):
+            return self.creation_request.hod_reviewer
+
+        # 4. Check department_rel
         if self.department_rel and getattr(self.department_rel, 'hod', None):
             return self.department_rel.hod
 
+        # 5. Check department_id
+        if self.department_id:
+            dept_by_id = CollegeDepartment.query.get(self.department_id)
+            if dept_by_id and getattr(dept_by_id, 'hod', None):
+                return dept_by_id.hod
+
+        # 6. Check department code, normalized alias, or name
         if self.department:
-            from .department import CollegeDepartment, Department
             norm = Department.normalize_code(self.department)
             dept = CollegeDepartment.query.filter(
                 (CollegeDepartment.code == self.department) |
@@ -321,14 +340,21 @@ class Event(db.Model):
             ).first()
             if dept and getattr(dept, 'hod', None):
                 return dept.hod
+            if dept and dept.hod_id:
+                hod_by_dept_id = User.query.get(dept.hod_id)
+                if hod_by_dept_id:
+                    return hod_by_dept_id
 
-            from .user import User, UserRole, FacultyProfile
-            hod_user = User.query.filter_by(role=UserRole.HOD).join(
+            # 7. Check FacultyProfile joined with User where role is HOD
+            hod_user = User.query.filter(
+                (User.role == UserRole.HOD) | (User.role == 'hod')
+            ).join(
                 FacultyProfile, User.id == FacultyProfile.user_id, isouter=True
             ).filter(
                 (FacultyProfile.department == self.department) |
                 (FacultyProfile.department == norm) |
-                (FacultyProfile.department == getattr(dept, 'name', None))
+                (FacultyProfile.department == getattr(dept, 'name', None)) |
+                (FacultyProfile.department == getattr(dept, 'code', None))
             ).first()
             if hod_user:
                 return hod_user

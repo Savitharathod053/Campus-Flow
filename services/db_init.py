@@ -55,6 +55,9 @@ def init_db_and_seed(app, force=False):
             # 5. Seed baseline Dean and HOD accounts if missing
             _seed_baseline_officials()
 
+            # 6. Ensure all active departments have their responsible HOD linked
+            _link_department_hods()
+
             db.session.commit()
             _DB_INITIALIZED = True
             logger.info("Database initialization, schema synchronization, and seeding completed successfully.")
@@ -389,4 +392,34 @@ def _seed_baseline_officials():
                 logger.info(f"Successfully provisioned baseline CSE HOD: {hod_email}")
     except Exception as e:
         logger.warning(f"Baseline officials seeding note: {e}")
+        db.session.rollback()
+
+
+def _link_department_hods():
+    """
+    Ensures that every active CollegeDepartment record has its hod_id linked
+    to an existing HOD user with matching departmental assignment.
+    """
+    try:
+        departments = CollegeDepartment.query.filter_by(is_active=True).all()
+        for dept in departments:
+            if not dept.hod_id:
+                # Look for an HOD user assigned to this department
+                hod_user = User.query.filter(
+                    (User.role == UserRole.HOD) | (User.role == 'hod')
+                ).join(
+                    FacultyProfile, User.id == FacultyProfile.user_id, isouter=True
+                ).filter(
+                    (FacultyProfile.department == dept.code) |
+                    (FacultyProfile.department == dept.name) |
+                    (User.email.ilike(f"%{dept.code.lower()}%"))
+                ).first()
+
+                if hod_user:
+                    dept.hod_id = hod_user.id
+                    db.session.add(dept)
+                    logger.info(f"Linked Department '{dept.code}' to HOD user #{hod_user.id} ({hod_user.name}).")
+        db.session.commit()
+    except Exception as e:
+        logger.warning(f"Department HOD linking note: {e}")
         db.session.rollback()

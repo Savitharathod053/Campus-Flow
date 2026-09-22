@@ -23,6 +23,18 @@
                 <a href="{{ url_for('organizer.edit_event', event_id=event.id) }}" class="btn btn-light btn-sm fw-bold">
                     <i class="bi bi-pencil me-1"></i> Edit Event
                 </a>
+                {% if event.status in ['APPROVED', 'UPCOMING', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'] %}
+                <form method="POST" action="{{ url_for('organizer.start_event', event_id=event.id) }}" class="d-inline" onsubmit="return confirm('Start this event now? This will notify your Department HOD of any remaining empty slots and mark the event as Started.');">
+                    <button type="submit" class="btn btn-success btn-sm fw-bold">
+                        <i class="bi bi-play-circle-fill me-1"></i> Start Event
+                    </button>
+                </form>
+                {% elif event.status in ['STARTED', 'ONGOING', 'Started'] %}
+                <span class="badge bg-success text-white d-inline-flex align-items-center py-2 px-3 fw-bold shadow-sm">
+                    <span class="spinner-grow spinner-grow-sm me-1" role="status" aria-hidden="true" style="width: 0.65rem; height: 0.65rem;"></span>
+                    Event in Progress (Started)
+                </span>
+                {% endif %}
                 {% if event.status != 'EVENT_COMPLETED' %}
                 <form method="POST" action="{{ url_for('organizer.complete_event', event_id=event.id) }}" onsubmit="return confirm('Mark this event as Complete? Active passes will be archived while all historical attendance, payments, and certificates are safely preserved.');" class="d-inline">
                     <button type="submit" class="btn btn-warning btn-sm fw-bold">

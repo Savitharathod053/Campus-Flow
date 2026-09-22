@@ -1134,6 +1134,77 @@ def preview_certificate(cert_id):
     )
 
 
+@organizer_bp.route('/events/<int:event_id>/start', methods=['POST'])
+@organizer_required
+def start_event(event_id):
+    """
+    Organizer starts the event.
+    Transitions event status to STARTED, persists to database,
+    and triggers the automatic empty slots capacity notification to the responsible HOD.
+    Supports both AJAX/JSON clients and standard form POST requests.
+    """
+    user = get_current_user()
+    event = Event.query.get_or_404(event_id)
+
+    # 1. Validate organizer permission
+    if event.organizer_id != user.id and not user.is_admin:
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': 'Unauthorized: You can only start your own events.'}), 403
+        abort(403)
+
+    # 2. Check if already completed or cancelled
+    if event.is_completed or event.status in (EventStatus.CANCELLED, EventStatus.REJECTED, EventStatus.COMPLETED, 'EVENT_COMPLETED'):
+        msg = f"Cannot start event '{event.title}' because it is already {event.status}."
+        if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': False, 'message': msg}), 400
+        flash(msg, 'warning')
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    # 3. Change event status to STARTED/ACTIVE and save
+    was_already_started = (event.status == EventStatus.STARTED)
+    event.status = EventStatus.STARTED
+    db.session.add(event)
+    db.session.commit()
+    current_app.logger.info(f"[EVENT_STARTED] Event ID {event.id} ('{event.title}') status set to STARTED by {user.name} (User #{user.id})")
+
+    # 4-9. Execute HOD empty slots notification trigger
+    from services.capacity_notification_service import notify_hod_event_started
+    notif_result = None
+    try:
+        notif_result = notify_hod_event_started(event, force=False)
+    except Exception as e:
+        current_app.logger.error(f"Error during HOD empty slots capacity check for event #{event.id}: {e}", exc_info=True)
+
+    # 10. Return response
+    total_slots = event.max_participants or 0
+    confirmed = event.confirmed_registrations_count
+    empty = max(0, total_slots - confirmed)
+
+    msg = f"Event '{event.title}' has been successfully STARTED!"
+    if notif_result:
+        msg += f" Responsible HOD ({notif_result.get('hod_email')}) notified of {notif_result.get('empty_slots')} empty slots."
+    elif empty <= 0:
+        msg += f" Event is fully booked ({confirmed}/{total_slots} participants)."
+    elif was_already_started:
+        msg += " Event was already in progress."
+
+    if request.is_json or request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({
+            'success': True,
+            'message': msg,
+            'event_id': event.id,
+            'status': event.status,
+            'total_slots': total_slots,
+            'confirmed_registrations': confirmed,
+            'empty_slots': empty,
+            'notification_dispatched': bool(notif_result),
+            'notification_info': notif_result
+        }), 200
+
+    flash(msg, 'success')
+    return redirect(request.referrer or url_for('organizer.manage_event', event_id=event.id))
+
+
 @organizer_bp.route('/events/<int:event_id>/complete', methods=['POST'])
 @organizer_required
 def complete_event(event_id):
