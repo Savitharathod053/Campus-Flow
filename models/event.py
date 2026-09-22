@@ -5,6 +5,7 @@ from .user import db
 class EventStatus:
     UPCOMING = 'UPCOMING'
     ONGOING = 'ONGOING'
+    STARTED = 'Started'
     COMPLETED = 'COMPLETED'
     EVENT_COMPLETED = 'COMPLETED'
     CANCELLED = 'CANCELLED'
@@ -16,7 +17,7 @@ class EventStatus:
     REJECTED = 'REJECTED'
 
     CHOICES = [
-        UPCOMING, ONGOING, COMPLETED, CANCELLED,
+        UPCOMING, ONGOING, STARTED, COMPLETED, CANCELLED,
         DRAFT, PENDING_APPROVAL, APPROVED, 
         REGISTRATION_OPEN, REGISTRATION_CLOSED, 
         REJECTED
@@ -113,6 +114,10 @@ class Event(db.Model):
     dean_approved = db.Column(db.Boolean, default=False, nullable=False)
     event_request_id = db.Column(db.Integer, db.ForeignKey('event_requests.id'), nullable=True)
 
+    # Empty Slots Notification & Capacity Tracking
+    empty_slot_notification_sent = db.Column(db.Boolean, default=False, nullable=False)
+    responsible_hod_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+
     # Lifecycle Status
     status = db.Column(db.String(30), default=EventStatus.PENDING_APPROVAL, nullable=False, index=True)
     rejection_reason = db.Column(db.Text, nullable=True)
@@ -122,7 +127,8 @@ class Event(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
-    organizer = db.relationship('User', back_populates='organized_events')
+    organizer = db.relationship('User', back_populates='organized_events', foreign_keys=[organizer_id])
+    responsible_hod = db.relationship('User', foreign_keys=[responsible_hod_id])
     department_rel = db.relationship('CollegeDepartment', foreign_keys=[department_id])
     custom_fields = db.relationship('CustomRegistrationField', back_populates='event', cascade='all, delete-orphan', order_by='CustomRegistrationField.display_order')
     registrations = db.relationship('EventRegistration', back_populates='event', cascade='all, delete-orphan', lazy='dynamic')
@@ -196,6 +202,30 @@ class Event(db.Model):
         return max(0, self.max_participants - count)
 
     @property
+    def empty_slots(self):
+        """Calculates unfilled registration slots: total capacity - confirmed registrations (excludes cancelled)."""
+        return self.available_seats
+
+    @property
+    def occupancy_percentage(self):
+        """Returns occupancy percentage based on confirmed registrations / total capacity."""
+        total = self.max_participants or 0
+        if total <= 0:
+            return 0.0
+        return round((self.confirmed_registrations_count / total) * 100.0, 1)
+
+    @property
+    def is_started(self):
+        """Returns True if the event status is STARTED or if its start_time has arrived and event is not cancelled/draft/pending."""
+        if self.status == EventStatus.STARTED:
+            return True
+        if self.status in (EventStatus.CANCELLED, EventStatus.REJECTED, EventStatus.DRAFT, EventStatus.PENDING_APPROVAL):
+            return False
+        if self.start_time and datetime.utcnow() >= self.start_time:
+            return True
+        return False
+
+    @property
     def is_expired(self):
         """Returns True if the event is marked COMPLETED, CANCELLED, or if its end_time has passed."""
         if self.status in (EventStatus.COMPLETED, 'EVENT_COMPLETED', EventStatus.CANCELLED, EventStatus.REJECTED):
@@ -242,18 +272,65 @@ class Event(db.Model):
 
     @property
     def dynamic_lifecycle_status(self):
-        """Returns the dynamic lifecycle status: UPCOMING, ONGOING, COMPLETED, CANCELLED, etc."""
+        """Returns the dynamic lifecycle status: UPCOMING, ONGOING, STARTED, COMPLETED, CANCELLED, etc."""
         if self.status == EventStatus.CANCELLED:
             return EventStatus.CANCELLED
         if self.is_completed:
             return EventStatus.COMPLETED
         if not self.is_published_and_approved:
             return EventStatus.PENDING_APPROVAL
+        if self.status == EventStatus.STARTED:
+            return EventStatus.STARTED
         if self.is_ongoing:
             return EventStatus.ONGOING
         if self.is_upcoming:
             return EventStatus.UPCOMING
         return self.status
+
+    def get_responsible_hod(self):
+        """
+        Resolves the single responsible HOD user for this event.
+        Priority:
+        1. Explicit event.responsible_hod
+        2. event.responsible_hod_id lookup
+        3. CollegeDepartment via event.department_id -> department_rel.hod
+        4. CollegeDepartment lookup by department code/name -> hod
+        5. User with role 'hod' whose faculty_profile.department matches event.department
+        """
+        if self.responsible_hod:
+            return self.responsible_hod
+        if self.responsible_hod_id:
+            from .user import User
+            hod = User.query.get(self.responsible_hod_id)
+            if hod:
+                return hod
+
+        if self.department_rel and getattr(self.department_rel, 'hod', None):
+            return self.department_rel.hod
+
+        if self.department:
+            from .department import CollegeDepartment, Department
+            norm = Department.normalize_code(self.department)
+            dept = CollegeDepartment.query.filter(
+                (CollegeDepartment.code == self.department) |
+                (CollegeDepartment.code == norm) |
+                (CollegeDepartment.name == self.department)
+            ).first()
+            if dept and getattr(dept, 'hod', None):
+                return dept.hod
+
+            from .user import User, UserRole, FacultyProfile
+            hod_user = User.query.filter_by(role=UserRole.HOD).join(
+                FacultyProfile, User.id == FacultyProfile.user_id, isouter=True
+            ).filter(
+                (FacultyProfile.department == self.department) |
+                (FacultyProfile.department == norm) |
+                (FacultyProfile.department == getattr(dept, 'name', None))
+            ).first()
+            if hod_user:
+                return hod_user
+
+        return None
 
     @property
     def is_full(self):

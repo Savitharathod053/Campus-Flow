@@ -37,7 +37,7 @@ class User(db.Model):
     organizer_profile = db.relationship('OrganizerProfile', back_populates='user', foreign_keys='OrganizerProfile.user_id', uselist=False, cascade='all, delete-orphan')
     faculty_profile = db.relationship('FacultyProfile', back_populates='user', uselist=False, cascade='all, delete-orphan')
     
-    organized_events = db.relationship('Event', back_populates='organizer', lazy='dynamic', cascade='all, delete-orphan')
+    organized_events = db.relationship('Event', back_populates='organizer', foreign_keys='Event.organizer_id', lazy='dynamic', cascade='all, delete-orphan')
     registrations = db.relationship('EventRegistration', back_populates='student', lazy='dynamic', cascade='all, delete-orphan')
     announcements = db.relationship('Announcement', back_populates='author', lazy='dynamic')
     audit_logs = db.relationship('AuditLog', back_populates='admin', lazy='dynamic')

@@ -10,7 +10,7 @@ from .announcement import Announcement, TargetAudience
 from .certificate import Certificate, CertificateStatus
 from .audit_log import AuditLog
 from .request import OrganizerRequest, OrganizerRequestStatus, EventRequest, EventRequestStatus
-from .notification import Notification, NotificationType
+from .notification import Notification, NotificationType, EventNotificationLog
 
 __all__ = [
     'OrganizerRequest',
@@ -19,6 +19,7 @@ __all__ = [
     'EventRequestStatus',
     'Notification',
     'NotificationType',
+    'EventNotificationLog',
     'Department',
     'db',
     'User',

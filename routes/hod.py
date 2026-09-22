@@ -5,7 +5,7 @@ department metrics, and student/faculty directories.
 Strictly scoped to the HOD's assigned department.
 """
 from datetime import datetime
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
+from flask import Blueprint, render_template, request, redirect, url_for, flash, abort, jsonify
 from sqlalchemy import or_, func
 from models import (
     db, User, UserRole, StudentProfile, OrganizerProfile, FacultyProfile,
@@ -112,6 +112,12 @@ def dashboard():
         )
     ).order_by(Announcement.is_pinned.desc(), Announcement.created_at.desc()).limit(5).all()
 
+    # In-App Notifications & Capacity Alerts
+    hod_notifications = Notification.query.filter_by(
+        user_id=user.id
+    ).order_by(Notification.created_at.desc()).all()
+    unread_capacity_alerts = [n for n in hod_notifications if not n.is_read and n.type == NotificationType.EVENT_CAPACITY_ALERT]
+
     return render_template(
         'hod/dashboard.html',
         user=user,
@@ -129,7 +135,9 @@ def dashboard():
         total_students=total_students,
         total_organizers=total_organizers,
         total_events_count=total_events_count,
-        announcements=announcements
+        announcements=announcements,
+        hod_notifications=hod_notifications,
+        unread_capacity_alerts=unread_capacity_alerts
     )
 
 
@@ -574,4 +582,53 @@ def announcements():
         dept_obj=dept_obj,
         announcements=announcements_list
     )
+
+
+# ==============================================================================
+# HOD NOTIFICATIONS & CAPACITY ALERTS
+# ==============================================================================
+
+@hod_bp.route('/notifications', methods=['GET'])
+@hod_required
+def get_notifications():
+    """
+    Returns the list of notifications for the authenticated HOD.
+    """
+    user = get_current_user()
+    notifs = Notification.query.filter_by(
+        user_id=user.id
+    ).order_by(Notification.created_at.desc()).all()
+
+    from services.timezone_service import format_ist_datetime
+    return jsonify({
+        'success': True,
+        'notifications': [{
+            'id': n.id,
+            'title': n.title,
+            'message': n.message,
+            'type': n.type,
+            'link': n.link,
+            'is_read': n.is_read,
+            'created_at': format_ist_datetime(n.created_at) if n.created_at else None,
+            'created_at_raw': n.created_at.isoformat() if n.created_at else None
+        } for n in notifs]
+    })
+
+
+@hod_bp.route('/notifications/<int:notification_id>/read', methods=['POST'])
+@hod_required
+def mark_notification_read(notification_id):
+    """
+    Marks an in-app notification as read.
+    """
+    user = get_current_user()
+    notif = Notification.query.filter_by(id=notification_id, user_id=user.id).first_or_404()
+    notif.is_read = True
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'message': 'Notification marked as read.',
+        'notification_id': notif.id
+    })
+
 

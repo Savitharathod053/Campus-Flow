@@ -1,6 +1,6 @@
 from datetime import datetime
-from flask import Blueprint, render_template, request, url_for
-from models import db, Event, EventStatus, EventType, EventRegistration, User, StudentProfile, Department
+from flask import Blueprint, render_template, request, url_for, abort, jsonify
+from models import db, Event, EventStatus, EventType, EventRegistration, User, StudentProfile, Department, Notification
 from routes.auth import get_current_user
 
 public_bp = Blueprint('public', __name__)
@@ -154,7 +154,11 @@ def events():
 @public_bp.route('/events/<slug>')
 def event_detail(slug):
     current_user = get_current_user()
-    event = Event.query.filter_by(slug=slug).first_or_404()
+    event = None
+    if slug.isdigit():
+        event = Event.query.get(int(slug))
+    if not event:
+        event = Event.query.filter_by(slug=slug).first_or_404()
 
     # MANDATORY DUAL APPROVAL VALIDATION:
     # If the event is not approved by both HOD and Dean, public/students cannot view it.
@@ -203,3 +207,46 @@ def event_detail(slug):
         announcements=announcements,
         current_user=current_user
     )
+
+
+@public_bp.route('/events/<int:event_id>/capacity', methods=['GET'])
+def event_capacity_api(event_id):
+    """
+    Returns real-time capacity and occupancy metrics for a given event.
+    """
+    event = Event.query.get_or_404(event_id)
+    from services.timezone_service import format_ist_datetime
+    return jsonify({
+        'success': True,
+        'event_id': event.id,
+        'event_title': event.title,
+        'department': event.department,
+        'total_capacity': event.max_participants,
+        'confirmed_students': event.confirmed_registrations_count,
+        'empty_slots': event.empty_slots,
+        'occupancy_percentage': event.occupancy_percentage,
+        'is_started': event.is_started,
+        'status': event.status,
+        'start_time': event.start_time.isoformat() if event.start_time else None,
+        'start_time_ist': format_ist_datetime(event.start_time) if event.start_time else None
+    })
+
+
+@public_bp.route('/notifications/<int:notification_id>/read', methods=['POST'])
+def global_mark_notification_read(notification_id):
+    """
+    Marks an in-app notification as read for the authenticated user.
+    """
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+
+    notif = Notification.query.filter_by(id=notification_id, user_id=current_user.id).first_or_404()
+    notif.is_read = True
+    db.session.commit()
+    return jsonify({
+        'success': True,
+        'message': 'Notification marked as read.',
+        'notification_id': notif.id
+    })
+

@@ -124,6 +124,8 @@ def sync_missing_columns():
             ('allowed_years', 'VARCHAR(50)', "'ALL'", False),
             ('allowed_sections', 'VARCHAR(50)', "'ALL'", False),
             ('eligibility_notes', 'VARCHAR(255)', None, True),
+            ('empty_slot_notification_sent', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'FALSE' if 'postgres' in dialect else '0', False),
+            ('responsible_hod_id', 'INTEGER', None, True),
         ],
         'organizer_profiles': [
             ('roll_number', 'VARCHAR(50)', None, True),

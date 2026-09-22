@@ -36,6 +36,49 @@
 </div>
 
 <div class="container pb-5">
+    <!-- Event Capacity & Empty Slots Alerts Banner -->
+    {% if unread_capacity_alerts and unread_capacity_alerts|length > 0 %}
+    <div class="card border-warning border-2 shadow-sm rounded-3 mb-4 overflow-hidden">
+        <div class="card-header bg-warning text-dark py-3 px-4 d-flex justify-content-between align-items-center">
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-dark text-warning fs-6 px-2 py-1"><i class="bi bi-bell-fill"></i></span>
+                <h5 class="fw-bold mb-0 text-dark">🔔 Event Capacity Alerts ({{ unread_capacity_alerts|length }} Active)</h5>
+            </div>
+            <span class="badge bg-danger rounded-pill px-3 py-2 text-uppercase fw-bold" style="letter-spacing: 0.5px;">Action Recommended</span>
+        </div>
+        <div class="card-body p-3 bg-warning-subtle">
+            <div class="row g-3">
+                {% for alert in unread_capacity_alerts %}
+                <div class="col-md-6 col-lg-4" id="alert-card-{{ alert.id }}">
+                    <div class="p-3 bg-white rounded-3 border border-warning shadow-sm h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-start mb-2">
+                                <h6 class="fw-bold text-dark mb-0">{{ alert.title }}</h6>
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle small">Unfilled Slots</span>
+                            </div>
+                            <p class="small text-secondary mb-2">{{ alert.message }}</p>
+                            <div class="small text-muted mb-3">
+                                <i class="bi bi-clock-history me-1 text-primary"></i> Alerted: {{ alert.created_at|datetimeformat }} (IST)
+                            </div>
+                        </div>
+                        <div class="d-flex gap-2">
+                            {% if alert.link %}
+                            <a href="{{ alert.link }}" class="btn btn-sm btn-primary flex-grow-1 fw-bold">
+                                <i class="bi bi-eye me-1"></i> View Event
+                            </a>
+                            {% endif %}
+                            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="markNotificationRead({{ alert.id }}, this)">
+                                <i class="bi bi-check2"></i> Mark Read
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     <!-- Executive Stat Cards -->
     <div class="row g-3 mb-4">
         <div class="col-sm-6 col-xl-3">
@@ -121,6 +164,14 @@
                 <li class="nav-item" role="presentation">
                     <button class="nav-link {% if active_tab == 'dept_events' %}active fw-bold text-primary{% else %}text-muted{% endif %}" id="dept-events-tab" data-bs-toggle="tab" data-bs-target="#dept-events" type="button" role="tab">
                         <i class="bi bi-calendar-event me-1 text-success"></i> Department Published Events ({{ dept_published_events|length }})
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if active_tab == 'capacity_alerts' %}active fw-bold text-primary{% else %}text-muted{% endif %}" id="capacity-alerts-tab" data-bs-toggle="tab" data-bs-target="#capacity-alerts" type="button" role="tab">
+                        <i class="bi bi-bell-fill me-1 text-warning"></i> Empty Slots Alerts
+                        {% if unread_capacity_alerts|length > 0 %}
+                            <span class="badge bg-danger ms-1">{{ unread_capacity_alerts|length }}</span>
+                        {% endif %}
                     </button>
                 </li>
             </ul>
@@ -544,6 +595,82 @@
                     {% endif %}
                 </div>
 
+                <!-- TAB 6: EMPTY SLOTS CAPACITY ALERTS -->
+                <div class="tab-pane fade {% if active_tab == 'capacity_alerts' %}show active{% endif %}" id="capacity-alerts" role="tabpanel">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <h5 class="fw-bold text-dark mb-1">
+                                <i class="bi bi-bell-fill text-warning me-2"></i> Event Capacity & Empty Slots Notifications
+                            </h5>
+                            <small class="text-muted">Automated alerts triggered when department events start with unfilled registration slots.</small>
+                        </div>
+                    </div>
+
+                    {% set capacity_alerts = hod_notifications|selectattr('type', 'equalto', 'EVENT_CAPACITY_ALERT')|list %}
+                    {% if capacity_alerts and capacity_alerts|length > 0 %}
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle border mb-0">
+                                <thead class="table-light small text-uppercase">
+                                    <tr>
+                                        <th class="ps-3">Alert / Event</th>
+                                        <th>Details</th>
+                                        <th>Started Time (IST)</th>
+                                        <th>Status</th>
+                                        <th class="text-end pe-3">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for alert in capacity_alerts %}
+                                    <tr id="table-row-{{ alert.id }}" class="{% if not alert.is_read %}table-warning-subtle fw-semibold{% endif %}">
+                                        <td class="ps-3">
+                                            <div class="d-flex align-items-center gap-2">
+                                                <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+                                                <div>
+                                                    <span class="text-dark">{{ alert.title }}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <small class="text-secondary">{{ alert.message }}</small>
+                                        </td>
+                                        <td>
+                                            <small class="text-muted"><i class="bi bi-clock me-1 text-primary"></i>{{ alert.created_at|datetimeformat }} (IST)</small>
+                                        </td>
+                                        <td>
+                                            {% if alert.is_read %}
+                                                <span class="badge bg-light text-secondary border">Read</span>
+                                            {% else %}
+                                                <span class="badge bg-danger">Unread</span>
+                                            {% endif %}
+                                        </td>
+                                        <td class="text-end pe-3">
+                                            <div class="btn-group btn-group-sm">
+                                                {% if alert.link %}
+                                                <a href="{{ alert.link }}" class="btn btn-primary">
+                                                    <i class="bi bi-eye me-1"></i> View Event
+                                                </a>
+                                                {% endif %}
+                                                {% if not alert.is_read %}
+                                                <button type="button" class="btn btn-outline-secondary" onclick="markNotificationRead({{ alert.id }}, this)">
+                                                    <i class="bi bi-check2"></i>
+                                                </button>
+                                                {% endif %}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5 bg-light rounded-3 border">
+                            <i class="bi bi-check-circle text-success fs-1 mb-2 d-block"></i>
+                            <h6 class="fw-bold text-dark">No Empty Slots Alerts</h6>
+                            <p class="text-muted small mb-0">All department events have full attendance or have not reached start time.</p>
+                        </div>
+                    {% endif %}
+                </div>
+
             </div>
         </div>
     </div>
@@ -601,4 +728,53 @@
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function markNotificationRead(notificationId, btnElement) {
+    if (!notificationId) return;
+    if (btnElement) {
+        btnElement.disabled = true;
+        btnElement.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+    }
+
+    fetch(`/hod/notifications/${notificationId}/read`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            // Dim or remove banner card if present
+            const card = document.getElementById(`alert-card-${notificationId}`);
+            if (card) {
+                card.style.opacity = '0.5';
+                if (btnElement) btnElement.outerHTML = '<span class="badge bg-secondary">Read</span>';
+            }
+            // Update table row if present
+            const row = document.getElementById(`table-row-${notificationId}`);
+            if (row) {
+                row.classList.remove('table-warning-subtle', 'fw-semibold');
+                const badge = row.querySelector('.badge.bg-danger');
+                if (badge) {
+                    badge.className = 'badge bg-light text-secondary border';
+                    badge.textContent = 'Read';
+                }
+                if (btnElement) btnElement.remove();
+            }
+        }
+    })
+    .catch(err => {
+        console.error("Failed to mark notification as read:", err);
+        if (btnElement) {
+            btnElement.disabled = false;
+            btnElement.innerHTML = '<i class="bi bi-check2"></i>';
+        }
+    });
+}
+</script>
 {% endblock %}

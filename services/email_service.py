@@ -1100,3 +1100,41 @@ def send_event_admin_action_email(event, organizer, action, reason=None):
     dispatch_email(organizer.email, subject, body)
     return True
 
+
+def send_empty_slots_hod_email(hod, event, empty_slots, total_capacity, confirmed_count):
+    """
+    Sends an email notification to the responsible HOD when an event starts with empty slots.
+    """
+    if not hod or not hod.email:
+        return False
+
+    from services.timezone_service import format_ist_datetime
+    start_time_str = format_ist_datetime(event.start_time) if event.start_time else "N/A"
+    hod_display = hod.name if (hod.name and hod.name.strip().lower().startswith("dr.")) else f"Dr. {hod.name if hod else 'HOD'}"
+
+    subject = f"{empty_slots} Empty Slots - {event.title}"
+    body = (
+        f"Hello {hod_display},\n\n"
+        f"The event \"{event.title}\" has officially started.\n\n"
+        f"Event Details:\n"
+        f"- Department: {event.department}\n"
+        f"- Start Time: {start_time_str}\n"
+        f"- Total Capacity: {total_capacity}\n"
+        f"- Confirmed Registrations: {confirmed_count}\n"
+        f"- Empty Slots Remaining: {empty_slots}\n\n"
+        f"Please review the event status in your Campus Flow dashboard.\n\n"
+        f"Campus Flow Event Monitoring System"
+    )
+
+    email_record = {
+        'to': hod.email,
+        'subject': subject,
+        'body': body,
+        'type': 'EVENT_CAPACITY_ALERT'
+    }
+    SENT_EMAILS.append(email_record)
+    logger.info(f"[EMAIL SENT] Empty slots alert to HOD {hod.email} for event {event.id}")
+    dispatch_email(hod.email, subject, body)
+    return True
+
+

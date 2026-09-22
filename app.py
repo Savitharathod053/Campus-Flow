@@ -261,6 +261,23 @@ def create_app(config_class=Config):
         from services.db_diagnostic import run_db_diagnostic
         run_db_diagnostic(app)
 
+    # CLI Command to check and dispatch empty slots notifications
+    @app.cli.command("check-empty-slots")
+    def check_empty_slots_cli():
+        """Scan starting events and notify responsible HODs of unfilled registration slots."""
+        from services.capacity_notification_service import check_and_notify_empty_slots
+        alerts = check_and_notify_empty_slots(app)
+        print(f"Processed {len(alerts)} empty slot capacity alert(s).")
+        for a in alerts:
+            print(f" - Event #{a['event_id']} '{a['event_title']}': {a['empty_slots']} empty slots -> HOD {a['hod_email']}")
+
+    # Start background capacity monitoring scheduler (checks starting events periodically)
+    try:
+        from services.capacity_notification_service import start_capacity_monitoring_scheduler
+        start_capacity_monitoring_scheduler(app, interval_seconds=60)
+    except Exception as sched_err:
+        app.logger.warning(f"Note: Could not start capacity monitoring scheduler: {sched_err}")
+
     return app
 
 
