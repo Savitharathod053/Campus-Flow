@@ -178,6 +178,23 @@ def approve_request(request_id):
         )
         db.session.add(event)
         db.session.flush()
+    else:
+        # Sync existing event fields with approved request
+        event.title = req.event_name
+        event.event_type = req.category
+        event.department = dept_code
+        event.department_id = req.department_id
+        event.description = req.description
+        event.venue = req.venue
+        event.start_time = req.start_time
+        event.end_time = req.end_time
+        if req.registration_start_date:
+            event.registration_start_date = req.registration_start_date
+        if req.registration_deadline:
+            event.registration_deadline = req.registration_deadline
+        event.max_participants = req.expected_participants
+        event.registration_fee = req.registration_fee or 0.0
+        event.is_free = req.is_free
 
     # Set dual approval and published flags
     event.is_published = True

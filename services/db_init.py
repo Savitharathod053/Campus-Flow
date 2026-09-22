@@ -103,6 +103,7 @@ def sync_missing_columns():
             ('razorpay_status', 'VARCHAR(50)', None, True),
         ],
         'events': [
+            ('registration_start_date', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
             ('registration_type', 'VARCHAR(20)', "'INDIVIDUAL'", False),
             ('min_team_size', 'INTEGER', '2', False),
             ('max_team_size', 'INTEGER', '4', False),
@@ -126,6 +127,42 @@ def sync_missing_columns():
             ('eligibility_notes', 'VARCHAR(255)', None, True),
             ('empty_slot_notification_sent', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'FALSE' if 'postgres' in dialect else '0', False),
             ('responsible_hod_id', 'INTEGER', None, True),
+        ],
+        'event_requests': [
+            ('registration_start_date', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
+            ('registration_deadline', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
+            ('registration_fee', 'FLOAT', '0.0', False),
+            ('is_free', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'TRUE' if 'postgres' in dialect else '1', False),
+            ('poster_image', 'VARCHAR(255)', None, True),
+            ('rules', 'TEXT', None, True),
+            ('contact_info', 'VARCHAR(200)', None, True),
+            ('faculty_coordinator', 'VARCHAR(150)', None, True),
+            ('faculty_coordinator_contact', 'VARCHAR(100)', None, True),
+            ('allowed_departments', 'VARCHAR(255)', "'ALL'", False),
+            ('allowed_years', 'VARCHAR(50)', "'ALL'", False),
+            ('allowed_sections', 'VARCHAR(50)', "'ALL'", False),
+            ('eligibility_notes', 'VARCHAR(255)', None, True),
+            ('registration_type', 'VARCHAR(20)', "'INDIVIDUAL'", False),
+            ('min_team_size', 'INTEGER', '2', False),
+            ('max_team_size', 'INTEGER', '4', False),
+            ('team_payment_type', 'VARCHAR(20)', "'FREE'", False),
+            ('require_full_team', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'FALSE' if 'postgres' in dialect else '0', False),
+            ('upi_id', 'VARCHAR(100)', None, True),
+            ('upi_number', 'VARCHAR(20)', None, True),
+            ('upi_qr_image', 'VARCHAR(255)', None, True),
+            ('payment_instructions', 'TEXT', None, True),
+            ('enable_attendance', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'TRUE' if 'postgres' in dialect else '1', False),
+            ('min_attendance_percentage', 'FLOAT', '0.0', False),
+            ('hod_reviewer_id', 'INTEGER', None, True),
+            ('hod_approval_status', 'VARCHAR(30)', "'pending'", False),
+            ('hod_decision_at', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
+            ('hod_rejection_reason', 'TEXT', None, True),
+            ('dean_reviewer_id', 'INTEGER', None, True),
+            ('dean_approval_status', 'VARCHAR(30)', "'pending'", False),
+            ('dean_decision_at', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
+            ('dean_rejection_reason', 'TEXT', None, True),
+            ('overall_status', 'VARCHAR(30)', "'pending_hod_approval'", False),
+            ('event_id', 'INTEGER', None, True),
         ],
         'organizer_profiles': [
             ('roll_number', 'VARCHAR(50)', None, True),
@@ -174,6 +211,23 @@ def sync_missing_columns():
                     except Exception as e:
                         logger.warning(f"Note on adding {table_name}.{col_name}: {e}")
                         conn.rollback()
+
+        # Safely backfill registration_start_date from created_at if NULL
+        if 'event_requests' in existing_tables:
+            try:
+                conn.execute(text("UPDATE event_requests SET registration_start_date = created_at WHERE registration_start_date IS NULL"))
+                conn.commit()
+            except Exception as e:
+                logger.warning(f"Note on backfilling event_requests.registration_start_date: {e}")
+                conn.rollback()
+
+        if 'events' in existing_tables:
+            try:
+                conn.execute(text("UPDATE events SET registration_start_date = created_at WHERE registration_start_date IS NULL"))
+                conn.commit()
+            except Exception as e:
+                logger.warning(f"Note on backfilling events.registration_start_date: {e}")
+                conn.rollback()
 
 
 

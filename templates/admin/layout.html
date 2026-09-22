@@ -25,6 +25,7 @@
         body.admin-body {
             background-color: #f1f5f9;
             min-height: 100vh;
+            overflow-x: clip;
         }
         .admin-sidebar {
             width: var(--admin-sidebar-w);
@@ -32,23 +33,43 @@
             position: fixed;
             top: 0;
             left: 0;
-            z-index: 1050;
+            z-index: 1060;
             background: #0f172a;
             color: #e2e8f0;
             display: flex;
             flex-direction: column;
             overflow-y: auto;
-            transition: transform 0.3s ease;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .admin-sidebar-backdrop {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background: rgba(15, 23, 42, 0.55);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 1055;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity 0.25s ease, visibility 0.25s ease;
+        }
+        .admin-sidebar-backdrop.show {
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
         }
         .admin-sidebar .sidebar-brand {
-            padding: 1.25rem 1.5rem;
+            padding: 1.15rem 1.25rem;
             font-size: 1.25rem;
             font-weight: 800;
             color: #ffffff;
             border-bottom: 1px solid rgba(255,255,255,0.1);
             display: flex;
             align-items: center;
-            gap: 0.5rem;
+            justify-content: space-between;
         }
         .admin-sidebar .nav-link {
             color: #94a3b8;
@@ -84,6 +105,7 @@
             min-height: 100vh;
             display: flex;
             flex-direction: column;
+            min-width: 0;
         }
         .admin-topbar {
             height: var(--admin-topbar-h);
@@ -92,14 +114,16 @@
             position: sticky;
             top: 0;
             z-index: 1020;
-            padding: 0 1.75rem;
+            padding: 0 1.5rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 1rem;
         }
         .admin-main {
             padding: 1.75rem;
             flex: 1;
+            min-width: 0;
         }
         @media (max-width: 991.98px) {
             .admin-sidebar {
@@ -111,20 +135,34 @@
             .admin-content {
                 margin-left: 0;
             }
+            .admin-topbar {
+                padding: 0 1rem;
+            }
+            .admin-main {
+                padding: 1.25rem 1rem;
+            }
         }
     </style>
     {% block extra_css %}{% endblock %}
 </head>
 <body class="admin-body">
 
+    <!-- Mobile Sidebar Backdrop Overlay -->
+    <div class="admin-sidebar-backdrop d-lg-none" id="adminSidebarBackdrop" onclick="closeAdminSidebar()"></div>
+
     <!-- Super Admin Sidebar -->
     <aside class="admin-sidebar" id="adminSidebar">
         <div class="sidebar-brand">
-            <i class="bi bi-shield-lock-fill text-warning fs-4"></i>
-            <div>
-                Campus <span class="text-warning">Flow</span>
-                <div class="small fw-semibold text-secondary" style="font-size: 0.7rem; letter-spacing: 0.05em;">SUPER ADMIN PANEL</div>
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-shield-lock-fill text-warning fs-4"></i>
+                <div>
+                    Campus <span class="text-warning">Flow</span>
+                    <div class="small fw-semibold text-secondary" style="font-size: 0.7rem; letter-spacing: 0.05em;">SUPER ADMIN</div>
+                </div>
             </div>
+            <button type="button" class="btn btn-sm btn-link text-white-50 text-decoration-none p-1 d-lg-none" onclick="closeAdminSidebar()" aria-label="Close sidebar">
+                <i class="bi bi-x-lg fs-5"></i>
+            </button>
         </div>
 
         <nav class="py-2 flex-grow-1">
@@ -203,31 +241,31 @@
     <div class="admin-content">
         <!-- Topbar -->
         <header class="admin-topbar">
-            <div class="d-flex align-items-center gap-3">
-                <button class="btn btn-sm btn-outline-secondary d-lg-none" type="button" onclick="document.getElementById('adminSidebar').classList.toggle('show')">
+            <div class="d-flex align-items-center gap-2 flex-grow-1 min-w-0" style="max-width: 480px;">
+                <button class="btn btn-sm btn-outline-secondary d-lg-none flex-shrink-0" type="button" onclick="toggleAdminSidebar()" aria-label="Toggle admin navigation">
                     <i class="bi bi-list fs-5"></i>
                 </button>
 
                 <!-- Global Search Box -->
-                <form action="{{ url_for('admin.global_search') }}" method="GET" class="d-flex align-items-center" style="max-width: 420px;">
-                    <div class="input-group input-group-sm">
+                <form action="{{ url_for('admin.global_search') }}" method="GET" class="d-flex align-items-center flex-grow-1 min-w-0">
+                    <div class="input-group input-group-sm w-100">
                         <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-                        <input type="text" name="q" class="form-control bg-light border-start-0 ps-0" placeholder="Search name, email, roll no, event, ticket..." value="{{ request.args.get('q', '') }}" style="max-width: 260px; width: 100%;">
+                        <input type="text" name="q" class="form-control bg-light border-start-0 ps-0" placeholder="Search users, events, tickets..." value="{{ request.args.get('q', '') }}">
                     </div>
                 </form>
             </div>
 
-            <div class="d-flex align-items-center gap-3">
-                <a href="{{ url_for('public.home') }}" target="_blank" class="btn btn-outline-primary btn-sm d-none d-md-flex align-items-center gap-1">
+            <div class="d-flex align-items-center gap-2 gap-sm-3 flex-shrink-0">
+                <a href="{{ url_for('public.home') }}" target="_blank" class="btn btn-outline-primary btn-sm d-none d-sm-flex align-items-center gap-1">
                     <i class="bi bi-box-arrow-up-right"></i> View Site
                 </a>
 
                 <div class="d-flex align-items-center gap-2">
-                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 36px; height: 36px; font-size: 0.9rem;">
+                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center fw-bold" style="width: 34px; height: 34px; font-size: 0.85rem;">
                         {{ current_user.name[:1].upper() if current_user else 'A' }}
                     </div>
-                    <div class="d-none d-sm-block lh-1">
-                        <div class="fw-bold small">{{ current_user.name if current_user else 'Super Admin' }}</div>
+                    <div class="d-none d-md-block lh-1">
+                        <div class="fw-bold small text-truncate" style="max-width: 140px;">{{ current_user.name if current_user else 'Super Admin' }}</div>
                         <span class="badge bg-warning text-dark" style="font-size: 0.65rem;">SUPER ADMIN</span>
                     </div>
                 </div>
@@ -235,7 +273,7 @@
         </header>
 
         <!-- Flash Messages -->
-        <div class="container-fluid px-4 pt-3">
+        <div class="container-fluid px-3 px-sm-4 pt-3">
             {% with messages = get_flashed_messages(with_categories=true) %}
                 {% if messages %}
                     {% for category, message in messages %}
@@ -257,6 +295,20 @@
     <!-- Bootstrap Bundle JS -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="{{ url_for('static', filename='js/app.js') }}?v=3d-4.0"></script>
+    <script>
+        function toggleAdminSidebar() {
+            var sidebar = document.getElementById('adminSidebar');
+            var backdrop = document.getElementById('adminSidebarBackdrop');
+            if (sidebar) sidebar.classList.toggle('show');
+            if (backdrop) backdrop.classList.toggle('show');
+        }
+        function closeAdminSidebar() {
+            var sidebar = document.getElementById('adminSidebar');
+            var backdrop = document.getElementById('adminSidebarBackdrop');
+            if (sidebar) sidebar.classList.remove('show');
+            if (backdrop) backdrop.classList.remove('show');
+        }
+    </script>
     {% block extra_js %}{% endblock %}
 </body>
 </html>

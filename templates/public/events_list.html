@@ -152,17 +152,17 @@
                                         {% endif %}
                                     </span>
                                 </div>
-                                <div class="card-body p-4 d-flex flex-column flex-grow-1">
-                                    <div class="small text-muted mb-2 d-flex align-items-center gap-2">
+                                <div class="card-body p-4 d-flex flex-column flex-grow-1 min-w-0">
+                                    <div class="small text-muted mb-2 d-flex align-items-center gap-2 flex-wrap">
                                         <i class="bi bi-calendar3 text-primary"></i>
                                         <span>{{ event.start_time|dateformat }} &bull; {{ event.start_time|timeformat }}</span>
                                     </div>
-                                    <h5 class="fw-bold mb-2 text-dark">{{ event.title }}</h5>
-                                    <p class="text-muted small mb-3 flex-grow-1">{{ event.description|truncate(100) }}</p>
+                                    <h5 class="fw-bold mb-2 text-dark event-card-title" title="{{ event.title }}">{{ event.title }}</h5>
+                                    <p class="text-muted small mb-3 flex-grow-1 text-break">{{ event.description|truncate(100) }}</p>
                                     
                                     <div class="border-top pt-3 mt-auto">
-                                        <div class="d-flex justify-content-between align-items-center small text-muted mb-3">
-                                            <span><i class="bi bi-geo-alt me-1 text-danger"></i> {{ event.venue|truncate(20) }}</span>
+                                        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 small text-muted mb-3">
+                                            <span class="text-truncate" style="max-width: 140px;"><i class="bi bi-geo-alt me-1 text-danger"></i> {{ event.venue|truncate(20) }}</span>
                                             {% if event.is_registration_not_started %}
                                                 <span class="badge bg-warning-subtle text-dark border border-warning-subtle">Reg Starts {{ event.registration_start_date|dateformat }}</span>
                                             {% elif event.is_deadline_passed %}

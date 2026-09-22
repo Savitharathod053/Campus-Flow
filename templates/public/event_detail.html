@@ -162,14 +162,14 @@
                     </div>
                 </div>
 
-                <div class="d-flex justify-content-between align-items-center mb-3 p-3 bg-light rounded-3">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3 p-3 bg-light rounded-3">
                     <div>
                         <div class="small text-muted">Registration Fee</div>
                         <div class="fw-bold fs-4 text-primary">
                             {% if event.is_free %}FREE{% else %}₹{{ "%.2f"|format(event.registration_fee) }}{% endif %}
                         </div>
                     </div>
-                    <div class="text-end">
+                    <div class="text-sm-end">
                         <div class="small text-muted">Empty Slots</div>
                         <div class="fw-bold fs-4 {% if event.empty_slots <= 5 %}text-danger{% else %}text-success{% endif %}">
                             {{ event.empty_slots }} / {{ event.max_participants }}

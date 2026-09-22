@@ -284,19 +284,19 @@
                                         <span class="fw-semibold">₹{{ "%.0f"|format(event.registration_fee) }}</span>
                                     {% endif %}
                                 </td>
-                                <td class="text-end">
-                                    <div class="btn-group btn-group-sm">
-                                        <a href="{{ url_for('organizer.manage_event', event_id=event.id) }}" class="btn btn-primary" title="Manage Event Hub">
+                                <td class="text-end text-nowrap">
+                                    <div class="d-inline-flex align-items-center gap-1 flex-wrap justify-content-end">
+                                        <a href="{{ url_for('organizer.manage_event', event_id=event.id) }}" class="btn btn-sm btn-primary" title="Manage Event Hub">
                                             <i class="bi bi-gear-fill me-1"></i> Manage
                                         </a>
-                                        <a href="{{ url_for('organizer.attendance_scanner', event_id=event.id) }}" class="btn btn-outline-info" title="Open QR Scanner">
+                                        <a href="{{ url_for('organizer.attendance_scanner', event_id=event.id) }}" class="btn btn-sm btn-outline-info" title="Open QR Scanner">
                                             <i class="bi bi-qr-code-scan"></i>
                                         </a>
-                                        <a href="{{ url_for('organizer.participants', event_id=event.id) }}" class="btn btn-outline-secondary" title="View Participants">
+                                        <a href="{{ url_for('organizer.participants', event_id=event.id) }}" class="btn btn-sm btn-outline-secondary" title="View Participants">
                                             <i class="bi bi-people"></i>
                                         </a>
                                         <form method="POST" action="{{ url_for('organizer.delete_event', event_id=event.id) }}" class="d-inline" onsubmit="return confirm('Permanently delete {{ event.title }}?');">
-                                            <button type="submit" class="btn btn-outline-danger" title="Delete Event">
+                                            <button type="submit" class="btn btn-sm btn-outline-danger" title="Delete Event">
                                                 <i class="bi bi-trash3"></i>
                                             </button>
                                         </form>
@@ -307,6 +307,7 @@
                     </tbody>
                 </table>
             </div>
+        {% else %}
             <div class="text-center py-5 text-muted">
                 <i class="bi bi-calendar-check fs-1 text-muted opacity-50 d-block mb-2"></i>
                 {% if current_tab == 'active' %}

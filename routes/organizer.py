@@ -433,6 +433,21 @@ def edit_event(event_id):
                 file.save(upload_dir / filename)
                 event.poster_image = f"uploads/posters/{filename}"
 
+        # Sync associated EventRequest record if present
+        if hasattr(event, 'creation_request') and event.creation_request:
+            req = event.creation_request
+            req.event_name = event.title
+            req.description = event.description
+            req.category = event.event_type
+            req.venue = event.venue
+            req.start_time = event.start_time
+            req.end_time = event.end_time
+            req.registration_start_date = event.registration_start_date
+            req.registration_deadline = event.registration_deadline
+            req.expected_participants = event.max_participants
+            req.registration_fee = event.registration_fee
+            req.is_free = event.is_free
+
         db.session.commit()
         flash('Event updated successfully!', 'success')
         return redirect(url_for('organizer.manage_event', event_id=event.id))
