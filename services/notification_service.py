@@ -63,6 +63,7 @@ def get_unread_count(user_id):
 def mark_as_read(notification_id, user_id=None):
     """
     Marks a specific notification as read.
+    Returns the Notification instance if successfully found and updated, otherwise None.
     """
     try:
         query = Notification.query.filter_by(id=notification_id)
@@ -70,25 +71,29 @@ def mark_as_read(notification_id, user_id=None):
             query = query.filter_by(user_id=user_id)
         notification = query.first()
         if notification:
-            notification.is_read = True
-            db.session.commit()
-            return True
-        return False
+            if not notification.is_read:
+                notification.is_read = True
+                db.session.commit()
+            return notification
+        return None
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error marking notification {notification_id} as read: {e}", exc_info=True)
-        return False
+        return None
 
 
 def mark_all_as_read(user_id):
     """
     Marks all notifications for a user as read.
+    Returns the number of notifications marked as read (int >= 0), or -1 on error.
     """
+    if not user_id:
+        return 0
     try:
-        Notification.query.filter_by(user_id=user_id, is_read=False).update({'is_read': True})
+        count = Notification.query.filter_by(user_id=user_id, is_read=False).update({'is_read': True})
         db.session.commit()
-        return True
+        return count
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error marking all notifications as read for user {user_id}: {e}", exc_info=True)
-        return False
+        return -1

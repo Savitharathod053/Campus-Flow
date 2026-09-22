@@ -108,39 +108,89 @@
                 <ul class="navbar-nav ms-auto mb-2 mb-lg-0 flex-row align-items-center gap-2">
                     {% if current_user %}
                         <!-- In-App Notification Dropdown -->
-                        <li class="nav-item dropdown">
-                            <a class="nav-link position-relative text-dark px-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications">
+                        <li class="nav-item dropdown" id="notificationDropdownContainer">
+                            <a class="nav-link position-relative text-dark px-2" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications" id="notificationDropdownToggle">
                                 <i class="bi bi-bell-fill fs-5"></i>
-                                {% if unread_notifications_count and unread_notifications_count > 0 %}
-                                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem;">
-                                    {{ unread_notifications_count }}
+                                <span id="notificationBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger notification-bell-badge {% if not unread_notifications_count or unread_notifications_count == 0 %}d-none{% endif %}">
+                                    {{ unread_notifications_count or 0 }}
                                 </span>
-                                {% endif %}
                             </a>
-                            <ul class="dropdown-menu dropdown-menu-end shadow border-0 p-2" style="min-width: 300px; max-width: 360px;">
-                                <li class="d-flex justify-content-between align-items-center px-2 py-1 border-bottom mb-2">
-                                    <span class="fw-bold fs-6">Notifications</span>
-                                    {% if unread_notifications_count and unread_notifications_count > 0 %}
-                                    <button class="btn btn-sm btn-link text-decoration-none p-0 small" onclick="markAllNotificationsRead()">Mark all read</button>
-                                    {% endif %}
-                                </li>
-                                {% if recent_notifications %}
-                                    {% for n in recent_notifications %}
-                                    <li class="p-2 mb-1 rounded {% if not n.is_read %}bg-light border-start border-3 border-primary{% endif %}">
-                                        <div class="d-flex justify-content-between">
-                                            <strong class="small text-dark">{{ n.title }}</strong>
-                                            <small class="text-muted" style="font-size: 0.68rem;">{{ n.created_at|datetimeformat('%b %d, %I:%M %p') }}</small>
-                                        </div>
-                                        <p class="small text-muted mb-1" style="font-size: 0.8rem;">{{ n.message }}</p>
-                                        {% if n.link %}
-                                        <a href="{{ n.link }}" class="small text-primary text-decoration-none fw-semibold" onclick="markNotificationRead({{ n.id }})">View Details &rarr;</a>
+                            <div class="dropdown-menu dropdown-menu-end shadow-3d border-0 p-0 notification-dropdown-menu" aria-labelledby="notificationDropdownToggle">
+                                <!-- Dropdown Header -->
+                                <div class="notification-dropdown-header d-flex justify-content-between align-items-center">
+                                    <div class="d-flex align-items-center gap-2">
+                                        <span class="fw-bold text-dark" style="font-size: 0.95rem;">Notifications</span>
+                                        <span id="notificationUnreadPill" class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill {% if not unread_notifications_count or unread_notifications_count == 0 %}d-none{% endif %}" style="font-size: 0.7rem;">
+                                            <span id="notificationUnreadCountText">{{ unread_notifications_count or 0 }}</span> new
+                                        </span>
+                                    </div>
+                                    <button id="markAllReadBtn" type="button" class="btn btn-sm btn-link text-primary text-decoration-none p-0 fw-semibold small {% if not unread_notifications_count or unread_notifications_count == 0 %}d-none{% endif %}" onclick="markAllNotificationsRead(event)">
+                                        <i class="bi bi-check2-all me-1"></i>Mark all read
+                                    </button>
+                                </div>
+
+                                <!-- Notification List -->
+                                <div class="notification-list-container" id="notificationList">
+                                    {% if recent_notifications %}
+                                        {% for n in recent_notifications %}
+                                        {% set icon_class = 'bi-bell-fill text-primary' %}
+                                        {% set icon_bg = 'bg-primary-subtle' %}
+                                        {% if n.type == 'EVENT_CAPACITY_ALERT' %}
+                                            {% set icon_class = 'bi-exclamation-triangle-fill text-warning' %}
+                                            {% set icon_bg = 'bg-warning-subtle' %}
+                                        {% elif 'APPROVAL' in n.type or 'APPROVED' in n.type %}
+                                            {% set icon_class = 'bi-check-circle-fill text-success' %}
+                                            {% set icon_bg = 'bg-success-subtle' %}
+                                        {% elif 'REJECT' in n.type %}
+                                            {% set icon_class = 'bi-x-circle-fill text-danger' %}
+                                            {% set icon_bg = 'bg-danger-subtle' %}
+                                        {% elif 'REQUEST' in n.type %}
+                                            {% set icon_class = 'bi-file-earmark-text-fill text-info' %}
+                                            {% set icon_bg = 'bg-info-subtle' %}
                                         {% endif %}
-                                    </li>
-                                    {% endfor %}
-                                {% else %}
-                                    <li class="text-center text-muted py-3 small">No notifications yet.</li>
-                                {% endif %}
-                            </ul>
+                                        <div class="notification-item {% if not n.is_read %}notification-unread{% else %}notification-read{% endif %}"
+                                             id="notif-dropdown-item-{{ n.id }}"
+                                             data-notification-id="{{ n.id }}"
+                                             data-is-read="{{ 'true' if n.is_read else 'false' }}">
+                                            <div class="d-flex align-items-start gap-2">
+                                                <div class="notification-icon-box {{ icon_bg }} flex-shrink-0 mt-1">
+                                                    <i class="bi {{ icon_class }}"></i>
+                                                </div>
+                                                <div class="flex-grow-1 min-w-0">
+                                                    <div class="d-flex align-items-start justify-content-between gap-2">
+                                                        <span class="notification-title text-truncate" title="{{ n.title }}">{{ n.title }}</span>
+                                                        <span class="notification-dot {% if n.is_read %}d-none{% endif %}" id="notif-dot-{{ n.id }}" title="Unread"></span>
+                                                    </div>
+                                                    <p class="notification-message mb-1 text-break">{{ n.message }}</p>
+                                                    <div class="d-flex align-items-center justify-content-between pt-1 gap-2 flex-wrap">
+                                                        <span class="notification-meta">
+                                                            <i class="bi bi-clock"></i>{{ n.created_at|datetimeformat('%b %d, %I:%M %p') }}
+                                                        </span>
+                                                        <div class="d-flex align-items-center gap-2 ms-auto">
+                                                            {% if n.link %}
+                                                            <a href="{{ n.link }}" class="btn btn-sm btn-outline-primary notification-action-btn" onclick="handleNotificationLinkClick(event, {{ n.id }}, '{{ n.link }}')">
+                                                                View <i class="bi bi-arrow-right ms-1"></i>
+                                                            </a>
+                                                            {% endif %}
+                                                            <button type="button" class="btn btn-sm btn-link text-primary text-decoration-none p-0 notification-action-btn mark-read-btn {% if n.is_read %}d-none{% endif %}"
+                                                                    id="notif-mark-read-btn-{{ n.id }}"
+                                                                    onclick="markNotificationRead({{ n.id }}, this, event)">
+                                                                <i class="bi bi-check2 me-1"></i>Mark read
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {% endfor %}
+                                    {% else %}
+                                        <div class="text-center py-4 px-3 text-muted" id="noNotificationsPlaceholder">
+                                            <i class="bi bi-bell-slash fs-3 d-block text-secondary mb-2 opacity-50"></i>
+                                            <p class="small mb-0">No notifications yet</p>
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            </div>
                         </li>
 
                         <!-- User Profile Dropdown -->

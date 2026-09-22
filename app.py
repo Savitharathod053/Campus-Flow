@@ -162,22 +162,6 @@ def create_app(config_class=Config):
             app.logger.warning(f"Database readiness check note: {e}")
 
 
-    # Notification API Endpoints
-    @app.route('/notifications/read/<int:notification_id>', methods=['POST'])
-    def read_notification(notification_id):
-        user_id = session.get('user_id')
-        if not user_id:
-            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-        success = mark_as_read(notification_id, user_id=user_id)
-        return jsonify({'success': success})
-
-    @app.route('/notifications/read-all', methods=['POST'])
-    def read_all_notifications():
-        user_id = session.get('user_id')
-        if not user_id:
-            return jsonify({'success': False, 'error': 'Unauthorized'}), 401
-        success = mark_all_as_read(user_id)
-        return jsonify({'success': success})
 
     @app.route('/faculty/dashboard')
     def faculty_dashboard():

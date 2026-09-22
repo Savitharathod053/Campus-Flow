@@ -233,20 +233,101 @@ def event_capacity_api(event_id):
 
 
 @public_bp.route('/notifications/<int:notification_id>/read', methods=['POST'])
+@public_bp.route('/notifications/read/<int:notification_id>', methods=['POST'])
 def global_mark_notification_read(notification_id):
     """
     Marks an in-app notification as read for the authenticated user.
+    Returns JSON with updated read state and current unread count.
     """
+    from services.notification_service import mark_as_read, get_unread_count
     current_user = get_current_user()
     if not current_user:
-        return jsonify({'success': False, 'error': 'Authentication required'}), 401
+        return jsonify({'success': False, 'error': 'Authentication required', 'message': 'Please log in to manage notifications.'}), 401
 
-    notif = Notification.query.filter_by(id=notification_id, user_id=current_user.id).first_or_404()
-    notif.is_read = True
-    db.session.commit()
+    notif = mark_as_read(notification_id, user_id=current_user.id)
+    if not notif:
+        # Check if notification exists at all (for proper 404 response)
+        exists = Notification.query.filter_by(id=notification_id).first()
+        if not exists or exists.user_id != current_user.id:
+            return jsonify({
+                'success': False,
+                'error': 'Notification not found',
+                'message': 'Notification not found or access denied.'
+            }), 404
+
+    unread_count = get_unread_count(current_user.id)
     return jsonify({
         'success': True,
         'message': 'Notification marked as read.',
-        'notification_id': notif.id
-    })
+        'notification_id': notification_id,
+        'is_read': True,
+        'unread_count': unread_count
+    }), 200
+
+
+@public_bp.route('/notifications/read-all', methods=['POST'])
+def global_mark_all_notifications_read():
+    """
+    Marks all in-app notifications as read for the authenticated user.
+    Returns JSON with updated unread count (0).
+    """
+    from services.notification_service import mark_all_as_read, get_unread_count
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'success': False, 'error': 'Authentication required', 'message': 'Please log in to manage notifications.'}), 401
+
+    count = mark_all_as_read(current_user.id)
+    return jsonify({
+        'success': True,
+        'message': 'All notifications marked as read.',
+        'marked_count': max(count, 0),
+        'unread_count': 0
+    }), 200
+
+
+@public_bp.route('/notifications/unread-count', methods=['GET'])
+def global_get_unread_notifications_count():
+    """
+    Returns the real-time unread notifications count for the authenticated user.
+    """
+    from services.notification_service import get_unread_count
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'success': False, 'unread_count': 0, 'error': 'Authentication required'}), 401
+
+    return jsonify({
+        'success': True,
+        'unread_count': get_unread_count(current_user.id)
+    }), 200
+
+
+@public_bp.route('/notifications', methods=['GET'])
+def global_get_notifications():
+    """
+    Returns recent in-app notifications for the authenticated user.
+    """
+    from services.notification_service import get_user_notifications, get_unread_count
+    from services.timezone_service import format_ist_datetime
+    current_user = get_current_user()
+    if not current_user:
+        return jsonify({'success': False, 'notifications': [], 'unread_count': 0, 'error': 'Authentication required'}), 401
+
+    notifs = get_user_notifications(current_user.id, limit=20)
+    unread_count = get_unread_count(current_user.id)
+
+    return jsonify({
+        'success': True,
+        'unread_count': unread_count,
+        'notifications': [{
+            'id': n.id,
+            'title': n.title,
+            'message': n.message,
+            'type': n.type,
+            'link': n.link,
+            'is_read': n.is_read,
+            'created_at': format_ist_datetime(n.created_at) if n.created_at else '',
+            'created_at_iso': n.created_at.isoformat() if n.created_at else ''
+        } for n in notifs]
+    }), 200
+
 

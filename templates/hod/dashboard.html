@@ -731,50 +731,5 @@
 {% endblock %}
 
 {% block extra_js %}
-<script>
-function markNotificationRead(notificationId, btnElement) {
-    if (!notificationId) return;
-    if (btnElement) {
-        btnElement.disabled = true;
-        btnElement.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
-    }
-
-    fetch(`/hod/notifications/${notificationId}/read`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            // Dim or remove banner card if present
-            const card = document.getElementById(`alert-card-${notificationId}`);
-            if (card) {
-                card.style.opacity = '0.5';
-                if (btnElement) btnElement.outerHTML = '<span class="badge bg-secondary">Read</span>';
-            }
-            // Update table row if present
-            const row = document.getElementById(`table-row-${notificationId}`);
-            if (row) {
-                row.classList.remove('table-warning-subtle', 'fw-semibold');
-                const badge = row.querySelector('.badge.bg-danger');
-                if (badge) {
-                    badge.className = 'badge bg-light text-secondary border';
-                    badge.textContent = 'Read';
-                }
-                if (btnElement) btnElement.remove();
-            }
-        }
-    })
-    .catch(err => {
-        console.error("Failed to mark notification as read:", err);
-        if (btnElement) {
-            btnElement.disabled = false;
-            btnElement.innerHTML = '<i class="bi bi-check2"></i>';
-        }
-    });
-}
-</script>
+{# Global markNotificationRead in static/js/app.js handles HOD cards, table rows, and navbar counters #}
 {% endblock %}

@@ -621,14 +621,20 @@ def mark_notification_read(notification_id):
     """
     Marks an in-app notification as read.
     """
+    from services.notification_service import mark_as_read, get_unread_count
     user = get_current_user()
-    notif = Notification.query.filter_by(id=notification_id, user_id=user.id).first_or_404()
-    notif.is_read = True
-    db.session.commit()
+    notif = mark_as_read(notification_id, user_id=user.id)
+    if not notif:
+        return jsonify({'success': False, 'error': 'Notification not found', 'message': 'Notification not found.'}), 404
+
+    unread_count = get_unread_count(user.id)
     return jsonify({
         'success': True,
         'message': 'Notification marked as read.',
-        'notification_id': notif.id
+        'notification_id': notif.id,
+        'is_read': True,
+        'unread_count': unread_count
     })
+
 
 

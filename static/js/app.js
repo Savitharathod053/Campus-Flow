@@ -302,3 +302,264 @@ function initCopyButtons() {
         });
     });
 }
+
+
+/* ==========================================================================
+   Campus Flow — In-App Notification System Controller
+   Handles real-time read/unread toggling, optimistic UI updates, error rollbacks,
+   and navbar badge counter synchronization.
+   ========================================================================== */
+
+const inFlightNotificationRequests = new Set();
+let isMarkingAllInFlight = false;
+
+/**
+ * Updates all visual notification counters, badges, and pill indicators across the UI.
+ * @param {number} newCount - The updated unread notifications count
+ */
+function updateNotificationBadgeUI(newCount) {
+    const badge = document.getElementById('notificationBadge');
+    const pill = document.getElementById('notificationUnreadPill');
+    const countText = document.getElementById('notificationUnreadCountText');
+    const markAllBtn = document.getElementById('markAllReadBtn');
+
+    const count = Math.max(0, parseInt(newCount, 10) || 0);
+
+    if (badge) {
+        badge.textContent = count;
+        if (count > 0) {
+            badge.classList.remove('d-none');
+        } else {
+            badge.classList.add('d-none');
+        }
+    }
+
+    if (pill) {
+        if (count > 0) {
+            pill.classList.remove('d-none');
+        } else {
+            pill.classList.add('d-none');
+        }
+    }
+
+    if (countText) {
+        countText.textContent = count;
+    }
+
+    if (markAllBtn) {
+        if (count > 0) {
+            markAllBtn.classList.remove('d-none');
+        } else {
+            markAllBtn.classList.add('d-none');
+        }
+    }
+}
+
+/**
+ * Marks an individual notification as read.
+ * Provides immediate optimistic visual feedback, decrements bell count,
+ * and rolls back gracefully if backend communication fails.
+ *
+ * @param {number|string} notificationId - The database ID of the notification
+ * @param {HTMLElement|null} btnElement - The button triggering the action (optional)
+ * @param {Event|null} event - The triggering DOM event (optional)
+ */
+function markNotificationRead(notificationId, btnElement, event) {
+    if (event) {
+        try {
+            event.preventDefault();
+            event.stopPropagation();
+        } catch (e) {}
+    }
+    if (!notificationId) return;
+
+    const notifIdStr = String(notificationId);
+    if (inFlightNotificationRequests.has(notifIdStr)) return;
+    inFlightNotificationRequests.add(notifIdStr);
+
+    // Identify related DOM elements
+    const dropdownItem = document.getElementById(`notif-dropdown-item-${notificationId}`);
+    const dot = document.getElementById(`notif-dot-${notificationId}`);
+    const markBtn = btnElement || document.getElementById(`notif-mark-read-btn-${notificationId}`);
+    const hodCard = document.getElementById(`alert-card-${notificationId}`);
+    const hodRow = document.getElementById(`table-row-${notificationId}`);
+
+    const badge = document.getElementById('notificationBadge');
+    const prevBadgeCount = badge ? (parseInt(badge.textContent, 10) || 0) : 0;
+    const wasUnread = dropdownItem ? (dropdownItem.dataset.isRead !== 'true') : true;
+
+    // 1. Optimistic UI Updates:
+    if (dropdownItem) {
+        dropdownItem.classList.remove('notification-unread');
+        dropdownItem.classList.add('notification-read');
+        dropdownItem.dataset.isRead = 'true';
+    }
+    if (dot) {
+        dot.classList.add('d-none');
+    }
+    if (markBtn) {
+        markBtn.classList.add('d-none');
+        markBtn.disabled = true;
+    }
+    if (hodCard) {
+        hodCard.style.opacity = '0.5';
+        const cardBtn = hodCard.querySelector('button');
+        if (cardBtn) cardBtn.outerHTML = '<span class="badge bg-secondary">Read</span>';
+    }
+    if (hodRow) {
+        hodRow.classList.remove('table-warning-subtle', 'fw-semibold');
+        const rBadge = hodRow.querySelector('.badge.bg-danger');
+        if (rBadge) {
+            rBadge.className = 'badge bg-light text-secondary border';
+            rBadge.textContent = 'Read';
+        }
+        const rowBtn = hodRow.querySelector('button');
+        if (rowBtn) rowBtn.remove();
+    }
+
+    // Decrement navbar unread badge immediately
+    if (wasUnread && prevBadgeCount > 0) {
+        updateNotificationBadgeUI(prevBadgeCount - 1);
+    }
+
+    // 2. Transmit to Backend API
+    fetch(`/notifications/${notificationId}/read`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            if (typeof data.unread_count !== 'undefined') {
+                updateNotificationBadgeUI(data.unread_count);
+            }
+        } else {
+            throw new Error(data.message || 'Mark as read failed');
+        }
+    })
+    .catch(err => {
+        console.error(`Failed to mark notification ${notificationId} as read:`, err);
+        // 3. Rollback UI if backend request failed
+        if (dropdownItem && wasUnread) {
+            dropdownItem.classList.add('notification-unread');
+            dropdownItem.classList.remove('notification-read');
+            dropdownItem.dataset.isRead = 'false';
+        }
+        if (dot && wasUnread) {
+            dot.classList.remove('d-none');
+        }
+        if (markBtn && wasUnread) {
+            markBtn.classList.remove('d-none');
+            markBtn.disabled = false;
+        }
+        if (hodCard) {
+            hodCard.style.opacity = '1';
+        }
+        if (wasUnread) {
+            updateNotificationBadgeUI(prevBadgeCount);
+        }
+    })
+    .finally(() => {
+        inFlightNotificationRequests.delete(notifIdStr);
+    });
+}
+
+/**
+ * Marks all notifications for the authenticated user as read.
+ * Optimistically updates all visible cards, clears unread dots, hides mark-read buttons,
+ * and sets the bell badge to 0.
+ *
+ * @param {Event|null} event - The triggering DOM event (optional)
+ */
+function markAllNotificationsRead(event) {
+    if (event) {
+        try {
+            event.preventDefault();
+            event.stopPropagation();
+        } catch (e) {}
+    }
+    if (isMarkingAllInFlight) return;
+    isMarkingAllInFlight = true;
+
+    const badge = document.getElementById('notificationBadge');
+    const prevBadgeCount = badge ? (parseInt(badge.textContent, 10) || 0) : 0;
+
+    // 1. Optimistic UI Updates across all cards in dropdown
+    const unreadItems = document.querySelectorAll('.notification-item.notification-unread');
+    unreadItems.forEach(item => {
+        item.classList.remove('notification-unread');
+        item.classList.add('notification-read');
+        item.dataset.isRead = 'true';
+    });
+
+    const unreadDots = document.querySelectorAll('.notification-dot');
+    unreadDots.forEach(dot => dot.classList.add('d-none'));
+
+    const markBtns = document.querySelectorAll('.mark-read-btn');
+    markBtns.forEach(btn => btn.classList.add('d-none'));
+
+    updateNotificationBadgeUI(0);
+
+    // 2. Transmit to Backend API
+    fetch('/notifications/read-all', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+    })
+    .then(response => {
+        if (!response.ok) {
+            throw new Error(`HTTP error ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            updateNotificationBadgeUI(data.unread_count || 0);
+        } else {
+            throw new Error(data.message || 'Mark all as read failed');
+        }
+    })
+    .catch(err => {
+        console.error('Failed to mark all notifications as read:', err);
+        // Rollback
+        unreadItems.forEach(item => {
+            item.classList.add('notification-unread');
+            item.classList.remove('notification-read');
+            item.dataset.isRead = 'false';
+        });
+        unreadDots.forEach(dot => dot.classList.remove('d-none'));
+        markBtns.forEach(btn => btn.classList.remove('d-none'));
+        updateNotificationBadgeUI(prevBadgeCount);
+    })
+    .finally(() => {
+        isMarkingAllInFlight = false;
+    });
+}
+
+/**
+ * Handles clicks on notification detail links.
+ * Proactively marks the notification as read before page navigation.
+ *
+ * @param {Event} event - The triggering click event
+ * @param {number|string} notificationId - The notification ID
+ * @param {string} linkUrl - The target URL
+ */
+function handleNotificationLinkClick(event, notificationId, linkUrl) {
+    if (notificationId) {
+        const item = document.getElementById(`notif-dropdown-item-${notificationId}`);
+        if (item && item.dataset.isRead !== 'true') {
+            markNotificationRead(notificationId, null, null);
+        }
+    }
+}
+
