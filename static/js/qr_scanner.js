@@ -5,6 +5,91 @@ let isScanning = false;
 let audioCtx = null;
 let currentEventId = null;
 
+/**
+ * Formats any attendance timestamp strictly in Indian Standard Time (IST, Asia/Kolkata, UTC+05:30).
+ * Independent of browser local timezone.
+ * Handles ISO strings (e.g. 2026-09-22T07:56:00Z), server formatted strings, Date objects, or unix timestamps.
+ */
+function formatAttendanceTime(timestamp, options = {}) {
+    if (!timestamp) return 'N/A';
+
+    // If it's already a full formatted IST string (e.g. "22 September 2026, 01:05 PM IST")
+    if (typeof timestamp === 'string') {
+        const trimmed = timestamp.trim();
+        if (trimmed.endsWith('IST')) {
+            if (options.timeOnly) {
+                const parts = trimmed.split(',');
+                return parts.length > 1 ? parts[parts.length - 1].trim() : trimmed;
+            }
+            if (options.dateOnly) {
+                const parts = trimmed.split(',');
+                return parts[0].trim();
+            }
+            return trimmed;
+        }
+    }
+
+    try {
+        let dateObj = null;
+        if (timestamp instanceof Date) {
+            dateObj = timestamp;
+        } else if (typeof timestamp === 'number') {
+            dateObj = new Date(timestamp);
+        } else if (typeof timestamp === 'string') {
+            let str = timestamp.trim();
+            // If string is YYYY-MM-DD HH:MM:SS (naive UTC from server), treat as UTC
+            if (/^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2})?(\.\d+)?$/.test(str)) {
+                str = str.replace(' ', 'T') + 'Z';
+            }
+            dateObj = new Date(str);
+        }
+
+        if (!dateObj || isNaN(dateObj.getTime())) {
+            return String(timestamp);
+        }
+
+        if (options.timeOnly) {
+            const timeFormatter = new Intl.DateTimeFormat('en-IN', {
+                timeZone: 'Asia/Kolkata',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: true
+            });
+            return `${timeFormatter.format(dateObj)} IST`;
+        }
+
+        if (options.dateOnly) {
+            const dateFormatter = new Intl.DateTimeFormat('en-IN', {
+                timeZone: 'Asia/Kolkata',
+                day: '2-digit',
+                month: 'long',
+                year: 'numeric'
+            });
+            return dateFormatter.format(dateObj);
+        }
+
+        // Full date and time in IST (e.g., 22 September 2026, 01:05 PM IST)
+        const dateFormatter = new Intl.DateTimeFormat('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            day: '2-digit',
+            month: 'long',
+            year: 'numeric'
+        });
+        const timeFormatter = new Intl.DateTimeFormat('en-IN', {
+            timeZone: 'Asia/Kolkata',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: true
+        });
+
+        return `${dateFormatter.format(dateObj)}, ${timeFormatter.format(dateObj)} IST`;
+    } catch (err) {
+        console.error('Error formatting timestamp to IST:', err);
+        return String(timestamp);
+    }
+}
+
+
 function getAudioContext() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -78,8 +163,15 @@ function showScanResult(type, title, message, studentData = null, rawCode = null
         const dept = studentData.department || studentData.department_name || studentData.dept || 'N/A';
         const yearSec = (studentData.year && studentData.year !== 'N/A') ? ` (${studentData.year}${studentData.section && studentData.section !== 'N/A' ? '-' + studentData.section : ''})` : '';
         const sessionName = studentData.session_name || studentData.session || 'General Attendance';
-        const scannedTime = studentData.scanned_at || studentData.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        
+        // Always format attendance time strictly in Indian Standard Time (Asia/Kolkata)
+        const rawTime = studentData.scanned_at || studentData.scanned_at_iso || studentData.time;
+        const formattedFullTime = formatAttendanceTime(rawTime);
+        const timeOnly = formatAttendanceTime(rawTime, { timeOnly: true });
+        const dateOnly = formatAttendanceTime(rawTime, { dateOnly: true });
         const teamName = studentData.team_name || studentData.team || '';
+
+        console.log(`[ATTENDANCE] Attendance timestamp displayed: ${formattedFullTime} (Asia/Kolkata)`);
 
         studentHtml = `
             <div class="mt-2 pt-2 border-top">
@@ -89,7 +181,8 @@ function showScanResult(type, title, message, studentData = null, rawCode = null
                     <div class="col-sm-6"><strong>Department:</strong> ${dept}${yearSec}</div>
                     ${teamName ? `<div class="col-sm-6"><strong>Team:</strong> <span class="badge bg-primary bg-opacity-10 text-primary">${teamName}</span></div>` : ''}
                     <div class="col-sm-6"><strong>Session:</strong> <span class="badge bg-info text-dark">${sessionName}</span></div>
-                    <div class="col-sm-6"><strong>Time:</strong> ${scannedTime}</div>
+                    <div class="col-sm-6"><strong>Attendance Date:</strong> ${dateOnly}</div>
+                    <div class="col-sm-6"><strong>Attendance Time:</strong> <span class="badge bg-success-subtle text-success-emphasis border border-success-subtle px-2 py-1">${timeOnly}</span></div>
                     ${studentData.student_percentage !== undefined ? `<div class="col-sm-6"><strong>Progress:</strong> ${studentData.student_attended_sessions}/${studentData.total_sessions} (${studentData.student_percentage}%)</div>` : ''}
                 </div>
             </div>
@@ -136,6 +229,8 @@ function showScanResult(type, title, message, studentData = null, rawCode = null
             const emptyRow = logTable.querySelector('.empty-log-row');
             if (emptyRow) emptyRow.remove();
 
+            const tableTime = formatAttendanceTime(studentData.scanned_at || studentData.scanned_at_iso, { timeOnly: true });
+
             const newRow = document.createElement('tr');
             newRow.className = 'table-success';
             newRow.innerHTML = `
@@ -146,7 +241,7 @@ function showScanResult(type, title, message, studentData = null, rawCode = null
                 <td><span class="badge bg-light text-dark border">${studentData.roll_number}</span></td>
                 <td>${studentData.department} (${studentData.year || ''}-${studentData.section || ''})</td>
                 <td><span class="badge bg-info text-dark small">${studentData.session_name}</span></td>
-                <td>${studentData.scanned_at}</td>
+                <td>${tableTime}</td>
                 <td><span class="badge bg-success">Verified</span></td>
             `;
             logTable.insertBefore(newRow, logTable.firstChild);

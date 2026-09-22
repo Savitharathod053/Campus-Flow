@@ -53,9 +53,17 @@ class Payment(db.Model):
     
     transaction_id = db.Column(db.String(100), nullable=True, index=True)
     extracted_transaction_id = db.Column(db.String(100), nullable=True)
-    payment_method = db.Column(db.String(50), nullable=True)  # UPI_QR, UPI_NUMBER, UPI_ID, etc.
+    payment_method = db.Column(db.String(50), nullable=True)  # UPI_QR, UPI_NUMBER, UPI_ID, RAZORPAY, etc.
     payment_screenshot = db.Column(db.String(255), nullable=True)
     screenshot_hash = db.Column(db.String(64), nullable=True, index=True)
+
+    # Razorpay Transaction & Verification Fields
+    razorpay_order_id = db.Column(db.String(100), nullable=True, index=True)
+    razorpay_payment_id = db.Column(db.String(100), nullable=True, index=True)
+    razorpay_signature = db.Column(db.String(255), nullable=True)
+    webhook_event_id = db.Column(db.String(100), nullable=True, index=True)
+    failure_reason = db.Column(db.Text, nullable=True)
+    razorpay_status = db.Column(db.String(50), nullable=True)
     
     status = db.Column(db.String(50), default=PaymentStatus.PENDING, nullable=False, index=True)
     fraud_risk = db.Column(db.String(20), default=FraudRisk.LOW, nullable=True)
@@ -114,6 +122,10 @@ class Payment(db.Model):
     @property
     def is_manual_review(self):
         return self.status == PaymentStatus.MANUAL_REVIEW
+
+    @property
+    def is_razorpay(self):
+        return (self.payment_method == 'RAZORPAY') or bool(self.razorpay_payment_id) or bool(self.razorpay_order_id)
 
     @property
     def status_label(self):

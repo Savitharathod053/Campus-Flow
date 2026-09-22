@@ -222,7 +222,7 @@
                                 <tr>
                                     <td>{{ att.event.title }}</td>
                                     <td>{{ att.session.session_name if att.session else 'Main Event' }}</td>
-                                    <td>{{ att.scanned_at.strftime('%b %d, %Y %H:%M') }}</td>
+                                    <td>{{ att.scanned_at|datetimeformat('%b %d, %I:%M %p') ~ ' IST' if att.scanned_at else '—' }}</td>
                                     <td><span class="badge bg-light text-dark border">{{ att.verification_method }}</span></td>
                                     <td><span class="badge {% if att.status == 'PRESENT' %}bg-success{% else %}bg-secondary{% endif %}">{{ att.status }}</span></td>
                                 </tr>

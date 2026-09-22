@@ -1,4 +1,4 @@
-﻿{% extends "base.html" %}
+{% extends "base.html" %}
 {% block title %}Attendance Matrix & Analytics - {{ event.title }}{% endblock %}
 
 {% block content %}
@@ -166,11 +166,11 @@
                                 {% for s_stat in row.session_statuses %}
                                     <td class="text-center">
                                         {% if s_stat.is_present %}
-                                            <span class="badge bg-success" title="Verified at {{ s_stat.scanned_at|timeformat if s_stat.scanned_at else '' }} via {{ s_stat.method }}">
+                                            <span class="badge bg-success" title="Verified at {{ s_stat.scanned_at|timeformat if s_stat.scanned_at else '' }} IST via {{ s_stat.method }}">
                                                 <i class="bi bi-check2-circle me-1"></i> Present
                                             </span>
                                             {% if s_stat.scanned_at %}
-                                                <div class="text-muted" style="font-size: 0.72rem;">{{ s_stat.scanned_at|timeformat }}</div>
+                                                <div class="text-muted" style="font-size: 0.72rem;">{{ s_stat.scanned_at|timeformat }} IST</div>
                                             {% endif %}
                                         {% else %}
                                             <span class="badge bg-light text-muted border">

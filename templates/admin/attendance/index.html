@@ -102,8 +102,8 @@
                             <span class="badge bg-light text-dark border font-monospace">{{ rec.verification_method or 'MANUAL' }}</span>
                         </td>
                         <td>
-                            <span class="small text-muted">{{ rec.scanned_at.strftime('%b %d, %Y') if rec.scanned_at else 'N/A' }}</span>
-                            <div class="text-muted small" style="font-size: 0.75rem;">{{ rec.scanned_at.strftime('%I:%M %p') if rec.scanned_at else '' }}</div>
+                            <span class="small text-muted">{{ rec.scanned_at|dateformat if rec.scanned_at else 'N/A' }}</span>
+                            <div class="text-muted small" style="font-size: 0.75rem;">{{ rec.scanned_at|timeformat if rec.scanned_at else '' }} IST</div>
                         </td>
                         <td style="max-width: 200px;">
                             <span class="small text-muted text-truncate d-inline-block" style="max-width: 200px;" title="{{ rec.remarks or 'None' }}">

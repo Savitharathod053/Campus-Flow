@@ -130,8 +130,8 @@
                                 </td>
                                 <td>
                                     {% if reg.attendance %}
-                                        <span class="badge bg-success" title="{{ reg.attendance.scanned_at|datetimeformat }}">
-                                            <i class="bi bi-check-circle-fill me-1"></i> Present ({{ reg.attendance.scanned_at|timeformat }})
+                                        <span class="badge bg-success" title="{{ reg.attendance.scanned_at|datetimeformat }} IST">
+                                            <i class="bi bi-check-circle-fill me-1"></i> Present ({{ reg.attendance.scanned_at|timeformat }} IST)
                                         </span>
                                     {% else %}
                                         <span class="badge bg-light text-muted border">Absent</span>

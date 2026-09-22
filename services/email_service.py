@@ -1054,7 +1054,8 @@ def send_attendance_marked_email(student, event, session, att_record):
         return False
 
     session_name = session.session_name if session else "General Session"
-    time_str = att_record.scanned_at.strftime('%b %d, %Y %I:%M %p') if (att_record and att_record.scanned_at) else datetime.utcnow().strftime('%b %d, %Y %I:%M %p')
+    from services.timezone_service import format_ist_datetime, get_current_ist_time
+    time_str = format_ist_datetime(att_record.scanned_at) if (att_record and att_record.scanned_at) else format_ist_datetime(get_current_ist_time())
     event_title = event.title if event else "Campus Event"
 
     subject = f"Attendance Confirmed: {event_title} ({session_name})"

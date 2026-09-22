@@ -80,17 +80,31 @@
                             <small class="text-muted">{{ p.submitted_at|datetimeformat if p.submitted_at else '' }}</small>
                         </td>
                         <td>
-                            <code class="fw-bold fs-7">{{ p.transaction_id or 'Not provided' }}</code>
+                            {% if p.is_razorpay %}
+                                <span class="badge bg-primary mb-1"><i class="bi bi-credit-card-2-front me-1"></i> Razorpay</span><br>
+                                <code class="fw-bold fs-7" title="Razorpay Payment ID">{{ p.razorpay_payment_id or p.transaction_id }}</code>
+                                {% if p.razorpay_order_id %}
+                                    <div class="small text-muted font-monospace" style="font-size:0.75rem;" title="Razorpay Order ID">Order: {{ p.razorpay_order_id }}</div>
+                                {% endif %}
+                            {% else %}
+                                <code class="fw-bold fs-7">{{ p.transaction_id or 'Not provided' }}</code>
+                            {% endif %}
                         </td>
                         <td>
-                            {% if p.extracted_transaction_id %}
+                            {% if p.is_razorpay %}
+                                <span class="badge bg-light text-primary border"><i class="bi bi-shield-check"></i> Gateway Direct</span>
+                            {% elif p.extracted_transaction_id %}
                                 <code class="text-success fw-bold fs-7">{{ p.extracted_transaction_id }}</code>
                             {% else %}
                                 <span class="badge bg-light text-muted border">Not detected</span>
                             {% endif %}
                         </td>
                         <td>
-                            {% if p.status == 'TRANSACTION_ID_VERIFIED' or (p.extracted_transaction_id and p.transaction_id and p.extracted_transaction_id|upper == p.transaction_id|upper) %}
+                            {% if p.is_razorpay %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                    <i class="bi bi-patch-check-fill me-1"></i> Auto-Reconciled
+                                </span>
+                            {% elif p.status == 'TRANSACTION_ID_VERIFIED' or (p.extracted_transaction_id and p.transaction_id and p.extracted_transaction_id|upper == p.transaction_id|upper) %}
                                 <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
                                     <i class="bi bi-check-circle-fill me-1"></i> Matched
                                 </span>
@@ -128,7 +142,11 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% if p.payment_screenshot %}
+                            {% if p.is_razorpay %}
+                                <span class="badge bg-light text-dark border px-2 py-1" title="Digital signature verified via Razorpay">
+                                    <i class="bi bi-file-earmark-lock text-success me-1"></i> Digital Token
+                                </span>
+                            {% elif p.payment_screenshot %}
                                 <a href="{{ url_for('payment.view_proof', payment_id=p.id) }}" target="_blank" class="btn btn-outline-primary btn-sm py-1 px-2 fw-semibold" title="View Full Payment Screenshot">
                                     <i class="bi bi-image me-1"></i> View Proof
                                 </a>

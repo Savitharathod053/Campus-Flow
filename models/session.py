@@ -1,4 +1,4 @@
-﻿from datetime import datetime
+from datetime import datetime
 from .user import db
 
 class AttendanceSessionStatus:
@@ -46,14 +46,19 @@ class AttendanceSession(db.Model):
         """
         Checks if current time falls within session start and end times if configured.
         Returns (is_active: bool, message: str)
+        Uses Indian Standard Time (IST, Asia/Kolkata).
         """
+        from services.timezone_service import get_current_ist_time, to_ist
+
         if self.status == AttendanceSessionStatus.CANCELLED:
             return False, "This attendance session has been cancelled."
         if self.status == AttendanceSessionStatus.COMPLETED:
             return False, "This attendance session has already concluded."
 
         if not current_dt:
-            current_dt = datetime.now()
+            current_dt = get_current_ist_time()
+        else:
+            current_dt = to_ist(current_dt)
 
         # If date is specified and doesn't match
         if self.event_date and current_dt.date() != self.event_date:

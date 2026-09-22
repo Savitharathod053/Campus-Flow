@@ -130,3 +130,9 @@ class Config:
     MAIL_DEFAULT_SENDER = (os.environ.get('MAIL_DEFAULT_SENDER') or os.environ.get('MAIL_USERNAME') or '').strip().strip("'\"")
     MAIL_DEV_REDIRECT_ENABLED = os.environ.get('MAIL_DEV_REDIRECT_ENABLED', 'True').strip().lower() in ('true', '1', 't', 'yes')
     MAIL_LIVE_TEST_RECIPIENT = (os.environ.get('MAIL_LIVE_TEST_RECIPIENT') or os.environ.get('MAIL_USERNAME') or '').strip().strip("'\"")
+
+    # Razorpay Payment Gateway Configuration (Test Mode by default)
+    RAZORPAY_KEY_ID = (os.environ.get('RAZORPAY_KEY_ID') or 'rzp_test_campusflow_dummy').strip().strip("'\"")
+    RAZORPAY_KEY_SECRET = (os.environ.get('RAZORPAY_KEY_SECRET') or 'campusflow_test_secret_key_2026').strip().strip("'\"")
+    RAZORPAY_WEBHOOK_SECRET = (os.environ.get('RAZORPAY_WEBHOOK_SECRET') or 'campusflow_webhook_secret_2026').strip().strip("'\"")
+    RAZORPAY_CURRENCY = (os.environ.get('RAZORPAY_CURRENCY') or 'INR').strip().strip("'\"")

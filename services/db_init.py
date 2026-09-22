@@ -95,6 +95,12 @@ def sync_missing_columns():
             ('event_id', 'INTEGER', None, True),
             ('student_id', 'INTEGER', None, True),
             ('organizer_id', 'INTEGER', None, True),
+            ('razorpay_order_id', 'VARCHAR(100)', None, True),
+            ('razorpay_payment_id', 'VARCHAR(100)', None, True),
+            ('razorpay_signature', 'VARCHAR(255)', None, True),
+            ('webhook_event_id', 'VARCHAR(100)', None, True),
+            ('failure_reason', 'TEXT', None, True),
+            ('razorpay_status', 'VARCHAR(50)', None, True),
         ],
         'events': [
             ('registration_type', 'VARCHAR(20)', "'INDIVIDUAL'", False),

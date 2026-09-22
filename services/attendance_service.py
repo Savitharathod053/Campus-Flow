@@ -5,6 +5,10 @@ manual overrides, and matrix report calculations.
 """
 from datetime import datetime, date, time
 import logging
+from services.timezone_service import (
+    get_current_attendance_time, get_current_ist_time, to_ist,
+    format_ist_datetime, format_ist_time, format_ist_date
+)
 from models import (
     db, Event, EventRegistration, RegistrationStatus, AttendanceRecord,
     AttendanceSession, AttendanceSessionStatus, AttendanceStatus,
@@ -176,6 +180,7 @@ def record_session_attendance(event_id, session_id, registration_code, marked_by
 
     # Validate confirmation status
     if not registration.is_confirmed:
+        now_ist = get_current_ist_time()
         return {
             'status': 'unconfirmed',
             'message': f"Registration is {registration.status}. Entry passes are only valid once confirmed.",
@@ -186,11 +191,15 @@ def record_session_attendance(event_id, session_id, registration_code, marked_by
             'section': profile.section if profile and profile.section else 'N/A',
             'team_name': registration.team.team_name if registration.team else None,
             'session_name': session.session_name,
-            'scanned_at': datetime.utcnow().strftime('%I:%M %p')
+            'scanned_at': format_ist_datetime(now_ist),
+            'scanned_time': format_ist_time(now_ist),
+            'scanned_date': format_ist_date(now_ist),
+            'scanned_at_iso': now_ist.isoformat()
         }, 400
 
     # Validate payment if required
     if not registration.is_paid:
+        now_ist = get_current_ist_time()
         team_name = registration.team.team_name if registration.team else None
         msg = f"Team payment for '{team_name}' is pending. Please complete fee payment." if team_name else "Registration fee payment is pending for this participant."
         return {
@@ -203,13 +212,17 @@ def record_session_attendance(event_id, session_id, registration_code, marked_by
             'section': profile.section if profile and profile.section else 'N/A',
             'team_name': team_name,
             'session_name': session.session_name,
-            'scanned_at': datetime.utcnow().strftime('%I:%M %p')
+            'scanned_at': format_ist_datetime(now_ist),
+            'scanned_time': format_ist_time(now_ist),
+            'scanned_date': format_ist_date(now_ist),
+            'scanned_at_iso': now_ist.isoformat()
         }, 400
 
     # Time Validation
     if not allow_time_override:
         is_active, time_msg = session.is_time_active()
         if not is_active:
+            now_ist = get_current_ist_time()
             return {
                 'status': 'session_closed',
                 'message': time_msg,
@@ -221,7 +234,10 @@ def record_session_attendance(event_id, session_id, registration_code, marked_by
                 'team_name': registration.team.team_name if registration.team else None,
                 'session_name': session.session_name,
                 'session_id': session.id,
-                'scanned_at': datetime.utcnow().strftime('%I:%M %p'),
+                'scanned_at': format_ist_datetime(now_ist),
+                'scanned_time': format_ist_time(now_ist),
+                'scanned_date': format_ist_date(now_ist),
+                'scanned_at_iso': now_ist.isoformat(),
                 'can_override': True
             }, 200
 
@@ -233,6 +249,9 @@ def record_session_attendance(event_id, session_id, registration_code, marked_by
     ).first()
 
     if existing_att and existing_att.status == AttendanceStatus.PRESENT:
+        dup_ist = to_ist(existing_att.scanned_at)
+        dup_formatted = format_ist_datetime(dup_ist)
+        logger.info(f"Attendance timestamp returned by API (duplicate): {dup_formatted} (ISO: {dup_ist.isoformat()}, tz: Asia/Kolkata)")
         return {
             'status': 'duplicate',
             'message': f"{student.name} is already marked PRESENT for '{session.session_name}'.",
@@ -243,10 +262,16 @@ def record_session_attendance(event_id, session_id, registration_code, marked_by
             'section': profile.section if profile and profile.section else 'N/A',
             'team_name': registration.team.team_name if registration.team else None,
             'session_name': session.session_name,
-            'scanned_at': existing_att.scanned_at.strftime('%I:%M %p')
+            'scanned_at': dup_formatted,
+            'scanned_time': format_ist_time(dup_ist),
+            'scanned_date': format_ist_date(dup_ist),
+            'scanned_at_iso': dup_ist.isoformat()
         }, 200
 
     # Create / Update attendance record
+    scan_timestamp = get_current_attendance_time()
+    logger.info(f"Attendance timestamp generated: {scan_timestamp} (tz: {scan_timestamp.tzinfo})")
+
     if not existing_att:
         att_record = AttendanceRecord(
             registration_id=registration.id,
@@ -256,17 +281,18 @@ def record_session_attendance(event_id, session_id, registration_code, marked_by
             marked_by_id=marked_by_user.id if marked_by_user else None,
             verification_method=VerificationMethod.QR_SCAN,
             status=AttendanceStatus.PRESENT,
-            scanned_at=datetime.utcnow()
+            scanned_at=scan_timestamp
         )
         db.session.add(att_record)
     else:
         existing_att.status = AttendanceStatus.PRESENT
-        existing_att.scanned_at = datetime.utcnow()
+        existing_att.scanned_at = scan_timestamp
         existing_att.marked_by_id = marked_by_user.id if marked_by_user else None
         existing_att.verification_method = VerificationMethod.QR_SCAN
         att_record = existing_att
 
     db.session.commit()
+    logger.info(f"Attendance timestamp stored: {att_record.scanned_at} (tz: {getattr(att_record.scanned_at, 'tzinfo', None)})")
 
     # Dispatch in-app notification & email to student
     try:
@@ -290,6 +316,14 @@ def record_session_attendance(event_id, session_id, registration_code, marked_by
     student_percentage = event.get_student_attendance_percentage(student.id)
     session_present_count = session.present_count
 
+    ist_dt = to_ist(att_record.scanned_at)
+    formatted_time = format_ist_datetime(ist_dt)
+    time_only = format_ist_time(ist_dt)
+    date_only = format_ist_date(ist_dt)
+    iso_str = ist_dt.isoformat()
+
+    logger.info(f"Attendance timestamp returned by API: {formatted_time} (ISO: {iso_str}, tz: Asia/Kolkata)")
+
     return {
         'status': 'success',
         'message': f"Attendance recorded for {student.name} ({session.session_name})",
@@ -306,7 +340,10 @@ def record_session_attendance(event_id, session_id, registration_code, marked_by
         'total_sessions': total_sessions,
         'student_percentage': student_percentage,
         'is_satisfied': event.is_student_attendance_satisfied(student.id),
-        'scanned_at': att_record.scanned_at.strftime('%I:%M %p')
+        'scanned_at': formatted_time,
+        'scanned_time': time_only,
+        'scanned_date': date_only,
+        'scanned_at_iso': iso_str
     }, 200
 
 
@@ -328,6 +365,9 @@ def manual_override_attendance(event_id, session_id, student_id, new_status, mar
         student_id=student.id
     ).first()
 
+    override_timestamp = get_current_attendance_time()
+    logger.info(f"Manual attendance timestamp generated: {override_timestamp} (tz: {override_timestamp.tzinfo})")
+
     if not record:
         record = AttendanceRecord(
             registration_id=registration.id,
@@ -338,7 +378,7 @@ def manual_override_attendance(event_id, session_id, student_id, new_status, mar
             verification_method=VerificationMethod.MANUAL,
             status=new_status,
             remarks=remarks or f"Manually marked as {new_status} by {marked_by_user.name if marked_by_user else 'Admin'}",
-            scanned_at=datetime.utcnow()
+            scanned_at=override_timestamp
         )
         db.session.add(record)
     else:
@@ -346,9 +386,10 @@ def manual_override_attendance(event_id, session_id, student_id, new_status, mar
         record.verification_method = VerificationMethod.MANUAL
         record.marked_by_id = marked_by_user.id if marked_by_user else None
         record.remarks = remarks or f"Manually changed to {new_status} by {marked_by_user.name if marked_by_user else 'Admin'}"
-        record.scanned_at = datetime.utcnow()
+        record.scanned_at = override_timestamp
 
     db.session.commit()
+    logger.info(f"Manual attendance timestamp stored: {record.scanned_at} (tz: {getattr(record.scanned_at, 'tzinfo', None)})")
 
     if new_status == AttendanceStatus.PRESENT:
         try:

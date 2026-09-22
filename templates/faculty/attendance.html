@@ -75,7 +75,7 @@
                                             </span>
                                         </td>
                                         <td>
-                                            <span class="small text-muted">{{ r.scanned_at.strftime('%b %d, %Y %I:%M %p') if r.scanned_at else 'Manual' }}</span>
+                                            <span class="small text-muted">{{ r.scanned_at|datetimeformat('%b %d, %Y %I:%M %p') ~ ' IST' if r.scanned_at else 'Manual' }}</span>
                                         </td>
                                         <td>
                                             <span class="badge bg-light text-secondary border small">{{ r.verification_method or 'QR_SCAN' }}</span>

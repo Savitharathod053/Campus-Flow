@@ -1,4 +1,5 @@
 from datetime import datetime
+from services.timezone_service import get_current_attendance_time, to_ist
 from .user import db
 
 class VerificationMethod:
@@ -26,7 +27,7 @@ class AttendanceRecord(db.Model):
     session_id = db.Column(db.Integer, db.ForeignKey('attendance_sessions.id'), nullable=True, index=True)
     marked_by_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     
-    scanned_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    scanned_at = db.Column(db.DateTime, default=get_current_attendance_time, nullable=False)
     verification_method = db.Column(db.String(30), default=VerificationMethod.QR_SCAN, nullable=False)
     status = db.Column(db.String(20), default=AttendanceStatus.PRESENT, nullable=False)
     remarks = db.Column(db.String(255), nullable=True)
@@ -46,6 +47,11 @@ class AttendanceRecord(db.Model):
     @property
     def is_present(self):
         return self.status == AttendanceStatus.PRESENT
+
+    @property
+    def scanned_at_ist(self):
+        """Attendance scan timestamp converted to Indian Standard Time (Asia/Kolkata)."""
+        return to_ist(self.scanned_at)
 
     def __repr__(self):
         return f'<AttendanceRecord Event:{self.event_id} Session:{self.session_id} Student:{self.student_id} Status:{self.status} at {self.scanned_at}>'

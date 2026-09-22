@@ -57,6 +57,10 @@ def create_app(config_class=Config):
     app.register_blueprint(hod_bp)
     app.register_blueprint(dean_bp)
 
+    # Razorpay Webhook Global API Endpoint
+    from routes.payment import handle_razorpay_webhook
+    app.add_url_rule('/api/payments/webhook/razorpay', 'api_razorpay_webhook', handle_razorpay_webhook, methods=['POST'])
+
     # Health Check Endpoints
     @app.route('/health')
     def health():
@@ -135,24 +139,51 @@ def create_app(config_class=Config):
             'app_name': 'Campus Flow'
         }
 
-    # Custom Jinja Filters
+    # Custom Jinja Filters (All timestamps rendered in Indian Standard Time Asia/Kolkata)
     @app.template_filter('datetimeformat')
     def datetimeformat(value, format='%b %d, %Y - %I:%M %p'):
         if value is None:
             return ""
-        return value.strftime(format)
+        from services.timezone_service import to_ist
+        if isinstance(value, datetime):
+            value = to_ist(value)
+        elif isinstance(value, str):
+            dt_conv = to_ist(value)
+            if dt_conv:
+                value = dt_conv
+        if hasattr(value, 'strftime'):
+            return value.strftime(format)
+        return str(value)
 
     @app.template_filter('dateformat')
     def dateformat(value, format='%b %d, %Y'):
         if value is None:
             return ""
-        return value.strftime(format)
+        from services.timezone_service import to_ist
+        if isinstance(value, datetime):
+            value = to_ist(value)
+        elif isinstance(value, str):
+            dt_conv = to_ist(value)
+            if dt_conv:
+                value = dt_conv
+        if hasattr(value, 'strftime'):
+            return value.strftime(format)
+        return str(value)
 
     @app.template_filter('timeformat')
     def timeformat(value, format='%I:%M %p'):
         if value is None:
             return ""
-        return value.strftime(format)
+        from services.timezone_service import to_ist
+        if isinstance(value, datetime):
+            value = to_ist(value)
+        elif isinstance(value, str):
+            dt_conv = to_ist(value)
+            if dt_conv:
+                value = dt_conv
+        if hasattr(value, 'strftime'):
+            return value.strftime(format)
+        return str(value)
 
     # Error Handlers
     @app.errorhandler(400)
