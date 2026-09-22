@@ -117,19 +117,37 @@ class Config:
     SESSION_COOKIE_SAMESITE = 'Lax'
     PERMANENT_SESSION_LIFETIME = 86400 * 7  # 7 days
 
-    # Email / SMTP Configuration
-    MAIL_SERVER = (os.environ.get('MAIL_SERVER') or 'smtp.gmail.com').strip().strip("'\"")
+    # Email / SMTP Configuration (Supports both SMTP_* and MAIL_* variable conventions)
+    SMTP_HOST = (os.environ.get('SMTP_HOST') or os.environ.get('MAIL_SERVER') or 'smtp.gmail.com').strip().strip("'\"")
     try:
-        MAIL_PORT = int((os.environ.get('MAIL_PORT') or '587').strip().strip("'\""))
+        SMTP_PORT = int(str(os.environ.get('SMTP_PORT') or os.environ.get('MAIL_PORT') or '587').strip().strip("'\""))
     except (ValueError, TypeError):
-        MAIL_PORT = 587
-    MAIL_USE_TLS = os.environ.get('MAIL_USE_TLS', 'True').strip().lower() in ('true', '1', 't', 'yes')
-    MAIL_USE_SSL = os.environ.get('MAIL_USE_SSL', 'False').strip().lower() in ('true', '1', 't', 'yes')
-    MAIL_USERNAME = (os.environ.get('MAIL_USERNAME') or '').strip().strip("'\"")
-    MAIL_PASSWORD = (os.environ.get('MAIL_PASSWORD') or '').strip().strip("'\"")
-    MAIL_DEFAULT_SENDER = (os.environ.get('MAIL_DEFAULT_SENDER') or os.environ.get('MAIL_USERNAME') or '').strip().strip("'\"")
-    MAIL_DEV_REDIRECT_ENABLED = os.environ.get('MAIL_DEV_REDIRECT_ENABLED', 'True').strip().lower() in ('true', '1', 't', 'yes')
-    MAIL_LIVE_TEST_RECIPIENT = (os.environ.get('MAIL_LIVE_TEST_RECIPIENT') or os.environ.get('MAIL_USERNAME') or '').strip().strip("'\"")
+        SMTP_PORT = 587
+    SMTP_USE_TLS = (os.environ.get('SMTP_USE_TLS') or os.environ.get('MAIL_USE_TLS') or 'True').strip().lower() in ('true', '1', 't', 'yes')
+    SMTP_USE_SSL = (os.environ.get('SMTP_USE_SSL') or os.environ.get('MAIL_USE_SSL') or 'False').strip().lower() in ('true', '1', 't', 'yes')
+    SMTP_USERNAME = (os.environ.get('SMTP_USERNAME') or os.environ.get('MAIL_USERNAME') or '').strip().strip("'\"")
+    
+    _raw_pw = (os.environ.get('SMTP_PASSWORD') or os.environ.get('MAIL_PASSWORD') or '').strip().strip("'\"")
+    # For Gmail, strip all internal spaces from 16-character App Passwords
+    SMTP_PASSWORD = "".join(_raw_pw.split()) if ('gmail' in SMTP_HOST.lower() or 'google' in SMTP_HOST.lower()) else _raw_pw
+
+    SMTP_FROM_EMAIL = (os.environ.get('SMTP_FROM_EMAIL') or os.environ.get('MAIL_DEFAULT_SENDER') or os.environ.get('MAIL_FROM') or SMTP_USERNAME or 'noreply@campusflow.edu').strip().strip("'\"")
+    SMTP_FROM_NAME = (os.environ.get('SMTP_FROM_NAME') or os.environ.get('MAIL_FROM_NAME') or 'Campus Flow').strip().strip("'\"")
+
+    # Backward compatibility aliases for existing services and templates
+    MAIL_SERVER = SMTP_HOST
+    MAIL_PORT = SMTP_PORT
+    MAIL_USE_TLS = SMTP_USE_TLS
+    MAIL_USE_SSL = SMTP_USE_SSL
+    MAIL_USERNAME = SMTP_USERNAME
+    MAIL_PASSWORD = SMTP_PASSWORD
+    MAIL_DEFAULT_SENDER = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>" if SMTP_FROM_NAME and '<' not in SMTP_FROM_EMAIL else SMTP_FROM_EMAIL
+
+    # Dev redirection: strictly disabled by default in production (Render) so college emails reach recipients
+    _is_production = bool(os.environ.get('RENDER') or os.environ.get('FLASK_ENV', '').lower() == 'production')
+    _default_redirect = 'False' if _is_production else 'True'
+    MAIL_DEV_REDIRECT_ENABLED = os.environ.get('MAIL_DEV_REDIRECT_ENABLED', _default_redirect).strip().lower() in ('true', '1', 't', 'yes')
+    MAIL_LIVE_TEST_RECIPIENT = (os.environ.get('MAIL_LIVE_TEST_RECIPIENT') or SMTP_USERNAME or '').strip().strip("'\"")
 
     # Razorpay Payment Gateway Configuration (Test Mode by default)
     RAZORPAY_KEY_ID = (os.environ.get('RAZORPAY_KEY_ID') or 'rzp_test_campusflow_dummy').strip().strip("'\"")

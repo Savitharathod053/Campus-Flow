@@ -9,6 +9,7 @@ import smtplib
 import logging
 import threading
 import email.utils
+from datetime import datetime
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate, make_msgid, parseaddr
@@ -45,62 +46,81 @@ def _parse_port(value, default=587):
 def get_mail_config():
     """
     Reads SMTP configuration from Flask current_app.config or environment variables.
-    Sanitizes values, removes quotes, and normalizes Google App Passwords.
+    Seamlessly supports both standard SMTP_* and legacy MAIL_* variable conventions.
+    Sanitizes values, removes quotes, and cleans Google App Passwords.
     """
     config = {}
-    if current_app:
-        app_cfg = current_app.config
-        server = (app_cfg.get('MAIL_SERVER') or os.environ.get('MAIL_SERVER') or 'smtp.gmail.com').strip().strip("'\"")
-        port = _parse_port(app_cfg.get('MAIL_PORT') or os.environ.get('MAIL_PORT'), 587)
-        use_tls = app_cfg.get('MAIL_USE_TLS')
-        if use_tls is None:
-            use_tls = os.environ.get('MAIL_USE_TLS', 'True').strip().lower() in ('true', '1', 't', 'yes')
-        use_ssl = app_cfg.get('MAIL_USE_SSL')
-        if use_ssl is None:
-            use_ssl = os.environ.get('MAIL_USE_SSL', 'False').strip().lower() in ('true', '1', 't', 'yes')
-        username = (app_cfg.get('MAIL_USERNAME') or os.environ.get('MAIL_USERNAME') or '').strip().strip("'\"")
-        password = (app_cfg.get('MAIL_PASSWORD') or os.environ.get('MAIL_PASSWORD') or '').strip().strip("'\"")
-        sender = (
-            app_cfg.get('MAIL_DEFAULT_SENDER') or 
-            os.environ.get('MAIL_DEFAULT_SENDER') or 
-            username or 
-            'noreply@campusflow.edu'
-        ).strip().strip("'\"")
-        testing = app_cfg.get('TESTING', False)
-        dev_redirect = app_cfg.get('MAIL_DEV_REDIRECT_ENABLED')
-        if dev_redirect is None:
-            dev_redirect = os.environ.get('MAIL_DEV_REDIRECT_ENABLED', 'True').strip().lower() in ('true', '1', 't', 'yes')
-        live_recipient = (app_cfg.get('MAIL_LIVE_TEST_RECIPIENT') or os.environ.get('MAIL_LIVE_TEST_RECIPIENT') or username or 'savitharathod053@gmail.com').strip().strip("'\"")
+    app_cfg = current_app.config if current_app else {}
+
+    def get_val(key_smtp, key_mail, default=''):
+        val = app_cfg.get(key_smtp)
+        if val is None or val == '':
+            val = app_cfg.get(key_mail)
+        if val is None or val == '':
+            val = os.environ.get(key_smtp)
+        if val is None or val == '':
+            val = os.environ.get(key_mail)
+        if val is None or val == '':
+            return default
+        return val
+
+    host = str(get_val('SMTP_HOST', 'MAIL_SERVER', 'smtp.gmail.com')).strip().strip("'\"")
+    port = _parse_port(get_val('SMTP_PORT', 'MAIL_PORT', 587), default=587)
+    
+    use_tls_raw = get_val('SMTP_USE_TLS', 'MAIL_USE_TLS', 'True')
+    use_tls = str(use_tls_raw).strip().lower() in ('true', '1', 't', 'yes')
+
+    use_ssl_raw = get_val('SMTP_USE_SSL', 'MAIL_USE_SSL', 'False')
+    use_ssl = str(use_ssl_raw).strip().lower() in ('true', '1', 't', 'yes')
+
+    username = str(get_val('SMTP_USERNAME', 'MAIL_USERNAME', '')).strip().strip("'\"")
+
+    # Password extraction & cleaning
+    raw_pw = str(get_val('SMTP_PASSWORD', 'MAIL_PASSWORD', '')).strip().strip("'\"")
+    # For Gmail, strip all internal spaces, tabs, and quotes from 16-character App Passwords
+    if ('gmail' in host.lower() or 'google' in host.lower()):
+        password = "".join(raw_pw.split()).strip("'\"")
     else:
-        server = (os.environ.get('MAIL_SERVER') or 'smtp.gmail.com').strip().strip("'\"")
-        port = _parse_port(os.environ.get('MAIL_PORT'), 587)
-        use_tls = os.environ.get('MAIL_USE_TLS', 'True').strip().lower() in ('true', '1', 't', 'yes')
-        use_ssl = os.environ.get('MAIL_USE_SSL', 'False').strip().lower() in ('true', '1', 't', 'yes')
-        username = (os.environ.get('MAIL_USERNAME') or '').strip().strip("'\"")
-        password = (os.environ.get('MAIL_PASSWORD') or '').strip().strip("'\"")
-        sender = (
-            os.environ.get('MAIL_DEFAULT_SENDER') or 
-            username or 
-            'noreply@campusflow.edu'
-        ).strip().strip("'\"")
-        testing = os.environ.get('TESTING', 'False').strip().lower() in ('true', '1')
-        dev_redirect = os.environ.get('MAIL_DEV_REDIRECT_ENABLED', 'True').strip().lower() in ('true', '1', 't', 'yes')
-        live_recipient = (os.environ.get('MAIL_LIVE_TEST_RECIPIENT') or username or 'savitharathod053@gmail.com').strip().strip("'\"")
+        password = raw_pw
 
-    # For Gmail accounts, Google App Passwords are 16 characters (often copied with spaces).
-    # Removing internal spaces ensures clean authentication across all deployment environments.
-    if ('gmail' in server.lower() or 'google' in server.lower()):
-        cleaned_pw = password.replace(' ', '')
-        if len(cleaned_pw) == 16:
-            password = cleaned_pw
+    from_email = str(get_val('SMTP_FROM_EMAIL', 'MAIL_FROM', '')).strip().strip("'\"")
+    if not from_email:
+        from_email = str(get_val('MAIL_DEFAULT_SENDER', 'MAIL_DEFAULT_SENDER', username or 'noreply@campusflow.edu')).strip().strip("'\"")
+    
+    from_name = str(get_val('SMTP_FROM_NAME', 'MAIL_FROM_NAME', 'Campus Flow')).strip().strip("'\"")
 
-    config['MAIL_SERVER'] = server
+    if from_name and '<' not in from_email:
+        sender_header = f"{from_name} <{from_email}>"
+    else:
+        sender_header = from_email
+
+    testing = bool(app_cfg.get('TESTING', os.environ.get('TESTING', 'False').strip().lower() in ('true', '1')))
+    
+    # Dev redirection: strictly False in production (Render) so college emails reach recipients
+    is_prod = bool(os.environ.get('RENDER') or os.environ.get('FLASK_ENV', '').lower() == 'production')
+    default_redirect = 'False' if is_prod else 'True'
+    dev_redirect_val = get_val('MAIL_DEV_REDIRECT_ENABLED', 'MAIL_DEV_REDIRECT_ENABLED', default_redirect)
+    dev_redirect = str(dev_redirect_val).strip().lower() in ('true', '1', 't', 'yes')
+
+    live_recipient = str(get_val('MAIL_LIVE_TEST_RECIPIENT', 'MAIL_LIVE_TEST_RECIPIENT', username or 'savitharathod053@gmail.com')).strip().strip("'\"")
+
+    # Populate both sets of keys in config dictionary for 100% interoperability
+    config['SMTP_HOST'] = host
+    config['SMTP_PORT'] = port
+    config['SMTP_USE_TLS'] = use_tls
+    config['SMTP_USE_SSL'] = use_ssl
+    config['SMTP_USERNAME'] = username
+    config['SMTP_PASSWORD'] = password
+    config['SMTP_FROM_EMAIL'] = from_email
+    config['SMTP_FROM_NAME'] = from_name
+
+    config['MAIL_SERVER'] = host
     config['MAIL_PORT'] = port
     config['MAIL_USE_TLS'] = use_tls
     config['MAIL_USE_SSL'] = use_ssl
     config['MAIL_USERNAME'] = username
     config['MAIL_PASSWORD'] = password
-    config['MAIL_DEFAULT_SENDER'] = sender
+    config['MAIL_DEFAULT_SENDER'] = sender_header
     config['TESTING'] = testing
     config['MAIL_DEV_REDIRECT_ENABLED'] = dev_redirect
     config['MAIL_LIVE_TEST_RECIPIENT'] = live_recipient
@@ -108,17 +128,53 @@ def get_mail_config():
     return config
 
 
+def check_email_startup_config(app=None):
+    """
+    Verifies that required SMTP environment variables exist on backend startup.
+    Checks: SMTP_HOST, SMTP_PORT, SMTP_USERNAME, SMTP_PASSWORD, SMTP_FROM_EMAIL.
+    Logs 'Email configuration: OK' or 'Email configuration: Missing <VARIABLE>'.
+    Never prints actual credential values. Does not crash the application.
+    """
+    cfg = get_mail_config()
+    required_keys = [
+        ('SMTP_HOST', 'MAIL_SERVER'),
+        ('SMTP_PORT', 'MAIL_PORT'),
+        ('SMTP_USERNAME', 'MAIL_USERNAME'),
+        ('SMTP_PASSWORD', 'MAIL_PASSWORD'),
+        ('SMTP_FROM_EMAIL', 'MAIL_DEFAULT_SENDER')
+    ]
+    missing = []
+    for smtp_key, mail_key in required_keys:
+        val = cfg.get(smtp_key) or cfg.get(mail_key)
+        if not val:
+            missing.append(smtp_key)
+
+    if missing:
+        msg = f"Email configuration: Missing {', '.join(missing)}"
+        logger.warning(msg)
+        print(msg)
+        return False, msg
+    else:
+        msg = "Email configuration: OK"
+        logger.info(msg)
+        print(msg)
+        return True, msg
+
+
 def _connect_and_send(server_host, port, use_ssl, use_tls, username, password, sender_envelope, to_email, msg_str, timeout=12):
     """
     Establish an SMTP connection with the specified port and TLS/SSL settings,
-    authenticates, and sends the message.
+    authenticates, and sends the message cleanly.
     """
+    server = None
     if use_ssl or port == 465:
         server = smtplib.SMTP_SSL(server_host, port, timeout=timeout)
     else:
         server = smtplib.SMTP(server_host, port, timeout=timeout)
+        server.ehlo()
         if use_tls:
             server.starttls()
+            server.ehlo()
 
     server.login(username, password)
     server.sendmail(sender_envelope, [to_email], msg_str)
@@ -129,42 +185,41 @@ def _connect_and_send(server_host, port, use_ssl, use_tls, username, password, s
     return True
 
 
-def _send_smtp_worker(to_email, subject, body_text, body_html=None, config=None):
+def _send_smtp_worker(to_email, subject, body_text, body_html=None, config=None, raise_exceptions=False):
     """
     Worker function executed to transmit email via SMTP.
-    Includes automated dual-port failover (Port 587 STARTTLS <-> Port 465 SSL)
-    to handle cloud platform firewall restrictions (e.g. Render, AWS, Linode).
+    Uses port 587 with STARTTLS (or port 465 with SSL), with automatic failover
+    between 587 and 465 to handle cloud platform firewall restrictions (e.g. Render).
     """
     if not config:
         config = get_mail_config()
 
-    server_host = config.get('MAIL_SERVER', 'smtp.gmail.com')
-    port = _parse_port(config.get('MAIL_PORT'), 587)
-    use_tls = config.get('MAIL_USE_TLS', True)
-    use_ssl = config.get('MAIL_USE_SSL', False)
-    username = config.get('MAIL_USERNAME', '')
-    password = config.get('MAIL_PASSWORD', '')
-    sender = config.get('MAIL_DEFAULT_SENDER') or username or 'noreply@campusflow.edu'
+    server_host = config.get('SMTP_HOST') or config.get('MAIL_SERVER', 'smtp.gmail.com')
+    port = _parse_port(config.get('SMTP_PORT') or config.get('MAIL_PORT'), 587)
+    use_tls = config.get('SMTP_USE_TLS', True)
+    use_ssl = config.get('SMTP_USE_SSL', False)
+    username = config.get('SMTP_USERNAME') or config.get('MAIL_USERNAME', '')
+    password = config.get('SMTP_PASSWORD') or config.get('MAIL_PASSWORD', '')
+    sender = config.get('SMTP_FROM_EMAIL') or config.get('MAIL_DEFAULT_SENDER') or username or 'noreply@campusflow.edu'
 
     if not username or not password:
         logger.warning(
             f"[EMAIL NOT SENT - MISSING CREDENTIALS] To: {to_email} | Subject: '{subject}'. "
-            "Please configure MAIL_USERNAME and MAIL_PASSWORD in production environment variables."
+            "Please configure SMTP_USERNAME and SMTP_PASSWORD in production environment variables."
         )
+        if raise_exceptions:
+            raise smtplib.SMTPAuthenticationError(535, b"SMTP credentials missing (SMTP_USERNAME / SMTP_PASSWORD)")
         return False
 
-    # Extract bare email for RFC 5321 MAIL FROM envelope and retain full display name for RFC 5322 header
-    sender_display = sender.strip().strip("'\"")
-    envelope_from = parseaddr(sender_display)[1] or username
+    sender_display = config.get('MAIL_DEFAULT_SENDER') or sender
+    envelope_from = parseaddr(sender_display)[1] or parseaddr(sender)[1] or username
 
-    # Determine primary and fallback port strategies
     primary_ssl = use_ssl or (port == 465)
     primary_strategy = {
         'port': port,
         'use_ssl': primary_ssl,
         'use_tls': use_tls and not primary_ssl
     }
-    # If primary is 587 TLS, fallback is 465 SSL; if primary is 465 SSL, fallback is 587 TLS
     fallback_strategy = {
         'port': 465 if not primary_ssl else 587,
         'use_ssl': not primary_ssl,
@@ -184,7 +239,7 @@ def _send_smtp_worker(to_email, subject, body_text, body_html=None, config=None)
             msg.attach(MIMEText(body_html, 'html', 'utf-8'))
         msg_str = msg.as_string()
 
-        # 1. Attempt primary port connection
+        # 1. Attempt primary port connection (Port 587 STARTTLS)
         try:
             _connect_and_send(
                 server_host=server_host,
@@ -196,22 +251,24 @@ def _send_smtp_worker(to_email, subject, body_text, body_html=None, config=None)
                 sender_envelope=envelope_from,
                 to_email=to_email,
                 msg_str=msg_str,
-                timeout=10
+                timeout=12
             )
             logger.info(f"[EMAIL DELIVERED] To: {to_email} | Subject: '{subject}' via {server_host}:{primary_strategy['port']}")
             return True
         except smtplib.SMTPAuthenticationError as auth_err:
             logger.error(
-                f"[EMAIL AUTHENTICATION ERROR] Could not authenticate with {server_host} for user {username}. "
-                f"If using Gmail, ensure a 16-character Google App Password is used without spaces: {auth_err}"
+                f"[EMAIL AUTHENTICATION ERROR] Authentication failed for user {username} on {server_host}. "
+                "Ensure Google 2FA is active and a 16-character App Password (without spaces) is configured."
             )
+            if raise_exceptions:
+                raise
             return False
         except (socket.timeout, TimeoutError, ConnectionRefusedError, OSError, smtplib.SMTPConnectError, smtplib.SMTPException) as conn_err:
             logger.warning(
                 f"[SMTP FAILOVER] Primary connection to {server_host}:{primary_strategy['port']} failed ({conn_err}). "
                 f"Attempting cloud failover to port {fallback_strategy['port']} (SSL={fallback_strategy['use_ssl']})..."
             )
-            # 2. Attempt fallback port connection
+            # 2. Attempt fallback port connection (Port 465 SSL)
             try:
                 _connect_and_send(
                     server_host=server_host,
@@ -227,29 +284,37 @@ def _send_smtp_worker(to_email, subject, body_text, body_html=None, config=None)
                 )
                 logger.info(f"[EMAIL DELIVERED VIA FAILOVER] To: {to_email} | Subject: '{subject}' via {server_host}:{fallback_strategy['port']}")
                 return True
+            except smtplib.SMTPAuthenticationError as auth_err:
+                logger.error(f"[EMAIL AUTHENTICATION ERROR] Fallback authentication failed for user {username}: {auth_err}")
+                if raise_exceptions:
+                    raise
+                return False
             except Exception as fallback_err:
                 logger.error(f"[EMAIL DELIVERY ERROR] Failed on both primary and fallback ports for {server_host}: {fallback_err}")
+                if raise_exceptions:
+                    raise
                 return False
 
     except Exception as exc:
         logger.error(f"[EMAIL DELIVERY ERROR] Unexpected error sending email to {to_email}: {exc}")
+        if raise_exceptions:
+            raise
         return False
 
 
-def dispatch_email(to_email, subject, body_text, body_html=None, sync=False):
+def dispatch_email(to_email, subject, body_text, body_html=None, sync=False, raise_exceptions=False):
     """
     Dispatches email. In test mode, records to SENT_EMAILS and bypasses network I/O.
-    In live mode with credentials, transmits via SMTP (using a non-daemon thread to ensure WSGI
-    lifecycle does not prematurely terminate socket I/O before completion).
-    Supports live routing for development and demo environments so emails to @college.edu
-    are delivered directly to the configured live email inbox.
+    In live mode with credentials, transmits via SMTP.
+    Supports live routing for development/demo environments so emails to dummy domains
+    are delivered directly to the configured live email inbox when dev redirect is enabled.
     """
     if not to_email:
         return False
 
     cfg = get_mail_config()
 
-    # Record to in-memory store for bare dispatch_email calls if not already recorded
+    # Record to in-memory store for test inspections
     if not SENT_EMAILS or (SENT_EMAILS[-1].get('to') != to_email or SENT_EMAILS[-1].get('subject') != subject):
         SENT_EMAILS.append({
             'to': to_email,
@@ -261,33 +326,29 @@ def dispatch_email(to_email, subject, body_text, body_html=None, sync=False):
     if cfg.get('TESTING', False):
         return True
 
-    if not cfg.get('MAIL_USERNAME') or not cfg.get('MAIL_PASSWORD'):
+    if not cfg.get('SMTP_USERNAME') or not cfg.get('SMTP_PASSWORD'):
         logger.warning(
             f"[EMAIL SIMULATED - CREDENTIALS UNSET] To: {to_email} | Subject: '{subject}'. "
-            "Configure MAIL_USERNAME and MAIL_PASSWORD in your hosting environment variables (e.g. Render Dashboard)."
+            "Configure SMTP_USERNAME and SMTP_PASSWORD in your hosting environment variables (e.g. Render Dashboard)."
         )
+        if raise_exceptions:
+            raise smtplib.SMTPAuthenticationError(535, b"SMTP credentials missing")
         return True
 
-    # Live routing / forward to real mailbox
     live_target = (
         cfg.get('MAIL_OVERRIDE_RECIPIENT') or 
         cfg.get('MAIL_LIVE_TEST_RECIPIENT') or 
-        cfg.get('MAIL_USERNAME') or 
+        cfg.get('SMTP_USERNAME') or 
         'savitharathod053@gmail.com'
     ).strip()
 
-    route_to_live = (
-        cfg.get('MAIL_DEV_REDIRECT_ENABLED', True) or
-        os.environ.get('MAIL_DEV_REDIRECT_ENABLED', 'True').strip().lower() in ('true', '1', 't', 'yes')
-    )
-
+    route_to_live = bool(cfg.get('MAIL_DEV_REDIRECT_ENABLED', False))
     delivery_target = to_email
     delivery_subject = subject
     delivery_body_text = body_text
     delivery_body_html = body_html
 
-    # Check if target is a dummy or non-routable domain (e.g. @college.edu, @example.com)
-    is_dummy_domain = any(to_email.lower().endswith(dom) for dom in ('@college.edu', '@example.com', '@test.com', '.local', '.invalid'))
+    is_dummy_domain = any(to_email.lower().endswith(dom) for dom in ('@example.com', '@test.com', '.local', '.invalid'))
     
     if route_to_live and (is_dummy_domain or os.environ.get('MAIL_ROUTE_ALL_TO_LIVE', 'False').strip().lower() in ('true', '1', 'yes')):
         delivery_target = live_target
@@ -310,15 +371,176 @@ def dispatch_email(to_email, subject, body_text, body_html=None, sync=False):
             delivery_body_html = banner_html + delivery_body_html
 
     if sync:
-        return _send_smtp_worker(delivery_target, delivery_subject, delivery_body_text, delivery_body_html, config=cfg)
+        return _send_smtp_worker(
+            to_email=delivery_target,
+            subject=delivery_subject,
+            body_text=delivery_body_text,
+            body_html=delivery_body_html,
+            config=cfg,
+            raise_exceptions=raise_exceptions
+        )
     else:
         thread = threading.Thread(
             target=_send_smtp_worker,
-            args=(delivery_target, delivery_subject, delivery_body_text, delivery_body_html, cfg),
+            args=(delivery_target, delivery_subject, delivery_body_text, delivery_body_html, cfg, False),
             daemon=False
         )
         thread.start()
         return True
+
+
+def send_email(to_email, subject, body_text, body_html=None, sync=False, raise_exceptions=False):
+    """
+    Unified central email dispatch function.
+    Validates recipient and credentials, creates message, and transmits via Gmail SMTP.
+    Returns boolean indicating whether the email was successfully accepted/dispatched.
+    """
+    return dispatch_email(
+        to_email=to_email,
+        subject=subject,
+        body_text=body_text,
+        body_html=body_html,
+        sync=sync,
+        raise_exceptions=raise_exceptions
+    )
+
+
+def send_test_email(recipient_email):
+    """
+    Sends a safe test email to verify production SMTP configuration.
+    Returns: (success: bool, message: str, error_type: str or None)
+    Never exposes passwords or sensitive credentials.
+    """
+    if not recipient_email or '@' not in recipient_email:
+        return False, "Recipient email is invalid or missing.", "ValidationError"
+
+    cfg = get_mail_config()
+    username = cfg.get('SMTP_USERNAME') or cfg.get('MAIL_USERNAME')
+    password = cfg.get('SMTP_PASSWORD') or cfg.get('MAIL_PASSWORD')
+    if not username or not password:
+        return False, "Email sending failed: Missing credentials", "MissingCredentialsError"
+
+    subject = "Campus Flow - Production SMTP Verification Test"
+    body_text = (
+        "Hello,\n\n"
+        "This is a verified test email from Campus Flow event management platform.\n"
+        f"Dispatched At: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
+        f"SMTP Server: {cfg.get('SMTP_HOST')}:{cfg.get('SMTP_PORT')}\n\n"
+        "If you received this message, your production email system is 100% operational.\n\n"
+        "— Campus Flow Automated Test Service"
+    )
+
+    try:
+        sent = _send_smtp_worker(
+            to_email=recipient_email,
+            subject=subject,
+            body_text=body_text,
+            config=cfg,
+            raise_exceptions=True
+        )
+        if sent:
+            return True, "Test email sent successfully", None
+        return False, "Email sending failed", "SMTPDeliveryError"
+    except smtplib.SMTPAuthenticationError:
+        return False, "Email sending failed", "SMTPAuthenticationError"
+    except (smtplib.SMTPConnectError, socket.timeout, TimeoutError, OSError):
+        return False, "Email sending failed", "SMTPConnectError"
+    except smtplib.SMTPException as e:
+        return False, "Email sending failed", type(e).__name__
+    except Exception as e:
+        return False, "Email sending failed", type(e).__name__
+
+
+def send_registration_confirmation(user, event, registration):
+    """
+    Standard wrapper: Sends registration confirmation email to student for an event.
+    """
+    return send_registration_confirmation_email(user, event, registration)
+
+
+def send_hod_notification(hod, title, message, event=None):
+    """
+    Sends official notification email to Head of Department (HOD).
+    """
+    if not hod or not getattr(hod, 'email', None):
+        return False
+    hod_name = getattr(hod, 'name', 'HOD')
+    hod_display = hod_name if hod_name.lower().startswith('dr.') else f"Dr. {hod_name}"
+    event_info = f"\nRelated Event: {event.title} ({event.department})\n" if event else ""
+    subject = f"Campus Flow Notice: {title}"
+    body = (
+        f"Hello {hod_display},\n\n"
+        f"{message}\n"
+        f"{event_info}\n"
+        f"Please log in to your Campus Flow HOD Portal for further details.\n\n"
+        f"— Campus Flow Administration"
+    )
+    email_record = {'to': hod.email, 'subject': subject, 'body': body, 'type': 'HOD_NOTIFICATION'}
+    SENT_EMAILS.append(email_record)
+    return dispatch_email(hod.email, subject, body)
+
+
+def send_organizer_notification(organizer, title, message, event=None):
+    """
+    Sends official notification email to Event Organizer.
+    """
+    if not organizer or not getattr(organizer, 'email', None):
+        return False
+    event_info = f"\nEvent: {event.title}\n" if event else ""
+    subject = f"Organizer Update: {title}"
+    body = (
+        f"Hello {getattr(organizer, 'name', 'Organizer')},\n\n"
+        f"{message}\n"
+        f"{event_info}\n"
+        f"You can review your events and requests in your Campus Flow Organizer Dashboard.\n\n"
+        f"— Campus Flow Administration"
+    )
+    email_record = {'to': organizer.email, 'subject': subject, 'body': body, 'type': 'ORGANIZER_NOTIFICATION'}
+    SENT_EMAILS.append(email_record)
+    return dispatch_email(organizer.email, subject, body)
+
+
+def send_otp_email(to_email, otp_code, purpose="verification"):
+    """
+    Sends an OTP / Verification Code email securely.
+    """
+    if not to_email:
+        return False
+    subject = f"Your Campus Flow Security Code: {otp_code}"
+    body = (
+        f"Hello,\n\n"
+        f"Your verification code for Campus Flow ({purpose}) is:\n\n"
+        f"  {otp_code}\n\n"
+        f"This code will expire in 10 minutes. If you did not request this code, please ignore this email.\n\n"
+        f"— Campus Flow Security Team"
+    )
+    email_record = {'to': to_email, 'subject': subject, 'body': body, 'type': 'OTP_VERIFICATION'}
+    SENT_EMAILS.append(email_record)
+    return dispatch_email(to_email, subject, body, sync=True)
+
+
+def send_password_reset_email(to_email, reset_url_or_token, user_name=None):
+    """
+    Sends a password reset link or token to the user.
+    """
+    if not to_email:
+        return False
+    name_greeting = f"Hello {user_name},\n\n" if user_name else "Hello,\n\n"
+    if str(reset_url_or_token).startswith('http'):
+        link_str = f"Click the link below to reset your password:\n{reset_url_or_token}\n\n"
+    else:
+        link_str = f"Your password reset token is: {reset_url_or_token}\n\n"
+    subject = "Campus Flow - Password Reset Request"
+    body = (
+        f"{name_greeting}"
+        f"We received a request to reset your password for Campus Flow.\n\n"
+        f"{link_str}"
+        f"If you did not request a password reset, please ignore this email.\n\n"
+        f"— Campus Flow Support Team"
+    )
+    email_record = {'to': to_email, 'subject': subject, 'body': body, 'type': 'PASSWORD_RESET'}
+    SENT_EMAILS.append(email_record)
+    return dispatch_email(to_email, subject, body, sync=True)
 
 
 def test_smtp_connection(config=None):
@@ -330,15 +552,15 @@ def test_smtp_connection(config=None):
     if not config:
         config = get_mail_config()
 
-    server_host = config.get('MAIL_SERVER', 'smtp.gmail.com')
-    port = _parse_port(config.get('MAIL_PORT'), 587)
-    use_tls = config.get('MAIL_USE_TLS', True)
-    use_ssl = config.get('MAIL_USE_SSL', False)
-    username = config.get('MAIL_USERNAME', '')
-    password = config.get('MAIL_PASSWORD', '')
+    server_host = config.get('SMTP_HOST') or config.get('MAIL_SERVER', 'smtp.gmail.com')
+    port = _parse_port(config.get('SMTP_PORT') or config.get('MAIL_PORT'), 587)
+    use_tls = config.get('SMTP_USE_TLS', True)
+    use_ssl = config.get('SMTP_USE_SSL', False)
+    username = config.get('SMTP_USERNAME') or config.get('MAIL_USERNAME', '')
+    password = config.get('SMTP_PASSWORD') or config.get('MAIL_PASSWORD', '')
 
     if not username or not password:
-        return False, "MAIL_USERNAME or MAIL_PASSWORD is not set in environment variables. Add them in your hosting dashboard."
+        return False, "SMTP_USERNAME or SMTP_PASSWORD is not set in environment variables. Add them in your hosting dashboard."
 
     primary_ssl = use_ssl or (port == 465)
     primary_tls = use_tls and not primary_ssl
@@ -351,8 +573,10 @@ def test_smtp_connection(config=None):
             server = smtplib.SMTP_SSL(server_host, port, timeout=10)
         else:
             server = smtplib.SMTP(server_host, port, timeout=10)
+            server.ehlo()
             if primary_tls:
                 server.starttls()
+                server.ehlo()
 
         server.login(username, password)
         server.quit()
@@ -366,8 +590,10 @@ def test_smtp_connection(config=None):
                 server = smtplib.SMTP_SSL(server_host, fallback_port, timeout=10)
             else:
                 server = smtplib.SMTP(server_host, fallback_port, timeout=10)
+                server.ehlo()
                 if fallback_tls:
                     server.starttls()
+                    server.ehlo()
 
             server.login(username, password)
             server.quit()

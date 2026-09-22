@@ -61,6 +61,77 @@ def create_app(config_class=Config):
     from routes.payment import handle_razorpay_webhook
     app.add_url_rule('/api/payments/webhook/razorpay', 'api_razorpay_webhook', handle_razorpay_webhook, methods=['POST'])
 
+    # Safe Protected Email Verification Endpoint
+    @app.route('/api/email/test', methods=['GET', 'POST'])
+    def api_email_test():
+        from flask import request
+        from routes.auth import get_current_user
+        from services.email_service import send_test_email, get_mail_config
+
+        # 1. Authorization check: Admin/Staff session OR Secret Token
+        auth_header = request.headers.get('Authorization', '')
+        admin_token = request.headers.get('X-Admin-Token', '')
+        bearer_token = auth_header.split(' ', 1)[1].strip() if auth_header.startswith('Bearer ') else ''
+        token = bearer_token or admin_token
+        secret = app.config.get('SECRET_KEY', '')
+
+        is_authorized = False
+        current_user = get_current_user()
+
+        if token and secret and token == secret:
+            is_authorized = True
+        elif current_user and current_user.is_active:
+            is_authorized = True
+
+        if not is_authorized:
+            return jsonify({
+                "success": False,
+                "message": "Unauthorized: Authentication or admin token required to test email system.",
+                "error_type": "Unauthorized"
+            }), 401
+
+        # 2. Extract recipient email
+        data = request.get_json(silent=True) or {}
+        recipient_email = (
+            data.get('recipient_email') or
+            data.get('email') or
+            data.get('to') or
+            request.args.get('recipient_email') or
+            request.args.get('email') or
+            request.args.get('to') or
+            (current_user.email if current_user else None)
+        )
+
+        if not recipient_email:
+            cfg = get_mail_config()
+            recipient_email = cfg.get('MAIL_LIVE_TEST_RECIPIENT') or cfg.get('SMTP_USERNAME')
+
+        if not recipient_email or '@' not in recipient_email:
+            return jsonify({
+                "success": False,
+                "message": "A valid recipient_email parameter is required.",
+                "error_type": "ValidationError"
+            }), 400
+
+        # 3. Transmit test email safely
+        success, message, error_type = send_test_email(recipient_email)
+        status_code = 200 if success else 500
+        response_payload = {
+            "success": success,
+            "message": message
+        }
+        if not success and error_type:
+            response_payload["error_type"] = error_type
+
+        return jsonify(response_payload), status_code
+
+    # Startup Email Configuration Check (Runs once when app is created)
+    try:
+        from services.email_service import check_email_startup_config
+        check_email_startup_config(app)
+    except Exception as email_cfg_err:
+        app.logger.warning(f"Note: Email startup configuration check encountered: {email_cfg_err}")
+
     # Health Check Endpoints
     @app.route('/health')
     def health():
