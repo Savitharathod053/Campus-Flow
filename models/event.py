@@ -88,6 +88,7 @@ class Event(db.Model):
     venue = db.Column(db.String(150), nullable=False)
     
     # Timing
+    registration_start_date = db.Column(db.DateTime, nullable=True)
     start_time = db.Column(db.DateTime, nullable=False)
     end_time = db.Column(db.DateTime, nullable=False)
     registration_deadline = db.Column(db.DateTime, nullable=False)
@@ -182,6 +183,8 @@ class Event(db.Model):
 
     @property
     def confirmed_registrations_count(self):
+        if not self.id:
+            return 0
         return self.registrations.filter_by(status='CONFIRMED').count()
 
     @property
@@ -332,19 +335,76 @@ class Event(db.Model):
 
         return None
 
+    # Field Aliases
+    @property
+    def registration_end_date(self):
+        return self.registration_deadline
+
+    @registration_end_date.setter
+    def registration_end_date(self, value):
+        self.registration_deadline = value
+
+    @property
+    def event_start_date(self):
+        return self.start_time
+
+    @event_start_date.setter
+    def event_start_date(self, value):
+        self.start_time = value
+
+    @property
+    def event_end_date(self):
+        return self.end_time
+
+    @event_end_date.setter
+    def event_end_date(self, value):
+        self.end_time = value
+
     @property
     def is_full(self):
         return self.available_seats <= 0
+
+    @property
+    def is_registration_not_started(self):
+        """Returns True if registration_start_date is in the future."""
+        if not self.registration_start_date:
+            return False
+        return datetime.utcnow() < self.registration_start_date
 
     @property
     def is_deadline_passed(self):
         return datetime.utcnow() > self.registration_deadline
 
     @property
+    def registration_status(self):
+        """
+        Returns dynamic human-readable registration status:
+        - 'Pending Approval' (if not yet approved/published)
+        - 'Registration Closed' (if completed or cancelled)
+        - 'Registration Not Started' (if current time is before registration_start_date)
+        - 'Registration Closed' (if deadline passed)
+        - 'Registration Closed (Full)' (if housefull)
+        - 'Registration Open' (currently active and accepting entries)
+        """
+        if not self.is_published_and_approved:
+            return 'Pending Approval'
+        if self.is_completed or self.status in (EventStatus.CANCELLED, EventStatus.REJECTED):
+            return 'Registration Closed'
+        if self.is_registration_not_started:
+            return 'Registration Not Started'
+        if self.is_deadline_passed:
+            return 'Registration Closed'
+        if self.is_full:
+            return 'Registration Closed (Full)'
+        return 'Registration Open'
+
+    @property
     def is_live_registration_open(self):
         if not self.is_published_and_approved:
             return False
         if self.is_completed or self.status not in (EventStatus.APPROVED, EventStatus.REGISTRATION_OPEN, EventStatus.UPCOMING, EventStatus.ONGOING):
+            return False
+        if self.is_registration_not_started:
             return False
         if self.is_deadline_passed:
             return False

@@ -158,9 +158,10 @@ def create_event():
         allowed_sections = request.form.get('allowed_sections', 'ALL').strip()
         eligibility_notes = request.form.get('eligibility_notes', '').strip()
 
+        reg_start_str = request.form.get('registration_start_date', '').strip()
+        deadline_str = request.form.get('registration_deadline', '').strip()
         start_time_str = request.form.get('start_time', '').strip()
         end_time_str = request.form.get('end_time', '').strip()
-        deadline_str = request.form.get('registration_deadline', '').strip()
 
         max_participants = int(request.form.get('max_participants', 100))
         is_free = request.form.get('is_free') == 'true' or request.form.get('is_free') == 'on'
@@ -181,12 +182,27 @@ def create_event():
             flash('Please fill in all required event proposal fields.', 'danger')
             return render_template('organizer/create_event.html', user=user, event_types=EventType.CHOICES, dept_obj=dept_obj)
 
-        try:
-            start_time = datetime.strptime(start_time_str, '%Y-%m-%dT%H:%M')
-            end_time = datetime.strptime(end_time_str, '%Y-%m-%dT%H:%M')
-            registration_deadline = datetime.strptime(deadline_str, '%Y-%m-%dT%H:%M') if deadline_str else start_time
-        except ValueError:
-            flash('Invalid date or time format.', 'danger')
+        from services.timezone_service import parse_form_datetime, to_ist
+        start_time = parse_form_datetime(start_time_str)
+        end_time = parse_form_datetime(end_time_str)
+        registration_deadline = parse_form_datetime(deadline_str) if deadline_str else start_time
+        registration_start_date = parse_form_datetime(reg_start_str) if reg_start_str else datetime.utcnow()
+
+        if not all([start_time, end_time, registration_deadline]):
+            flash('Invalid date or time format. Please verify your schedule entries.', 'danger')
+            return render_template('organizer/create_event.html', user=user, event_types=EventType.CHOICES, dept_obj=dept_obj)
+
+        # Chronological validation
+        if registration_start_date >= registration_deadline:
+            flash('Registration start date/time must be earlier than the registration deadline.', 'danger')
+            return render_template('organizer/create_event.html', user=user, event_types=EventType.CHOICES, dept_obj=dept_obj)
+
+        if registration_deadline > start_time:
+            flash('Registration deadline must be before or equal to the event start time.', 'danger')
+            return render_template('organizer/create_event.html', user=user, event_types=EventType.CHOICES, dept_obj=dept_obj)
+
+        if start_time >= end_time:
+            flash('Event start time must be before event end time.', 'danger')
             return render_template('organizer/create_event.html', user=user, event_types=EventType.CHOICES, dept_obj=dept_obj)
 
         # Handle UPI & QR upload for paid events
@@ -223,7 +239,7 @@ def create_event():
             event_name=title,
             description=description,
             category=event_type,
-            proposed_event_date=start_time.date(),
+            proposed_event_date=to_ist(start_time).date(),
             start_time=start_time,
             end_time=end_time,
             venue=venue,
@@ -231,6 +247,7 @@ def create_event():
             registration_details=f"Type: {registration_type} | Fee: ₹{registration_fee}",
             budget_requirements=budget_requirements,
             additional_requirements=additional_requirements,
+            registration_start_date=registration_start_date,
             registration_deadline=registration_deadline,
             registration_fee=registration_fee,
             is_free=is_free,
@@ -323,16 +340,38 @@ def edit_event(event_id):
         event.rules = request.form.get('rules', '').strip()
         event.venue = request.form.get('venue', event.venue).strip()
 
+        reg_start_str = request.form.get('registration_start_date', '').strip()
+        deadline_str = request.form.get('registration_deadline', '').strip()
         start_time_str = request.form.get('start_time', '').strip()
         end_time_str = request.form.get('end_time', '').strip()
-        deadline_str = request.form.get('registration_deadline', '').strip()
 
-        if start_time_str:
-            event.start_time = datetime.strptime(start_time_str, '%Y-%m-%dT%H:%M')
-        if end_time_str:
-            event.end_time = datetime.strptime(end_time_str, '%Y-%m-%dT%H:%M')
-        if deadline_str:
-            event.registration_deadline = datetime.strptime(deadline_str, '%Y-%m-%dT%H:%M')
+        from services.timezone_service import parse_form_datetime
+        new_reg_start = parse_form_datetime(reg_start_str) if reg_start_str else event.registration_start_date
+        new_deadline = parse_form_datetime(deadline_str) if deadline_str else event.registration_deadline
+        new_start_time = parse_form_datetime(start_time_str) if start_time_str else event.start_time
+        new_end_time = parse_form_datetime(end_time_str) if end_time_str else event.end_time
+
+        # Validate schedule chronology if dates are set
+        if new_reg_start and new_deadline and new_reg_start >= new_deadline:
+            flash('Registration start date/time must be earlier than the registration deadline.', 'danger')
+            return redirect(url_for('organizer.edit_event', event_id=event.id))
+
+        if new_deadline and new_start_time and new_deadline > new_start_time:
+            flash('Registration deadline must be before or equal to the event start time.', 'danger')
+            return redirect(url_for('organizer.edit_event', event_id=event.id))
+
+        if new_start_time and new_end_time and new_start_time >= new_end_time:
+            flash('Event start time must be before event end time.', 'danger')
+            return redirect(url_for('organizer.edit_event', event_id=event.id))
+
+        if reg_start_str and new_reg_start:
+            event.registration_start_date = new_reg_start
+        if deadline_str and new_deadline:
+            event.registration_deadline = new_deadline
+        if start_time_str and new_start_time:
+            event.start_time = new_start_time
+        if end_time_str and new_end_time:
+            event.end_time = new_end_time
 
         event.max_participants = int(request.form.get('max_participants', event.max_participants))
         is_free = request.form.get('is_free') == 'true' or request.form.get('is_free') == 'on'

@@ -240,6 +240,14 @@ def create_app(config_class=Config):
             return value.strftime(format)
         return str(value)
 
+    @app.template_filter('to_ist_input')
+    def to_ist_input(value):
+        if value is None:
+            return ""
+        from services.timezone_service import to_ist_input_format
+        return to_ist_input_format(value)
+
+
     # Error Handlers
     @app.errorhandler(400)
     def bad_request_error(error):

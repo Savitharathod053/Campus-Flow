@@ -111,6 +111,7 @@ class EventRequest(db.Model):
     additional_requirements = db.Column(db.Text, nullable=True)
 
     # Operational event configuration fields used to instantiate the Event record on approval
+    registration_start_date = db.Column(db.DateTime, nullable=True)
     registration_deadline = db.Column(db.DateTime, nullable=True)
     registration_fee = db.Column(db.Float, default=0.0, nullable=False)
     is_free = db.Column(db.Boolean, default=True, nullable=False)
@@ -164,6 +165,31 @@ class EventRequest(db.Model):
     def is_dual_approved(self):
         """Backend dual approval validation check."""
         return (self.hod_approval_status == 'approved' and self.dean_approval_status == 'approved')
+
+    # Field Aliases
+    @property
+    def registration_end_date(self):
+        return self.registration_deadline
+
+    @registration_end_date.setter
+    def registration_end_date(self, value):
+        self.registration_deadline = value
+
+    @property
+    def event_start_date(self):
+        return self.start_time
+
+    @event_start_date.setter
+    def event_start_date(self, value):
+        self.start_time = value
+
+    @property
+    def event_end_date(self):
+        return self.end_time
+
+    @event_end_date.setter
+    def event_end_date(self, value):
+        self.end_time = value
 
     @property
     def status_label(self):

@@ -122,3 +122,71 @@ def format_ist_date(dt: Union[datetime, date, str, None], fmt: str = '%d %B %Y')
     if not ist_dt:
         return ''
     return ist_dt.strftime(fmt)
+
+def parse_form_datetime(val: Union[datetime, str, None]) -> Optional[datetime]:
+    """
+    Parses a datetime string from an HTML form (datetime-local, date, or text),
+    interprets the user-entered wall-clock time as Indian Standard Time (IST, UTC+05:30),
+    and converts it to a naive UTC datetime for standard database persistence.
+    """
+    if val is None:
+        return None
+    if isinstance(val, datetime):
+        if val.tzinfo is None:
+            val = val.replace(tzinfo=IST)
+        return val.astimezone(UTC).replace(tzinfo=None)
+
+    cleaned = str(val).strip()
+    if not cleaned:
+        return None
+
+    dt = None
+    # Try ISO format first
+    try:
+        if cleaned.endswith('Z'):
+            cleaned = cleaned[:-1] + '+00:00'
+        dt = datetime.fromisoformat(cleaned)
+    except Exception:
+        pass
+
+    if dt is None:
+        formats = (
+            '%Y-%m-%dT%H:%M',
+            '%Y-%m-%dT%H:%M:%S',
+            '%Y-%m-%d %H:%M:%S',
+            '%Y-%m-%d %H:%M',
+            '%d-%m-%Y %H:%M:%S',
+            '%d-%m-%Y %H:%M',
+            '%d/%m/%Y %H:%M:%S',
+            '%d/%m/%Y %H:%M',
+            '%Y-%m-%d',
+            '%d-%m-%Y',
+            '%d/%m/%Y'
+        )
+        for fmt in formats:
+            try:
+                dt = datetime.strptime(cleaned, fmt)
+                break
+            except ValueError:
+                continue
+
+    if dt is None:
+        return None
+
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=IST)
+
+    return dt.astimezone(UTC).replace(tzinfo=None)
+
+def to_ist_input_format(dt: Union[datetime, str, None]) -> str:
+    """
+    Converts a stored UTC or IST datetime to IST and returns 'YYYY-MM-DDTHH:MM'
+    suitable for HTML datetime-local input fields (preserves exact organizer wall clock).
+    """
+    if dt is None:
+        return ''
+    ist_dt = to_ist(dt)
+    if not ist_dt:
+        return ''
+    return ist_dt.strftime('%Y-%m-%dT%H:%M')
+

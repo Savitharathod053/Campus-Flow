@@ -32,9 +32,12 @@
                             <span class="badge bg-success text-white px-2 py-1"><i class="bi bi-play-circle-fill me-1"></i> Event Started</span>
                             <span class="small fw-bold text-warning">{{ event.occupancy_percentage }}% Filled</span>
                         </div>
+                    {% elif event.is_registration_not_started %}
+                        <div class="small text-light opacity-75 mb-1">Registration Starts</div>
+                        <div class="fw-bold fs-6 mb-2"><i class="bi bi-calendar-event text-info me-2"></i> {{ event.registration_start_date|datetimeformat }}</div>
                     {% else %}
                         <div class="small text-light opacity-75 mb-1">Registration Deadline</div>
-                        <div class="fw-bold fs-5 mb-2"><i class="bi bi-clock-history text-warning me-2"></i> {{ event.registration_deadline|datetimeformat }}</div>
+                        <div class="fw-bold fs-6 mb-2"><i class="bi bi-clock-history text-warning me-2"></i> {{ event.registration_deadline|datetimeformat }}</div>
                     {% endif %}
                     <div class="d-flex justify-content-between small border-top border-light border-opacity-25 pt-2">
                         <span>Total Capacity: <strong>{{ event.max_participants }}</strong></span>
@@ -243,6 +246,11 @@
                                 <i class="bi bi-people me-1"></i> View My Team Roster
                             </a>
                         {% endif %}
+                    </div>
+                {% elif event.is_registration_not_started %}
+                    <div class="alert alert-info text-center mb-0">
+                        <i class="bi bi-calendar-event me-1"></i> <strong>Registration Not Started</strong>
+                        <div class="small mt-1">Registrations will open on <strong>{{ event.registration_start_date|datetimeformat }}</strong> (IST).</div>
                     </div>
                 {% elif event.is_started or event.status == 'Started' %}
                     <div class="alert alert-warning text-center mb-0">

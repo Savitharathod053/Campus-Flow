@@ -135,6 +135,7 @@ BEGIN
         [rules] NVARCHAR(MAX) NULL,
         [poster_image] NVARCHAR(255) NULL,
         [venue] NVARCHAR(150) NOT NULL,
+        [registration_start_date] DATETIME NULL,
         [start_time] DATETIME NOT NULL,
         [end_time] DATETIME NOT NULL,
         [registration_deadline] DATETIME NOT NULL,

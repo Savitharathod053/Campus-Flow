@@ -327,8 +327,19 @@ def register_event(event_id):
             return redirect(url_for('payment.checkout', registration_id=existing_reg.id))
 
     # 2. Check Event status and capacity
+    if event.is_registration_not_started:
+        from services.timezone_service import format_ist_datetime
+        formatted_start = format_ist_datetime(event.registration_start_date)
+        flash(f'Registration for this event has not started yet. Registrations open on {formatted_start}.', 'warning')
+        return redirect(url_for('public.event_detail', slug=event.slug))
+
     if not event.is_live_registration_open:
-        flash('Registration for this event is currently closed or unavailable.', 'danger')
+        if event.is_deadline_passed:
+            flash('Registration deadline has passed for this event.', 'danger')
+        elif event.is_full:
+            flash('This event is full. Maximum participant capacity reached.', 'danger')
+        else:
+            flash('Registration for this event is currently closed or unavailable.', 'danger')
         return redirect(url_for('public.event_detail', slug=event.slug))
 
     # 3. Check Eligibility
@@ -425,8 +436,19 @@ def register_team(event_id):
         flash('This event does not allow team registrations.', 'danger')
         return redirect(url_for('public.event_detail', slug=event.slug))
 
+    if event.is_registration_not_started:
+        from services.timezone_service import format_ist_datetime
+        formatted_start = format_ist_datetime(event.registration_start_date)
+        flash(f'Registration for this event has not started yet. Registrations open on {formatted_start}.', 'warning')
+        return redirect(url_for('public.event_detail', slug=event.slug))
+
     if not event.is_live_registration_open:
-        flash('Registration for this event is currently closed or full.', 'danger')
+        if event.is_deadline_passed:
+            flash('Registration deadline has passed for this event.', 'danger')
+        elif event.is_full:
+            flash('This event is full. Maximum participant capacity reached.', 'danger')
+        else:
+            flash('Registration for this event is currently closed or full.', 'danger')
         return redirect(url_for('public.event_detail', slug=event.slug))
 
     # Check if already registered or in team

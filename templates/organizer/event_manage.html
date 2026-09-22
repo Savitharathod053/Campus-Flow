@@ -234,7 +234,8 @@
                     <div class="small text-muted mb-1">Fee: <strong>{% if event.is_free %}FREE{% else %}₹{{ event.registration_fee }}{% endif %}</strong></div>
                     <div class="small text-muted mb-1">Target Dept: <strong>{{ event.allowed_departments }}</strong></div>
                     <div class="small text-muted mb-1">Target Years: <strong>{{ event.allowed_years }}</strong></div>
-                    <div class="small text-muted mb-1">Deadline: <strong>{{ event.registration_deadline|datetimeformat }}</strong></div>
+                    <div class="small text-muted mb-1">Reg Starts: <strong>{{ event.registration_start_date|datetimeformat if event.registration_start_date else 'Immediate' }}</strong></div>
+                    <div class="small text-muted mb-1">Reg Deadline: <strong>{{ event.registration_deadline|datetimeformat }}</strong></div>
                 </div>
                 <a href="{{ url_for('organizer.edit_event', event_id=event.id) }}" class="btn btn-outline-dark btn-sm">
                     <i class="bi bi-sliders me-1"></i> Modify Settings

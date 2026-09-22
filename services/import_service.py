@@ -255,3 +255,64 @@ def generate_sample_csv(role):
         writer.writerow(['Dr. Arvind S.', 'arvind@college.edu', 'FAC-CSM-104', 'CSM', 'Assistant Professor', '+91 9840112266'])
 
     return output.getvalue()
+
+
+def parse_event_import_dates(row_data: dict):
+    """
+    Safely parses registration start/end and event start/end dates from an uploaded
+    spreadsheet or JSON row dictionary.
+    CRITICAL: Strictly extracts values from column contents; never falls back to
+    file modified time, upload timestamp, or server current time.
+    Returns:
+        dict with keys:
+            'registration_start_date': datetime or None,
+            'registration_deadline': datetime or None,
+            'start_time': datetime or None,
+            'end_time': datetime or None
+        list of validation error strings (empty if valid)
+    """
+    from services.timezone_service import parse_form_datetime
+
+    def get_first(keys):
+        for k in keys:
+            val = row_data.get(k)
+            if val is not None and str(val).strip():
+                return str(val).strip()
+        return None
+
+    reg_start_raw = get_first(['registration_start_date', 'reg_start_date', 'reg_start', 'registration_start'])
+    reg_end_raw = get_first(['registration_end_date', 'registration_deadline', 'reg_end_date', 'reg_end', 'deadline'])
+    event_start_raw = get_first(['event_start_date', 'start_time', 'event_start', 'start_date'])
+    event_end_raw = get_first(['event_end_date', 'end_time', 'event_end', 'end_date'])
+
+    errors = []
+
+    reg_start = parse_form_datetime(reg_start_raw) if reg_start_raw else None
+    reg_end = parse_form_datetime(reg_end_raw) if reg_end_raw else None
+    event_start = parse_form_datetime(event_start_raw) if event_start_raw else None
+    event_end = parse_form_datetime(event_end_raw) if event_end_raw else None
+
+    if reg_start_raw and not reg_start:
+        errors.append(f"Invalid registration start date format: '{reg_start_raw}'")
+    if reg_end_raw and not reg_end:
+        errors.append(f"Invalid registration end date/deadline format: '{reg_end_raw}'")
+    if event_start_raw and not event_start:
+        errors.append(f"Invalid event start date format: '{event_start_raw}'")
+    if event_end_raw and not event_end:
+        errors.append(f"Invalid event end date format: '{event_end_raw}'")
+
+    # Chronological checks
+    if reg_start and reg_end and reg_start >= reg_end:
+        errors.append("Registration start date must be strictly before registration end date.")
+    if reg_end and event_start and reg_end > event_start:
+        errors.append("Registration deadline must be before or equal to event start date.")
+    if event_start and event_end and event_start >= event_end:
+        errors.append("Event start date must be strictly before event end date.")
+
+    return {
+        'registration_start_date': reg_start,
+        'registration_deadline': reg_end,
+        'start_time': event_start,
+        'end_time': event_end
+    }, errors
+

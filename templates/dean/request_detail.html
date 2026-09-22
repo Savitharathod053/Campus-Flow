@@ -129,12 +129,22 @@
                             <p class="fw-bold text-dark mb-0">{{ req.department.name if req.department else 'N/A' }} ({{ req.department.code if req.department else '' }})</p>
                         </div>
                         <div class="col-md-6">
-                            <label class="text-muted small text-uppercase fw-semibold">Schedule Date & Time</label>
+                            <label class="text-muted small text-uppercase fw-semibold">Event Schedule (IST)</label>
                             <p class="fw-bold text-dark mb-0">
                                 <i class="bi bi-calendar-event me-1"></i>
-                                {{ req.start_time.strftime('%a, %b %d, %Y %I:%M %p') if req.start_time else 'TBD' }}
+                                {{ req.start_time|datetimeformat if req.start_time else 'TBD' }}
                                 {% if req.end_time %}
-                                    <br><small class="text-muted">to {{ req.end_time.strftime('%a, %b %d, %Y %I:%M %p') }}</small>
+                                    <br><small class="text-muted">to {{ req.end_time|datetimeformat }}</small>
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="text-muted small text-uppercase fw-semibold">Registration Window (IST)</label>
+                            <p class="fw-bold text-dark mb-0">
+                                <i class="bi bi-clock-history me-1"></i>
+                                Opens: {{ req.registration_start_date|datetimeformat if req.registration_start_date else 'Immediate' }}
+                                {% if req.registration_deadline %}
+                                    <br><small class="text-muted">Closes: {{ req.registration_deadline|datetimeformat }}</small>
                                 {% endif %}
                             </p>
                         </div>

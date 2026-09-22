@@ -163,12 +163,23 @@
                                     <div class="border-top pt-3 mt-auto">
                                         <div class="d-flex justify-content-between align-items-center small text-muted mb-3">
                                             <span><i class="bi bi-geo-alt me-1 text-danger"></i> {{ event.venue|truncate(20) }}</span>
-                                            <span class="badge {% if event.available_seats > 10 %}bg-light text-dark border{% else %}bg-danger text-white{% endif %}">
-                                                {{ event.available_seats }} seats left
-                                            </span>
+                                            {% if event.is_registration_not_started %}
+                                                <span class="badge bg-warning-subtle text-dark border border-warning-subtle">Reg Starts {{ event.registration_start_date|dateformat }}</span>
+                                            {% elif event.is_deadline_passed %}
+                                                <span class="badge bg-secondary text-white">Reg Closed</span>
+                                            {% elif event.is_full %}
+                                                <span class="badge bg-danger text-white">Housefull</span>
+                                            {% else %}
+                                                <span class="badge {% if event.available_seats > 10 %}bg-light text-dark border{% else %}bg-danger text-white{% endif %}">
+                                                    {{ event.available_seats }} seats left
+                                                </span>
+                                            {% endif %}
                                         </div>
-                                        <a href="{{ url_for('public.event_detail', slug=event.slug) }}" class="btn {% if event.is_completed or event.is_expired %}btn-outline-secondary disabled{% else %}btn-primary{% endif %} w-100 fw-semibold">
-                                            {% if event.is_completed or event.is_expired %}Event Concluded{% else %}View Details & Register{% endif %}
+                                        <a href="{{ url_for('public.event_detail', slug=event.slug) }}" class="btn {% if event.is_completed or event.is_expired %}btn-outline-secondary disabled{% elif event.is_registration_not_started %}btn-outline-primary{% else %}btn-primary{% endif %} w-100 fw-semibold">
+                                            {% if event.is_completed or event.is_expired %}Event Concluded
+                                            {% elif event.is_registration_not_started %}View Details (Opens Soon)
+                                            {% elif event.is_deadline_passed %}View Details (Reg Closed)
+                                            {% else %}View Details & Register{% endif %}
                                         </a>
                                     </div>
                                 </div>

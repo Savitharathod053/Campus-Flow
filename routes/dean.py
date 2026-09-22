@@ -162,6 +162,7 @@ def approve_request(request_id):
             venue=req.venue,
             start_time=req.start_time,
             end_time=req.end_time,
+            registration_start_date=req.registration_start_date or req.created_at,
             registration_deadline=deadline,
             max_participants=req.expected_participants,
             registration_fee=req.registration_fee or 0.0,
