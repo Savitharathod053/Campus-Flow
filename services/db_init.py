@@ -23,9 +23,12 @@ def ensure_db_initialized(app):
     """
     Guarantees database schema tables exist before serving any request.
     If already initialized, returns immediately in sub-millisecond time.
+    If initialization is in progress in another thread, does not block HTTP requests.
     """
     global _DB_INITIALIZED
     if _DB_INITIALIZED:
+        return True
+    if _INIT_LOCK.locked():
         return True
     return init_db_and_seed(app)
 

@@ -7,46 +7,56 @@ public_bp = Blueprint('public', __name__)
 
 @public_bp.route('/')
 def home():
-    current_user = get_current_user()
-    now = datetime.utcnow()
-
-    # Featured upcoming events (strictly dual-approved, published, active, non-expired)
-    featured_candidates = Event.query.filter(
-        Event.is_published == True,
-        Event.hod_approved == True,
-        Event.dean_approved == True,
-        Event.status.in_([EventStatus.APPROVED, EventStatus.REGISTRATION_OPEN, EventStatus.UPCOMING]),
-        Event.start_time > now,
-        Event.end_time > now,
-        Event.registration_deadline > now,
-        Event.status.notin_([EventStatus.COMPLETED, 'EVENT_COMPLETED', EventStatus.CANCELLED, EventStatus.REJECTED])
-    ).order_by(Event.start_time.asc()).limit(12).all()
-    featured_events = [
-        e for e in featured_candidates 
-        if not e.is_completed and not e.is_expired and not e.is_deadline_passed and e.is_upcoming
-    ][:6]
-
-    # Recently added events (strictly dual-approved, published, active, non-expired)
-    recent_candidates = Event.query.filter(
-        Event.is_published == True,
-        Event.hod_approved == True,
-        Event.dean_approved == True,
-        Event.status.in_([EventStatus.APPROVED, EventStatus.REGISTRATION_OPEN, EventStatus.UPCOMING, EventStatus.ONGOING]),
-        Event.end_time > now,
-        Event.status.notin_([EventStatus.COMPLETED, 'EVENT_COMPLETED', EventStatus.CANCELLED, EventStatus.REJECTED])
-    ).order_by(Event.created_at.desc()).limit(12).all()
-    recent_events = [
-        e for e in recent_candidates 
-        if not e.is_completed and not e.is_expired
-    ][:6]
-
-    # Quick metrics for landing hero
-    total_events_count = Event.query.filter(Event.is_published == True).count()
-    total_registrations_count = EventRegistration.query.filter_by(status='CONFIRMED').count()
-    total_students_count = StudentProfile.query.count()
-
+    current_user = None
+    featured_events = []
+    recent_events = []
+    total_events_count = 0
+    total_registrations_count = 0
+    total_students_count = 0
     departments = Department.CHOICES
     event_types = EventType.CHOICES
+
+    try:
+        current_user = get_current_user()
+        now = datetime.utcnow()
+
+        # Featured upcoming events (strictly dual-approved, published, active, non-expired)
+        featured_candidates = Event.query.filter(
+            Event.is_published == True,
+            Event.hod_approved == True,
+            Event.dean_approved == True,
+            Event.status.in_([EventStatus.APPROVED, EventStatus.REGISTRATION_OPEN, EventStatus.UPCOMING]),
+            Event.start_time > now,
+            Event.end_time > now,
+            Event.registration_deadline > now,
+            Event.status.notin_([EventStatus.COMPLETED, 'EVENT_COMPLETED', EventStatus.CANCELLED, EventStatus.REJECTED])
+        ).order_by(Event.start_time.asc()).limit(12).all()
+        featured_events = [
+            e for e in featured_candidates 
+            if not e.is_completed and not e.is_expired and not e.is_deadline_passed and e.is_upcoming
+        ][:6]
+
+        # Recently added events (strictly dual-approved, published, active, non-expired)
+        recent_candidates = Event.query.filter(
+            Event.is_published == True,
+            Event.hod_approved == True,
+            Event.dean_approved == True,
+            Event.status.in_([EventStatus.APPROVED, EventStatus.REGISTRATION_OPEN, EventStatus.UPCOMING, EventStatus.ONGOING]),
+            Event.end_time > now,
+            Event.status.notin_([EventStatus.COMPLETED, 'EVENT_COMPLETED', EventStatus.CANCELLED, EventStatus.REJECTED])
+        ).order_by(Event.created_at.desc()).limit(12).all()
+        recent_events = [
+            e for e in recent_candidates 
+            if not e.is_completed and not e.is_expired
+        ][:6]
+
+        # Quick metrics for landing hero
+        total_events_count = Event.query.filter(Event.is_published == True).count()
+        total_registrations_count = EventRegistration.query.filter_by(status='CONFIRMED').count()
+        total_students_count = StudentProfile.query.count()
+    except Exception as e:
+        from flask import current_app
+        current_app.logger.warning(f"Public home fallback during initial DB connection/warmup: {e}")
 
     return render_template(
         'public/index.html',

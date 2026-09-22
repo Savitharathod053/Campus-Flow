@@ -153,7 +153,7 @@ def create_app(config_class=Config):
     @app.before_request
     def ensure_database_ready():
         from flask import request
-        if request.endpoint in ('static', 'health', 'health_db'):
+        if request.endpoint in ('static', 'health', 'health_db', 'public.home', 'public.index'):
             return
         from services.db_init import ensure_db_initialized
         try:
@@ -341,6 +341,12 @@ def create_app(config_class=Config):
     except Exception as sched_err:
         app.logger.warning(f"Note: Could not start capacity monitoring scheduler: {sched_err}")
 
+    # Safe startup port log showing dynamic port configuration without secrets
+    configured_port = os.environ.get('PORT', '5000')
+    port_log_msg = f"[Campus Flow] Application configured to listen on 0.0.0.0:{configured_port} (PORT={configured_port})"
+    app.logger.info(port_log_msg)
+    print(port_log_msg)
+
     return app
 
 
@@ -348,6 +354,6 @@ app = create_app()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    host = '0.0.0.0' if (os.environ.get('PORT') or os.environ.get('RENDER')) else '127.0.0.1'
+    host = '0.0.0.0' if (os.environ.get('PORT') or os.environ.get('RENDER') or os.environ.get('FLASK_ENV') == 'production') else '127.0.0.1'
     app.run(host=host, port=port, debug=False)
 

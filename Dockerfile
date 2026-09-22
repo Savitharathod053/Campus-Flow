@@ -1,10 +1,9 @@
 # Campus Flow - Production Docker Container
 FROM python:3.11-slim
 
-# Set environment variables
+# Set environment variables (PORT is provided dynamically by Render and other cloud platforms)
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    PORT=5000 \
     FLASK_ENV=production
 
 # Install system dependencies including msodbcsql18 prerequisites, curl, and tesseract-ocr
@@ -35,9 +34,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application source code
 COPY . /app/
 
-# Expose port
-EXPOSE 5000
-
 # Run migrations and start with Gunicorn WSGI server (binds dynamically to deployment platform's assigned $PORT)
-CMD python migrate_production_schema.py && exec gunicorn wsgi:app --bind 0.0.0.0:${PORT:-5000} --workers 2 --threads 2 --timeout 120
+CMD python migrate_production_schema.py && exec gunicorn wsgi:app --bind 0.0.0.0:${PORT:-10000} --workers 2 --threads 2 --timeout 120
 

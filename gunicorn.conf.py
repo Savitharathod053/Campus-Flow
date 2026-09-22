@@ -19,3 +19,14 @@ keepalive = 5
 accesslog = "-"
 errorlog = "-"
 loglevel = os.environ.get("LOG_LEVEL", "info")
+
+
+def on_starting(server):
+    p = os.environ.get("PORT", "5000")
+    print(f"[Campus Flow Gunicorn] Master starting on 0.0.0.0:{p} (PORT={p})")
+
+
+def when_ready(server):
+    p = os.environ.get("PORT", "5000")
+    print(f"[Campus Flow Gunicorn] Server is ready and listening for HTTP connections at http://0.0.0.0:{p}")
+
