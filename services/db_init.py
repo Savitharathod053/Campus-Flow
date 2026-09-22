@@ -12,8 +12,11 @@ from models import (
     OrganizerProfile, CollegeDepartment, Department
 )
 
+import threading
+
 logger = logging.getLogger("CampusFlow.DBInit")
 _DB_INITIALIZED = False
+_INIT_LOCK = threading.Lock()
 
 
 def ensure_db_initialized(app):
@@ -27,6 +30,19 @@ def ensure_db_initialized(app):
     return init_db_and_seed(app)
 
 
+def start_background_db_init(app):
+    """
+    Safely starts database schema verification and baseline seeding in a background
+    daemon thread so the WSGI server can bind to $PORT immediately without port scan timeout.
+    """
+    def _run():
+        init_db_and_seed(app)
+
+    t = threading.Thread(target=_run, name="CampusFlow.BackgroundDBInit", daemon=True)
+    t.start()
+    return t
+
+
 def init_db_and_seed(app, force=False):
     """
     Initializes all database tables, ensures all model columns exist on pre-existing tables,
@@ -36,36 +52,40 @@ def init_db_and_seed(app, force=False):
     if _DB_INITIALIZED and not force:
         return True
 
-    with app.app_context():
-        try:
-            # 1. Create all 21 tables idempotently
-            logger.info("Verifying and creating database tables via SQLAlchemy metadata...")
-            db.create_all()
-            logger.info("Database schema tables verified.")
-
-            # 2. Synchronize any missing columns on pre-existing tables (e.g. payments.extracted_transaction_id)
-            sync_missing_columns()
-
-            # 3. Seed canonical college departments if empty
-            _seed_departments()
-
-            # 4. Seed initial Super Admin if not present
-            _seed_super_admin()
-
-            # 5. Seed baseline Dean and HOD accounts if missing
-            _seed_baseline_officials()
-
-            # 6. Ensure all active departments have their responsible HOD linked
-            _link_department_hods()
-
-            db.session.commit()
-            _DB_INITIALIZED = True
-            logger.info("Database initialization, schema synchronization, and seeding completed successfully.")
+    with _INIT_LOCK:
+        if _DB_INITIALIZED and not force:
             return True
-        except Exception as e:
-            logger.error(f"Database initialization encountered an error: {e}", exc_info=True)
-            db.session.rollback()
-            return False
+
+        with app.app_context():
+            try:
+                # 1. Create all 21 tables idempotently
+                logger.info("Verifying and creating database tables via SQLAlchemy metadata...")
+                db.create_all()
+                logger.info("Database schema tables verified.")
+
+                # 2. Synchronize any missing columns on pre-existing tables (e.g. payments.extracted_transaction_id)
+                sync_missing_columns()
+
+                # 3. Seed canonical college departments if empty
+                _seed_departments()
+
+                # 4. Seed initial Super Admin if not present
+                _seed_super_admin()
+
+                # 5. Seed baseline Dean and HOD accounts if missing
+                _seed_baseline_officials()
+
+                # 6. Ensure all active departments have their responsible HOD linked
+                _link_department_hods()
+
+                db.session.commit()
+                _DB_INITIALIZED = True
+                logger.info("Database initialization, schema synchronization, and seeding completed successfully.")
+                return True
+            except Exception as e:
+                logger.error(f"Database initialization encountered an error: {e}", exc_info=True)
+                db.session.rollback()
+                return False
 
 
 def sync_missing_columns():

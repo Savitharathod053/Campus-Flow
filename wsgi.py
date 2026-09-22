@@ -1,19 +1,11 @@
 """
 Campus Flow - Production WSGI Entry Point
+Directly imports the single pre-configured application instance to ensure instant,
+sub-second worker boots and immediate port binding on Render.
 """
 
 import os
-from app import create_app
-
-app = create_app()
-
-# Ensure schema synchronization and baseline initialization on worker process startup
-with app.app_context():
-    try:
-        from services.db_init import ensure_db_initialized
-        ensure_db_initialized(app)
-    except Exception as e:
-        app.logger.warning(f"WSGI startup db initialization note: {e}")
+from app import app
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))

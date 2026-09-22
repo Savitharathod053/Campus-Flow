@@ -153,7 +153,7 @@ def create_app(config_class=Config):
     @app.before_request
     def ensure_database_ready():
         from flask import request
-        if request.endpoint == 'static':
+        if request.endpoint in ('static', 'health', 'health_db'):
             return
         from services.db_init import ensure_db_initialized
         try:
@@ -281,12 +281,12 @@ def create_app(config_class=Config):
                 500
             )
 
-    with app.app_context():
-        try:
-            from services.db_init import init_db_and_seed
-            init_db_and_seed(app)
-        except Exception as e:
-            app.logger.warning(f"Note: Automatic database initialization encountered: {e}")
+    # Asynchronously verify and seed DB in background so port binding is immediate on Render
+    try:
+        from services.db_init import start_background_db_init
+        start_background_db_init(app)
+    except Exception as e:
+        app.logger.warning(f"Note: Background database initialization encountered: {e}")
 
     # CLI Command to initialize and seed database
     @app.cli.command("init-db")
