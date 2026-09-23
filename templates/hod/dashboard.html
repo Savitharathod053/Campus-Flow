@@ -81,7 +81,7 @@
 
     <!-- Executive Stat Cards -->
     <div class="row g-3 mb-4">
-        <div class="col-sm-6 col-xl-3">
+        <div class="col-sm-6 col-lg-4 col-xl">
             <div class="metric-card shadow-3d h-100">
                 <div class="metric-icon-box bg-warning text-dark">
                     <i class="bi bi-hourglass-top"></i>
@@ -93,7 +93,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-sm-6 col-xl-3">
+        <div class="col-sm-6 col-lg-4 col-xl">
             <div class="metric-card shadow-3d h-100">
                 <div class="metric-icon-box bg-info text-white">
                     <i class="bi bi-person-badge-fill"></i>
@@ -105,7 +105,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-sm-6 col-xl-3">
+        <div class="col-sm-6 col-lg-4 col-xl">
             <div class="metric-card shadow-3d h-100">
                 <div class="metric-icon-box bg-primary text-white">
                     <i class="bi bi-people-fill"></i>
@@ -117,7 +117,7 @@
                 </div>
             </div>
         </div>
-        <div class="col-sm-6 col-xl-3">
+        <div class="col-sm-6 col-lg-4 col-xl">
             <div class="metric-card shadow-3d h-100">
                 <div class="metric-icon-box bg-success text-white">
                     <i class="bi bi-calendar-check-fill"></i>
@@ -126,6 +126,18 @@
                     <div class="metric-number count-up" data-target="{{ total_events_count }}">{{ total_events_count }}</div>
                     <div class="metric-label">Published Events</div>
                     <small class="text-success fw-semibold" style="font-size: 0.75rem;">Dual-Approved</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-4 col-xl">
+            <div class="metric-card shadow-3d h-100 border border-danger-subtle" style="cursor: pointer; transition: transform 0.2s ease;" onclick="const tab = document.getElementById('not-attended-tab'); if(tab){ tab.click(); tab.scrollIntoView({behavior: 'smooth'}); }">
+                <div class="metric-icon-box bg-danger text-white">
+                    <i class="bi bi-person-x-fill"></i>
+                </div>
+                <div>
+                    <div class="metric-number count-up text-danger" data-target="{{ all_not_attended_count }}">{{ all_not_attended_count }}</div>
+                    <div class="metric-label text-dark">Not Attended</div>
+                    <small class="text-danger fw-semibold" style="font-size: 0.75rem;">Registered Absentees</small>
                 </div>
             </div>
         </div>
@@ -171,6 +183,14 @@
                         <i class="bi bi-bell-fill me-1 text-warning"></i> Empty Slots Alerts
                         {% if unread_capacity_alerts|length > 0 %}
                             <span class="badge bg-danger ms-1">{{ unread_capacity_alerts|length }}</span>
+                        {% endif %}
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link {% if active_tab == 'not_attended' %}active fw-bold text-danger{% else %}text-muted{% endif %}" id="not-attended-tab" data-bs-toggle="tab" data-bs-target="#not-attended" type="button" role="tab">
+                        <i class="bi bi-person-x-fill me-1 text-danger"></i> Registered but Not Attended
+                        {% if all_not_attended_count > 0 %}
+                            <span class="badge bg-danger ms-1">{{ all_not_attended_count }}</span>
                         {% endif %}
                     </button>
                 </li>
@@ -671,6 +691,147 @@
                     {% endif %}
                 </div>
 
+                <!-- TAB 7: REGISTERED BUT NOT ATTENDED -->
+                <div class="tab-pane fade {% if active_tab == 'not_attended' %}show active{% endif %}" id="not-attended" role="tabpanel">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3 gap-2">
+                        <div>
+                            <h5 class="fw-bold text-dark mb-0">
+                                <i class="bi bi-person-x-fill text-danger me-2"></i> Registered but Not Attended Students ({{ dept_code }})
+                            </h5>
+                            <small class="text-muted">Students from {{ dept_code }} who confirmed registration for started/completed events but have not attended.</small>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2 fs-6">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i> Total Absent: {{ all_not_attended_count }}
+                            </span>
+                            <a href="{{ url_for('hod.registered_not_attended_api') }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                                <i class="bi bi-code-slash me-1"></i> JSON API
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- Filter Bar -->
+                    <div class="card border bg-light mb-3">
+                        <div class="card-body p-3">
+                            <form method="GET" action="{{ url_for('hod.dashboard') }}" class="row g-2 align-items-end" id="naFilterForm">
+                                <input type="hidden" name="tab" value="not_attended">
+                                <div class="col-md-4 col-sm-12">
+                                    <label class="form-label small fw-semibold text-secondary mb-1">
+                                        <i class="bi bi-search me-1"></i> Search Student / Roll No
+                                    </label>
+                                    <input type="text" class="form-control form-control-sm" name="na_search" id="naSearchInput" 
+                                           placeholder="Type name or roll number..." value="{{ na_search or '' }}">
+                                </div>
+                                <div class="col-md-3 col-sm-6">
+                                    <label class="form-label small fw-semibold text-secondary mb-1">
+                                        <i class="bi bi-calendar-event me-1"></i> Filter by Event
+                                    </label>
+                                    <select class="form-select form-select-sm" name="na_event_id" id="naEventSelect">
+                                        <option value="">All Events</option>
+                                        {% for ev in not_attended_events_list %}
+                                            <option value="{{ ev.id }}" {% if na_filter_event_id == ev.id %}selected{% endif %}>{{ ev.title }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                                <div class="col-md-3 col-sm-6">
+                                    <label class="form-label small fw-semibold text-secondary mb-1">
+                                        <i class="bi bi-calendar3 me-1"></i> Filter by Date
+                                    </label>
+                                    <input type="date" class="form-control form-control-sm" name="na_date" id="naDateInput" 
+                                           value="{{ na_filter_date or '' }}">
+                                </div>
+                                <div class="col-md-2 col-sm-12 d-flex gap-1">
+                                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-semibold">
+                                        <i class="bi bi-funnel-fill me-1"></i> Filter
+                                    </button>
+                                    {% if na_search or na_filter_event_id or na_filter_date %}
+                                    <a href="{{ url_for('hod.dashboard', tab='not_attended') }}" class="btn btn-outline-secondary btn-sm" title="Reset Filters">
+                                        <i class="bi bi-arrow-counterclockwise"></i>
+                                    </a>
+                                    {% endif %}
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+
+                    {% if not_attended_students %}
+                        <div class="table-responsive rounded-3 border">
+                            <table class="table table-hover align-middle mb-0" id="notAttendedTable">
+                                <thead class="table-light small text-uppercase">
+                                    <tr>
+                                        <th class="ps-3" style="width: 40px;">#</th>
+                                        <th>Student Name</th>
+                                        <th>Roll Number</th>
+                                        <th>Department</th>
+                                        <th>Event Name</th>
+                                        <th>Event Date</th>
+                                        <th>Registration</th>
+                                        <th>Attendance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in not_attended_students %}
+                                    <tr class="na-table-row" 
+                                        data-student-name="{{ row.student_name|lower }}" 
+                                        data-roll-number="{{ row.roll_number|lower }}"
+                                        data-event-id="{{ row.event_id }}"
+                                        data-raw-date="{{ row.raw_date }}">
+                                        <td class="ps-3 text-muted small">{{ loop.index }}</td>
+                                        <td>
+                                            <div class="fw-bold text-dark">{{ row.student_name }}</div>
+                                            {% if row.student_email %}
+                                            <small class="text-muted"><i class="bi bi-envelope me-1"></i>{{ row.student_email }}</small>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-secondary-subtle text-dark border font-monospace">{{ row.roll_number }}</span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-info-subtle text-info border border-info-subtle fw-semibold">{{ row.department }}</span>
+                                        </td>
+                                        <td>
+                                            <a href="{{ url_for('public.event_detail', event_id=row.event_id) }}" class="fw-semibold text-decoration-none text-primary" target="_blank">
+                                                {{ row.event_name }}
+                                                <i class="bi bi-box-arrow-up-right ms-1 small" style="font-size: 0.75rem;"></i>
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <small class="text-secondary"><i class="bi bi-calendar-event me-1 text-primary"></i>{{ row.event_date }}</small>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-success-subtle text-success border border-success-subtle">
+                                                <i class="bi bi-check2-circle me-1"></i>{{ row.registration_status }}
+                                            </span>
+                                        </td>
+                                        <td>
+                                            <span class="badge bg-danger text-white px-2 py-1">
+                                                <i class="bi bi-x-circle me-1"></i>{{ row.attendance_status }}
+                                            </span>
+                                            {% if row.multi_session and row.sessions_detail %}
+                                                <div class="small text-muted mt-1" style="font-size: 0.72rem;">
+                                                    <i class="bi bi-info-circle me-1"></i>{{ row.sessions_detail }}
+                                                </div>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="noMatchMessage" class="text-center py-4 bg-light rounded-3 border mt-3 d-none">
+                            <i class="bi bi-search text-muted fs-2 mb-2 d-block"></i>
+                            <h6 class="fw-bold text-secondary">No matching student records found</h6>
+                            <p class="text-muted small mb-0">Try adjusting your search criteria or clearing filters.</p>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5 bg-light rounded-3 border">
+                            <i class="bi bi-shield-check text-success fs-1 mb-2 d-block"></i>
+                            <h6 class="fw-bold text-dark">No Absentee Records</h6>
+                            <p class="text-muted small mb-0">All registered students from {{ dept_code }} have attended their scheduled events, or no relevant events have started yet.</p>
+                        </div>
+                    {% endif %}
+                </div>
+
             </div>
         </div>
     </div>
@@ -732,4 +893,55 @@
 
 {% block extra_js %}
 {# Global markNotificationRead in static/js/app.js handles HOD cards, table rows, and navbar counters #}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('naSearchInput');
+    const eventSelect = document.getElementById('naEventSelect');
+    const dateInput = document.getElementById('naDateInput');
+    const tableRows = document.querySelectorAll('.na-table-row');
+    const noMatchMsg = document.getElementById('noMatchMessage');
+    const notAttendedTable = document.getElementById('notAttendedTable');
+
+    if (!tableRows.length) return;
+
+    function filterRows() {
+        const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
+        const selectedEvent = eventSelect ? eventSelect.value : '';
+        const selectedDate = dateInput ? dateInput.value : '';
+        let visibleCount = 0;
+
+        tableRows.forEach(row => {
+            const name = row.getAttribute('data-student-name') || '';
+            const roll = row.getAttribute('data-roll-number') || '';
+            const evId = row.getAttribute('data-event-id') || '';
+            const rawDate = row.getAttribute('data-raw-date') || '';
+
+            const matchesSearch = !query || name.includes(query) || roll.includes(query);
+            const matchesEvent = !selectedEvent || evId === selectedEvent;
+            const matchesDate = !selectedDate || rawDate === selectedDate;
+
+            if (matchesSearch && matchesEvent && matchesDate) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+
+        if (noMatchMsg) {
+            if (visibleCount === 0) {
+                noMatchMsg.classList.remove('d-none');
+                if (notAttendedTable) notAttendedTable.classList.add('d-none');
+            } else {
+                noMatchMsg.classList.add('d-none');
+                if (notAttendedTable) notAttendedTable.classList.remove('d-none');
+            }
+        }
+    }
+
+    if (searchInput) searchInput.addEventListener('input', filterRows);
+    if (eventSelect) eventSelect.addEventListener('change', filterRows);
+    if (dateInput) dateInput.addEventListener('change', filterRows);
+});
+</script>
 {% endblock %}

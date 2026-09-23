@@ -61,6 +61,10 @@ def create_app(config_class=Config):
     from routes.payment import handle_razorpay_webhook
     app.add_url_rule('/api/payments/webhook/razorpay', 'api_razorpay_webhook', handle_razorpay_webhook, methods=['POST'])
 
+    # HOD Registered but Not Attended Global API Endpoint
+    from routes.hod import registered_not_attended_api
+    app.add_url_rule('/api/hod/registered-not-attended', 'api_hod_registered_not_attended', registered_not_attended_api, methods=['GET'])
+
     # Safe Protected Email Verification Endpoint
     @app.route('/api/email/test', methods=['GET', 'POST'])
     def api_email_test():

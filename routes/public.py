@@ -1,6 +1,6 @@
 from datetime import datetime
 from flask import Blueprint, render_template, request, url_for, abort, jsonify
-from models import db, Event, EventStatus, EventType, EventRegistration, User, StudentProfile, Department, Notification
+from models import db, Event, EventStatus, EventType, EventRegistration, User, StudentProfile, Department, Notification, CollegeDepartment
 from routes.auth import get_current_user
 
 public_bp = Blueprint('public', __name__)
@@ -162,22 +162,35 @@ def events():
 
 
 @public_bp.route('/events/<slug>')
-def event_detail(slug):
+@public_bp.route('/events/<int:event_id>')
+def event_detail(slug=None, event_id=None):
     current_user = get_current_user()
     event = None
-    if slug.isdigit():
-        event = Event.query.get(int(slug))
-    if not event:
-        event = Event.query.filter_by(slug=slug).first_or_404()
+    if event_id is not None:
+        event = Event.query.get(event_id)
+        if not event:
+            abort(404)
+    elif slug:
+        if str(slug).isdigit():
+            event = Event.query.get(int(slug))
+        if not event:
+            event = Event.query.filter_by(slug=slug).first_or_404()
+    else:
+        abort(404)
 
     # MANDATORY DUAL APPROVAL VALIDATION:
     # If the event is not approved by both HOD and Dean, public/students cannot view it.
     if not event.is_published or not (event.hod_approved and event.dean_approved):
+        hod_dept = CollegeDepartment.query.filter_by(hod_id=current_user.id).first() if (current_user and current_user.is_hod) else None
         is_authorized_viewer = (
             current_user and (
                 current_user.is_super_admin or
                 current_user.is_students_affairs_dean or
-                (current_user.is_hod and (event.department_id == current_user.id or event.department == (current_user.faculty_profile.department if current_user.faculty_profile else ''))) or
+                (current_user.is_hod and (
+                    event.department_id == current_user.id or
+                    event.department == (current_user.faculty_profile.department if current_user.faculty_profile else '') or
+                    (hod_dept and (event.department_id == hod_dept.id or event.department == hod_dept.code))
+                )) or
                 current_user.id == event.organizer_id
             )
         )

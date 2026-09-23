@@ -12,7 +12,7 @@ from services.timezone_service import (
 from models import (
     db, Event, EventRegistration, RegistrationStatus, AttendanceRecord,
     AttendanceSession, AttendanceSessionStatus, AttendanceStatus,
-    VerificationMethod, User, StudentProfile
+    VerificationMethod, User, StudentProfile, EventStatus
 )
 
 logger = logging.getLogger(__name__)
@@ -479,3 +479,171 @@ def calculate_event_attendance_matrix(event):
         'total_participants': len(registrations),
         'min_attendance_percentage': event.min_attendance_percentage
     }
+
+
+def get_registered_not_attended_students(hod_user, event_id=None, date_filter=None, search=None, page=1, per_page=50):
+    """
+    Retrieves students belonging to the HOD's department who registered for an event
+    (with CONFIRMED registration) where the event has started or completed, but the
+    student has NOT attended (has no valid attendance record or failed attendance requirement).
+
+    Enforces:
+    - Student strictly belongs to HOD's department.
+    - Registration is CONFIRMED (cancelled or rejected registrations are excluded).
+    - Event has started or completed (events that have not started are excluded).
+    - Students who attended are excluded.
+    - Multi-session events respect existing attendance satisfaction rules.
+    - Zero N+1 queries using joinedload.
+    """
+    from routes.hod import get_hod_department
+    from models.department import Department, CollegeDepartment
+    from sqlalchemy.orm import joinedload
+    from sqlalchemy import or_, and_, func
+
+    dept_obj = get_hod_department(hod_user)
+    if not dept_obj:
+        return {
+            'records': [],
+            'all_records': [],
+            'total': 0,
+            'page': page or 1,
+            'per_page': per_page or 50,
+            'total_pages': 0,
+            'department': None,
+            'events_list': []
+        }
+
+    dept_code = dept_obj.code
+    now = datetime.utcnow()
+
+    # 1. Base query: Confirmed registrations of students in the HOD's department
+    # for events that have started or completed
+    query = EventRegistration.query.join(User, EventRegistration.student_id == User.id)\
+        .join(StudentProfile, StudentProfile.user_id == User.id)\
+        .join(Event, EventRegistration.event_id == Event.id)\
+        .options(
+            joinedload(EventRegistration.student).joinedload(User.student_profile),
+            joinedload(EventRegistration.event),
+            joinedload(EventRegistration.attendance_records)
+        )\
+        .filter(
+            StudentProfile.department == dept_code,
+            EventRegistration.status == RegistrationStatus.CONFIRMED,
+            Event.is_published == True,
+            Event.status.notin_([EventStatus.CANCELLED, EventStatus.REJECTED, EventStatus.DRAFT, 'CANCELLED', 'REJECTED', 'DRAFT']),
+            or_(
+                Event.start_time <= now,
+                Event.status.in_([EventStatus.STARTED, EventStatus.ONGOING, EventStatus.COMPLETED, 'Started', 'EVENT_COMPLETED', 'ONGOING', 'Completed'])
+            )
+        )
+
+    # 2. Filter by specific event if provided
+    if event_id:
+        query = query.filter(EventRegistration.event_id == event_id)
+
+    # 3. Filter by date if provided (matches event start date)
+    if date_filter:
+        parsed_d = parse_date_str(date_filter)
+        if parsed_d:
+            query = query.filter(func.cast(Event.start_time, db.Date) == parsed_d)
+
+    # 4. Search query (matches student name, roll number, or email)
+    if search:
+        s_term = f"%{str(search).strip()}%"
+        query = query.filter(
+            or_(
+                User.name.ilike(s_term),
+                User.email.ilike(s_term),
+                StudentProfile.roll_number.ilike(s_term)
+            )
+        )
+
+    # Order by event start time descending, then student name ascending
+    candidate_registrations = query.order_by(Event.start_time.desc(), User.name.asc()).all()
+
+    absent_records = []
+    distinct_events = {}
+
+    for reg in candidate_registrations:
+        event = reg.event
+        student = reg.student
+        profile = student.student_profile if student else None
+
+        if not event or not student:
+            continue
+
+        distinct_events[event.id] = event.title
+
+        # Check PRESENT attendance records
+        attended_records = [r for r in reg.attendance_records if r.status == AttendanceStatus.PRESENT]
+        attended_count = len(attended_records)
+        total_sessions = event.total_sessions_count or 1
+
+        is_absent = False
+        reason = "No attendance recorded"
+
+        if attended_count == 0:
+            is_absent = True
+            reason = "No attendance recorded"
+        else:
+            # Multi-session event: check if attendance criteria was met
+            is_event_ended = (event.end_time and event.end_time <= now) or (event.status in (EventStatus.COMPLETED, 'EVENT_COMPLETED', 'Completed'))
+            if is_event_ended:
+                if not event.is_student_attendance_satisfied(student.id):
+                    is_absent = True
+                    perc = event.get_student_attendance_percentage(student.id)
+                    reason = f"Attended {attended_count} of {total_sessions} sessions ({perc}% < {event.min_attendance_percentage}%)"
+            else:
+                # Event is ongoing and student has at least 1 attendance scan
+                is_absent = False
+
+        if is_absent:
+            start_ist = to_ist(event.start_time)
+            rec = {
+                "student_name": student.name if student else "N/A",
+                "roll_number": profile.roll_number if profile and profile.roll_number else "N/A",
+                "department": profile.department if profile and profile.department else dept_code,
+                "event_name": event.title,
+                "event_date": start_ist.strftime('%d %B %Y') if start_ist else "",
+                "event_date_formatted": start_ist.strftime('%d %B %Y') if start_ist else "",
+                "raw_date": start_ist.strftime('%Y-%m-%d') if start_ist else "",
+                "event_date_iso": start_ist.strftime('%Y-%m-%d') if start_ist else "",
+                "attendance_status": "Not Attended",
+                "attendance_status_code": "NOT_ATTENDED",
+                "attendance_label": "Not Attended",
+                "registration_status": reg.status,
+                "registration_id": reg.id,
+                "event_id": event.id,
+                "event_slug": event.slug,
+                "student_id": student.id,
+                "student_email": student.email if student else "",
+                "attended_sessions": attended_count,
+                "total_sessions": total_sessions,
+                "multi_session": total_sessions > 1,
+                "sessions_detail": f"{attended_count}/{total_sessions} sessions" if total_sessions > 1 else "",
+                "attendance_percentage": reg.attendance_percentage,
+                "reason": reason
+            }
+            absent_records.append(rec)
+
+    total_count = len(absent_records)
+    total_pages = (total_count + per_page - 1) // per_page if per_page and per_page > 0 else 1
+
+    if page and per_page and per_page > 0:
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_records = absent_records[start_idx:end_idx]
+    else:
+        paginated_records = absent_records
+
+    return {
+        'records': paginated_records,
+        'all_records': absent_records,
+        'total': total_count,
+        'page': page or 1,
+        'per_page': per_page or 50,
+        'total_pages': total_pages,
+        'department': dept_code,
+        'events_list': [{'id': eid, 'title': etitle} for eid, etitle in distinct_events.items()]
+    }
+

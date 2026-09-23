@@ -118,6 +118,21 @@ def dashboard():
     ).order_by(Notification.created_at.desc()).all()
     unread_capacity_alerts = [n for n in hod_notifications if not n.is_read and n.type == NotificationType.EVENT_CAPACITY_ALERT]
 
+    # Registered but Not Attended Students (Strictly Department Scoped)
+    from services.attendance_service import get_registered_not_attended_students
+    na_event_id = request.args.get('na_event_id', type=int)
+    na_date = request.args.get('na_date', '').strip()
+    na_search = request.args.get('na_search', '').strip()
+    not_attended_data = get_registered_not_attended_students(
+        hod_user=user,
+        event_id=na_event_id,
+        date_filter=na_date,
+        search=na_search
+    )
+    not_attended_students = not_attended_data['records']
+    all_not_attended_count = not_attended_data['total']
+    not_attended_events_list = not_attended_data['events_list']
+
     return render_template(
         'hod/dashboard.html',
         user=user,
@@ -137,7 +152,15 @@ def dashboard():
         total_events_count=total_events_count,
         announcements=announcements,
         hod_notifications=hod_notifications,
-        unread_capacity_alerts=unread_capacity_alerts
+        unread_capacity_alerts=unread_capacity_alerts,
+        not_attended_students=not_attended_students,
+        all_not_attended_count=all_not_attended_count,
+        not_attended_events_list=not_attended_events_list,
+        na_event_id=na_event_id,
+        na_filter_event_id=na_event_id,
+        na_date=na_date,
+        na_filter_date=na_date,
+        na_search=na_search
     )
 
 
@@ -635,6 +658,55 @@ def mark_notification_read(notification_id):
         'is_read': True,
         'unread_count': unread_count
     })
+
+
+# ==============================================================================
+# HOD ATTENDANCE & ABSENTEE REPORTING
+# ==============================================================================
+
+@hod_bp.route('/registered-not-attended', methods=['GET'])
+@hod_required
+def registered_not_attended_api():
+    """
+    Returns JSON list of students from the HOD's department who registered for
+    events that have started or completed, but have not attended.
+    Strictly scoped to the authenticated HOD's department.
+    """
+    user = get_current_user()
+    dept_obj = get_hod_department(user)
+    if not dept_obj:
+        return jsonify([]), 200
+
+    event_id = request.args.get('event_id', type=int)
+    date_val = request.args.get('date', '').strip()
+    search_val = request.args.get('q', '').strip() or request.args.get('search', '').strip()
+    page = request.args.get('page', default=1, type=int)
+    per_page = request.args.get('per_page', default=50, type=int)
+    format_envelope = request.args.get('format', '').strip().lower() == 'envelope' or request.args.get('envelope') == 'true'
+
+    from services.attendance_service import get_registered_not_attended_students
+    res = get_registered_not_attended_students(
+        hod_user=user,
+        event_id=event_id,
+        date_filter=date_val,
+        search=search_val,
+        page=page if page > 0 else 1,
+        per_page=per_page if per_page > 0 else 50
+    )
+
+    if format_envelope:
+        return jsonify({
+            'success': True,
+            'department': dept_obj.code,
+            'total': res['total'],
+            'page': res['page'],
+            'per_page': res['per_page'],
+            'total_pages': res['total_pages'],
+            'records': res['records']
+        })
+
+    return jsonify(res['records'])
+
 
 
 
