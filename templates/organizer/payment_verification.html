@@ -58,9 +58,9 @@
                         <th>Student & Roll No</th>
                         <th>Event & Fee</th>
                         <th>Entered Transaction ID</th>
-                        <th>OCR-Extracted ID</th>
-                        <th>Verification Match</th>
-                        <th>Status</th>
+                        <th>OCR Extracted & Match</th>
+                        <th>Fraud Detection</th>
+                        <th>Payment Status</th>
                         <th>Proof</th>
                         <th class="text-end">Actions</th>
                     </tr>
@@ -92,14 +92,13 @@
                         </td>
                         <td>
                             {% if p.is_razorpay %}
-                                <span class="badge bg-light text-primary border"><i class="bi bi-shield-check"></i> Gateway Direct</span>
+                                <span class="badge bg-light text-primary border mb-1"><i class="bi bi-shield-check"></i> Gateway Direct</span>
                             {% elif p.extracted_transaction_id %}
-                                <code class="text-success fw-bold fs-7">{{ p.extracted_transaction_id }}</code>
+                                <code class="text-success fw-bold fs-7 d-block mb-1">{{ p.extracted_transaction_id }}</code>
                             {% else %}
-                                <span class="badge bg-light text-muted border">Not detected</span>
+                                <span class="badge bg-light text-muted border mb-1">Not detected</span>
                             {% endif %}
-                        </td>
-                        <td>
+
                             {% if p.is_razorpay %}
                                 <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
                                     <i class="bi bi-patch-check-fill me-1"></i> Auto-Reconciled
@@ -121,8 +120,61 @@
                             {% if p.id in duplicate_payment_ids %}
                                 <div class="mt-1">
                                     <span class="badge bg-danger text-white px-2 py-1 shadow-sm" title="Warning: This Transaction ID was used by multiple students for this event!">
-                                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Duplicate Warning
+                                        <i class="bi bi-exclamation-triangle-fill me-1"></i> Duplicate
                                     </span>
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <!-- Fraud Status Badge (LOW RISK, SUSPICIOUS, MANUAL REVIEW, VERIFIED) -->
+                            {% if p.status in ('VERIFIED', 'APPROVED') %}
+                                <span class="badge bg-success text-white px-2 py-1">
+                                    <i class="bi bi-shield-check me-1"></i> VERIFIED
+                                </span>
+                            {% elif p.fraud_status == 'LOW_RISK' %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1">
+                                    <i class="bi bi-shield-check me-1"></i> LOW RISK
+                                </span>
+                            {% elif p.fraud_status == 'SUSPICIOUS' %}
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1">
+                                    <i class="bi bi-shield-slash-fill me-1"></i> SUSPICIOUS
+                                </span>
+                            {% elif p.fraud_status == 'MANUAL_REVIEW' %}
+                                <span class="badge bg-warning text-dark border px-2 py-1">
+                                    <i class="bi bi-shield-exclamation me-1"></i> MANUAL REVIEW
+                                </span>
+                            {% else %}
+                                <span class="badge bg-secondary-subtle text-secondary border px-2 py-1">
+                                    {{ p.display_fraud_status }}
+                                </span>
+                            {% endif %}
+
+                            <!-- Fraud Score -->
+                            <div class="small text-dark mt-1">
+                                <strong>Fraud Score:</strong> <span class="font-monospace fw-bold">{{ "%.1f"|format((p.fraud_score or 0.0) * 100) }}%</span>
+                            </div>
+
+                            <!-- Model Result -->
+                            <div class="small text-muted" title="{{ p.fraud_model or 'AI Model' }}">
+                                <strong>Model Result:</strong> <span class="badge bg-light text-dark border">{{ p.fraud_label or 'Analyzed' }}</span>
+                            </div>
+
+                            <!-- Checked Time -->
+                            <div class="text-muted" style="font-size: 0.72rem;">
+                                <i class="bi bi-clock me-1"></i> Checked: {{ p.fraud_checked_at.strftime('%d %b %I:%M %p') if p.fraud_checked_at else (p.submitted_at.strftime('%d %b %I:%M %p') if p.submitted_at else 'N/A') }}
+                            </div>
+
+                            {% if p.fraud_details %}
+                                <div class="mt-1">
+                                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" style="font-size:0.75rem;" data-bs-toggle="collapse" data-bs-target="#fraudDet{{ p.id }}">
+                                        <i class="bi bi-info-circle me-1"></i> View Signals
+                                    </button>
+                                    <div class="collapse mt-1" id="fraudDet{{ p.id }}">
+                                        <div class="p-2 bg-light rounded border text-start" style="font-size: 0.72rem; max-width: 200px;">
+                                            <div class="fw-bold text-dark mb-1">Model: <code>{{ p.fraud_model or 'N/A' }}</code></div>
+                                            <div class="text-muted">{{ p.fraud_details }}</div>
+                                        </div>
+                                    </div>
                                 </div>
                             {% endif %}
                         </td>
@@ -169,31 +221,6 @@
                                     <button type="button" class="btn btn-outline-danger btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#rejectModal{{ p.id }}" title="Reject proof and allow student re-upload">
                                         <i class="bi bi-x-lg me-1"></i> Reject
                                     </button>
-
-                                    <!-- Reject Modal -->
-                                    <div class="modal fade text-start" id="rejectModal{{ p.id }}" tabindex="-1" aria-hidden="true">
-                                        <div class="modal-dialog">
-                                            <div class="modal-content">
-                                                <form method="POST" action="{{ url_for('organizer.reject_student_payment', payment_id=p.id) }}">
-                                                    <div class="modal-header">
-                                                        <h5 class="modal-title fw-bold">Reject Payment Proof</h5>
-                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                                    </div>
-                                                    <div class="modal-body">
-                                                        <p class="small text-muted mb-3">Rejecting payment for <strong>{{ p.student.name if p.student else 'student' }}</strong> (Txn: <code>{{ p.transaction_id }}</code>). The student will be notified and will not receive a ticket.</p>
-                                                        <div class="mb-3">
-                                                            <label class="form-label small fw-bold">Rejection Reason *</label>
-                                                            <textarea name="rejection_reason" class="form-control" rows="3" placeholder="e.g. Payment amount does not match event fee or transaction ID invalid." required>{{ p.verification_reason or '' }}</textarea>
-                                                        </div>
-                                                    </div>
-                                                    <div class="modal-footer">
-                                                        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                                                        <button type="submit" class="btn btn-danger btn-sm fw-bold">Confirm Rejection</button>
-                                                    </div>
-                                                </form>
-                                            </div>
-                                        </div>
-                                    </div>
                                 {% endif %}
                             </div>
                         </td>
@@ -202,6 +229,35 @@
                 </tbody>
             </table>
         </div>
+
+        <!-- PAYMENT REJECTION MODALS (Rendered outside table to prevent stacking-context entrapment) -->
+        {% for p in payments %}
+            {% if p.status != 'REJECTED' %}
+                <div class="modal fade text-start" id="rejectModal{{ p.id }}" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog">
+                        <div class="modal-content">
+                            <form method="POST" action="{{ url_for('organizer.reject_student_payment', payment_id=p.id) }}">
+                                <div class="modal-header">
+                                    <h5 class="modal-title fw-bold">Reject Payment Proof</h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p class="small text-muted mb-3">Rejecting payment for <strong>{{ p.student.name if p.student else 'student' }}</strong> (Txn: <code>{{ p.transaction_id }}</code>). The student will be notified and will not receive a ticket.</p>
+                                    <div class="mb-3">
+                                        <label class="form-label small fw-bold">Rejection Reason *</label>
+                                        <textarea name="rejection_reason" class="form-control" rows="3" placeholder="e.g. Payment amount does not match event fee or transaction ID invalid." required>{{ p.verification_reason or '' }}</textarea>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                    <button type="submit" class="btn btn-danger btn-sm fw-bold">Confirm Rejection</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+        {% endfor %}
         {% else %}
         <div class="text-center py-5 text-muted">
             <i class="bi bi-shield-check fs-1 text-muted opacity-50 d-block mb-2"></i>

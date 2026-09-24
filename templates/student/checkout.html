@@ -251,9 +251,9 @@
                     </div>
                 </div>
 
-                <div class="text-center pt-4">
-                    <a href="{{ url_for('student.my_events') }}" class="small text-muted text-decoration-none">
-                        <i class="bi bi-arrow-left me-1"></i> Return to My Events
+                <div class="text-center pt-4 d-flex justify-content-center gap-3">
+                    <a href="{{ url_for('student.my_events') }}" class="btn btn-outline-secondary btn-sm fw-semibold px-3 py-2" id="cancelPaymentBtn">
+                        <i class="bi bi-x-circle me-1 text-danger"></i> Cancel Payment & Return
                     </a>
                 </div>
             </div>
@@ -367,6 +367,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     ondismiss: function() {
                         payBtn.disabled = false;
                         payBtn.innerHTML = originalHtml;
+                        document.body.style.overflow = '';
+                        document.body.classList.remove('modal-open');
+                        document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
                     }
                 }
             };

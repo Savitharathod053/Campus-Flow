@@ -61,6 +61,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // 7. Click-to-Copy for Passes and Certificates
     // ---------------------------------------------------------
     initCopyButtons();
+
+    // ---------------------------------------------------------
+    // 8. Modal Stacking & Scroll Architecture Guard
+    // ---------------------------------------------------------
+    initModalSanitizer();
 });
 
 
@@ -135,12 +140,16 @@ function initCardTilt() {
         let isHovered = false;
 
         card.addEventListener('mouseenter', () => {
+            if (document.body.classList.contains('modal-open')) return;
             isHovered = true;
             card.style.transition = 'transform 0.12s ease-out, box-shadow 0.2s ease, border-color 0.2s ease';
         });
 
         card.addEventListener('mousemove', (e) => {
-            if (!isHovered) return;
+            if (!isHovered || document.body.classList.contains('modal-open')) {
+                card.style.transform = '';
+                return;
+            }
             const rect = card.getBoundingClientRect();
             const x = e.clientX - rect.left;
             const y = e.clientY - rect.top;
@@ -300,6 +309,52 @@ function initCopyButtons() {
                 }, 2200);
             }).catch(() => {});
         });
+    });
+}
+
+
+/**
+ * Modal Architecture Guard:
+ * 1. Dynamically hoists all Bootstrap modals to document.body so they are NEVER trapped
+ *    within table cells (td), responsive wrappers, or transformed card containers.
+ * 2. Eliminates backdrop inversion where modal backdrops cover interactive modal buttons.
+ * 3. Prevents layout thrashing, hover shaking, and guarantees clean body scroll-lock recovery.
+ */
+function initModalSanitizer() {
+    const hoistModals = () => {
+        document.querySelectorAll('.modal').forEach(modal => {
+            if (modal.parentElement && modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
+        });
+    };
+
+    // Hoist on initial load
+    hoistModals();
+
+    // Re-verify modal placement whenever a modal begins opening
+    document.addEventListener('show.bs.modal', (e) => {
+        const modal = e.target;
+        if (modal && modal.parentElement !== document.body) {
+            document.body.appendChild(modal);
+        }
+        // Clear any residual card hover transforms that could induce jitter
+        document.querySelectorAll('.certificate-vault-card, .event-card, .tilt-card').forEach(el => {
+            el.style.transform = '';
+        });
+    });
+
+    // Cleanup on complete modal closure
+    document.addEventListener('hidden.bs.modal', () => {
+        setTimeout(() => {
+            const activeModals = document.querySelectorAll('.modal.show');
+            if (activeModals.length === 0) {
+                document.body.classList.remove('modal-open');
+                document.body.style.overflow = '';
+                document.body.style.paddingRight = '';
+                document.querySelectorAll('.modal-backdrop').forEach(bd => bd.remove());
+            }
+        }, 100);
     });
 }
 

@@ -59,7 +59,8 @@
                         <th>Student Details</th>
                         <th>Event</th>
                         <th>Amount</th>
-                        <th>Status</th>
+                        <th>AI Fraud Status</th>
+                        <th>Payment Status</th>
                         <th>Date & Time</th>
                         <th class="text-end pe-4">Receipt</th>
                     </tr>
@@ -96,6 +97,25 @@
                         </td>
                         <td>
                             {% if p.status in ['VERIFIED', 'SUCCESS', 'APPROVED'] %}
+                                <span class="badge bg-success text-white px-2 py-1"><i class="bi bi-shield-check me-1"></i> VERIFIED</span>
+                            {% elif p.fraud_status == 'LOW_RISK' %}
+                                <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="bi bi-shield-check me-1"></i> LOW RISK</span>
+                            {% elif p.fraud_status == 'SUSPICIOUS' %}
+                                <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-1"><i class="bi bi-shield-slash-fill me-1"></i> SUSPICIOUS</span>
+                            {% elif p.fraud_status == 'MANUAL_REVIEW' %}
+                                <span class="badge bg-warning text-dark border px-2 py-1"><i class="bi bi-shield-exclamation me-1"></i> MANUAL REVIEW</span>
+                            {% else %}
+                                <span class="badge {{ p.fraud_badge_class }} px-2 py-1">{{ p.display_fraud_status }}</span>
+                            {% endif %}
+                            {% if p.fraud_score is not none %}
+                                <div class="small text-muted font-monospace mt-1" style="font-size:0.72rem;">Score: {{ "%.1f"|format(p.fraud_score * 100) }}%</div>
+                            {% endif %}
+                            {% if p.fraud_label %}
+                                <div class="small text-muted" style="font-size:0.72rem;">{{ p.fraud_label }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if p.status in ['VERIFIED', 'SUCCESS', 'APPROVED'] %}
                                 <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1"><i class="bi bi-check-circle-fill me-1"></i> APPROVED</span>
                             {% elif p.status == 'TRANSACTION_ID_VERIFIED' %}
                                 <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1"><i class="bi bi-shield-check me-1"></i> TXN VERIFIED</span>
@@ -114,8 +134,8 @@
                             <div class="text-muted small" style="font-size: 0.75rem;">{{ p.created_at.strftime('%I:%M %p') if p.created_at else '' }}</div>
                         </td>
                         <td class="text-end pe-4">
-                            {% if p.screenshot_path %}
-                                <a href="{{ url_for('static', filename=p.screenshot_path) }}" target="_blank" class="btn btn-sm btn-outline-primary" title="View Payment Proof Screenshot">
+                            {% if p.payment_screenshot %}
+                                <a href="{{ url_for('payment.view_proof', payment_id=p.id) }}" target="_blank" class="btn btn-sm btn-outline-primary" title="View Payment Proof Screenshot">
                                     <i class="bi bi-image me-1"></i> Proof
                                 </a>
                             {% else %}
@@ -125,7 +145,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7" class="text-center py-5 text-muted">
+                        <td colspan="8" class="text-center py-5 text-muted">
                             <i class="bi bi-inbox fs-2 text-muted d-block mb-2"></i>
                             No payment transactions matching your filter criteria.
                         </td>

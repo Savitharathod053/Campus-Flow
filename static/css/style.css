@@ -486,8 +486,12 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .certificate-vault-card:hover {
-  transform: translateY(-6px) scale(1.015);
-  box-shadow: 0 20px 40px -8px rgba(15, 23, 42, 0.16) !important;
+  transform: translateY(-4px);
+  box-shadow: 0 16px 32px -6px rgba(15, 23, 42, 0.14) !important;
+}
+
+.certificate-vault-card .btn:hover {
+  transform: none !important;
 }
 
 .certificate-preview-frame {
@@ -983,9 +987,20 @@ h1, h2, h3, h4, h5, h6 {
   z-index: var(--ff-z-modal-backdrop) !important;
 }
 
+.modal:not(.show) {
+  pointer-events: none !important;
+  visibility: hidden;
+}
+
+.modal.show {
+  pointer-events: auto !important;
+  visibility: visible;
+}
+
 .modal-dialog {
   max-width: min(640px, calc(100vw - 1.5rem));
   margin: 1.5rem auto;
+  pointer-events: none;
 }
 
 .modal-dialog.modal-lg {
@@ -1001,12 +1016,35 @@ h1, h2, h3, h4, h5, h6 {
   border: 1px solid rgba(226, 232, 240, 0.9);
   box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.25);
   overflow: hidden;
+  pointer-events: auto;
 }
 
 .modal-body {
   max-height: calc(100vh - 12rem);
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
+}
+
+/* Modal and Button Anti-Jitter Guards */
+.modal .btn:hover,
+.modal-footer .btn:hover,
+.table .btn:hover {
+  transform: none !important;
+}
+
+/* Hover stabilization when modal is open */
+body.modal-open .certificate-vault-card,
+body.modal-open .event-card,
+body.modal-open .ff-card,
+body.modal-open .tilt-card,
+body.modal-open .btn {
+  transform: none !important;
+  transition: none !important;
+}
+
+body:not(.modal-open) .modal-backdrop {
+  display: none !important;
+  pointer-events: none !important;
 }
 
 /* Decimal Spacing Utility Fallbacks for Complete Robustness */
@@ -1060,7 +1098,8 @@ h1, h2, h3, h4, h5, h6 {
 
 .reveal-on-scroll.is-revealed {
   opacity: 1;
-  transform: translateY(0);
+  transform: none !important;
+  will-change: auto !important;
 }
 
 .reveal-delay-1 { transition-delay: 0.08s; }

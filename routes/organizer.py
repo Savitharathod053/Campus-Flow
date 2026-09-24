@@ -1339,6 +1339,7 @@ def verify_student_payment(payment_id):
         abort(403)
 
     payment.status = PaymentStatus.VERIFIED
+    payment.fraud_status = 'VERIFIED'
     payment.verified_at = datetime.utcnow()
     payment.verified_by_id = user.id
     notes = request.form.get('notes', '').strip()

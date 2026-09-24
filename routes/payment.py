@@ -96,6 +96,13 @@ def submit_proof(registration_id):
         flash('Invalid image format! Only PNG, JPG, JPEG, and WEBP files are allowed.', 'danger')
         return redirect(url_for('payment.checkout', registration_id=registration.id))
 
+    # MIME type check
+    content_type = getattr(file, 'content_type', '') or getattr(file, 'mimetype', '')
+    allowed_mimes = {'image/png', 'image/jpeg', 'image/jpg', 'image/pjpeg', 'image/webp'}
+    if content_type and content_type.lower() not in allowed_mimes:
+        flash('Invalid image MIME type! Only standard PNG, JPEG, and WEBP images are accepted.', 'danger')
+        return redirect(url_for('payment.checkout', registration_id=registration.id))
+
     # Check file size (10 MB limit)
     file.seek(0, os.SEEK_END)
     size_bytes = file.tell()
@@ -105,7 +112,7 @@ def submit_proof(registration_id):
         flash(f'File size exceeds {max_size // (1024 * 1024)}MB limit. Please upload a smaller image.', 'danger')
         return redirect(url_for('payment.checkout', registration_id=registration.id))
 
-    # 3. Run verification pipeline: duplicate check, OCR, amount match, fraud analysis
+    # 3. Run verification pipeline: duplicate check, OCR, amount match, AI vision fraud analysis
     payment, result = verify_payment_submission(
         registration=registration,
         entered_transaction_id=transaction_id,
@@ -146,11 +153,11 @@ def submit_proof(registration_id):
                     link=url_for('organizer.payment_verification', event_id=event_obj.id)
                 )
 
-            # 2. Notify Student
+            # 2. Notify Student (never expose internal fraud details)
             create_notification(
                 user_id=user.id,
                 title=f"Payment Proof Submitted: {event_obj.title}",
-                message=f"Your payment proof for '{event_obj.title}' was submitted. Status: {payment.status_label}. Ticket will be activated once verified.",
+                message=f"Your payment proof for '{event_obj.title}' has been submitted and is under verification. Ticket will be activated once verified.",
                 notification_type=NotificationType.SYSTEM,
                 link=url_for('student.my_events')
             )
@@ -160,12 +167,8 @@ def submit_proof(registration_id):
         except Exception as exc:
             current_app.logger.warning(f"Could not dispatch payment submission notifications: {exc}")
 
-        if status == PaymentStatus.TRANSACTION_ID_VERIFIED:
-            flash("Transaction ID verified! Your payment proof has been submitted and is awaiting organizer approval before your ticket is issued.", 'success')
-        elif status == PaymentStatus.MANUAL_REVIEW:
-            flash("Payment proof submitted! Your submission has been flagged for manual verification by the organizer.", 'warning')
-        else:
-            flash("Payment proof submitted successfully! Verification is pending organizer approval. Your ticket will be available once verified.", 'info')
+        # Requirement 7: Show student friendly "under verification" message without internal scores
+        flash("Your payment proof has been submitted and is under verification.", 'info')
         return redirect(url_for('student.my_events'))
     else:
         return redirect(url_for('student.my_events'))

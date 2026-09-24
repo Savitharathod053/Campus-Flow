@@ -10,6 +10,7 @@ from werkzeug.utils import secure_filename
 from flask import current_app
 
 from models import db, Payment, PaymentStatus, FraudRisk, EventRegistration, RegistrationStatus
+from fraud_detection import check_payment_image, FraudStatus
 
 try:
     import pytesseract
@@ -430,7 +431,12 @@ def verify_payment_submission(registration, entered_transaction_id, uploaded_fil
             fraud_risk=FraudRisk.HIGH,
             fraud_details=json.dumps([dup_reason]),
             ocr_data="{}",
-            verification_reason=dup_reason
+            verification_reason=dup_reason,
+            fraud_status=FraudStatus.SUSPICIOUS,
+            fraud_score=1.0,
+            fraud_label="DUPLICATE_PAYMENT",
+            fraud_model="DUPLICATE_RULE",
+            fraud_checked_at=datetime.utcnow()
         )
         return payment, {
             'status': PaymentStatus.REJECTED,
@@ -476,13 +482,38 @@ def verify_payment_submission(registration, entered_transaction_id, uploaded_fil
         current_registration_id=registration.id
     )
 
-    # 7. Fraud & Manipulation Detection
-    fraud_risk, fraud_indicators = analyze_image_fraud(str(file_path), ocr_text=ocr_raw_text, parsed_details=parsed)
+    # 7. AI Vision & Heuristic Fraud & Manipulation Detection
+    ai_fraud_result = check_payment_image(str(file_path))
+    heuristic_risk, heuristic_indicators = analyze_image_fraud(str(file_path), ocr_text=ocr_raw_text, parsed_details=parsed)
+
+    fraud_indicators = list(heuristic_indicators)
+    ai_status = ai_fraud_result.get('fraud_status', FraudStatus.LOW_RISK)
+    ai_conf = float(ai_fraud_result.get('confidence', 0.0))
+    ai_model = str(ai_fraud_result.get('model', 'HuggingFace'))
+    ai_label = str(ai_fraud_result.get('label', ''))
+    ai_reason = str(ai_fraud_result.get('reason', ''))
+
+    if ai_reason:
+        fraud_indicators.append(f"AI Model ({ai_model}): {ai_reason}")
+
+    # Determine composite fraud_status and fraud_risk
     if is_event_dup:
         fraud_risk = FraudRisk.HIGH
+        fraud_status = FraudStatus.SUSPICIOUS
         fraud_indicators.append(event_dup_reason)
+    elif ai_status == FraudStatus.SUSPICIOUS or heuristic_risk == FraudRisk.HIGH:
+        fraud_risk = FraudRisk.HIGH
+        fraud_status = FraudStatus.SUSPICIOUS
+    elif ai_status == FraudStatus.MANUAL_REVIEW or heuristic_risk == FraudRisk.MEDIUM:
+        fraud_risk = FraudRisk.MEDIUM
+        fraud_status = FraudStatus.MANUAL_REVIEW
+    else:
+        fraud_risk = FraudRisk.LOW
+        fraud_status = FraudStatus.LOW_RISK
 
     # 8. Calculate Final Payment Status according to Verification Rules:
+    # IMPORTANT: The system must NOT approve or reject a payment only because of the Hugging Face image model.
+    # The image model is only an advisory risk signal.
     if ocr_raw_text and not is_txn_match:
         # Mismatch detected by OCR
         final_status = PaymentStatus.PAYMENT_VERIFICATION_FAILED
@@ -493,21 +524,23 @@ def verify_payment_submission(registration, entered_transaction_id, uploaded_fil
         verif_reason = "; ".join(reasons)
     elif is_txn_match:
         # Manually entered Transaction ID matches Transaction ID in uploaded screenshot
-        final_status = PaymentStatus.TRANSACTION_ID_VERIFIED
         if is_event_dup:
+            final_status = PaymentStatus.MANUAL_REVIEW
             verif_reason = f"Transaction ID verified against screenshot, but {event_dup_reason} Flagged for organizer review."
-        elif fraud_risk in (FraudRisk.HIGH, FraudRisk.MEDIUM):
-            verif_reason = f"Transaction ID verified. Flagged for manual review due to {fraud_risk} risk indicators: {', '.join(fraud_indicators)}"
+        elif fraud_status in (FraudStatus.SUSPICIOUS, FraudStatus.MANUAL_REVIEW):
+            # Flag for manual review rather than rejecting
+            final_status = PaymentStatus.MANUAL_REVIEW
+            verif_reason = f"Transaction ID verified. Proof flagged for manual organizer review by AI Fraud Screening ({ai_model}): {ai_reason}"
         else:
+            final_status = PaymentStatus.TRANSACTION_ID_VERIFIED
             verif_reason = "Transaction ID verified successfully against payment screenshot. Awaiting organizer approval."
     else:
         # Fallback when OCR yields no text (e.g. Tesseract binary not present on local machine)
         if not _configure_tesseract():
-            if fraud_risk in (FraudRisk.HIGH, FraudRisk.MEDIUM):
-                final_status = PaymentStatus.MANUAL_REVIEW
-                verif_reason = f"Automated OCR engine is offline; flagged for manual review due to {fraud_risk} risk: {', '.join(fraud_indicators)}"
+            final_status = PaymentStatus.MANUAL_REVIEW
+            if fraud_status in (FraudStatus.SUSPICIOUS, FraudStatus.MANUAL_REVIEW):
+                verif_reason = f"Automated OCR engine is offline; flagged for manual review due to {fraud_status} risk: {ai_reason}"
             else:
-                final_status = PaymentStatus.PENDING
                 verif_reason = "Payment proof submitted. Automated OCR engine is offline; queued for manual organizer review."
         else:
             final_status = PaymentStatus.PAYMENT_VERIFICATION_FAILED
@@ -530,12 +563,21 @@ def verify_payment_submission(registration, entered_transaction_id, uploaded_fil
         fraud_risk=fraud_risk,
         fraud_details=json.dumps(fraud_indicators),
         ocr_data=json.dumps(parsed),
-        verification_reason=verif_reason
+        verification_reason=verif_reason,
+        fraud_status=fraud_status,
+        fraud_score=ai_conf,
+        fraud_label=ai_label,
+        fraud_model=ai_model,
+        fraud_checked_at=datetime.utcnow()
     )
 
     return payment, {
         'status': final_status,
         'fraud_risk': fraud_risk,
+        'fraud_status': fraud_status,
+        'fraud_score': ai_conf,
+        'fraud_label': ai_label,
+        'fraud_model': ai_model,
         'message': verif_reason,
         'reasons': reasons or fraud_indicators
     }
@@ -543,8 +585,9 @@ def verify_payment_submission(registration, entered_transaction_id, uploaded_fil
 
 def _upsert_payment_record(registration, event, student, expected_amount, detected_amount,
                            transaction_id, extracted_transaction_id, screenshot_path, screenshot_hash, status,
-                           fraud_risk, fraud_details, ocr_data, verification_reason):
-    """Helper to persist or update a Payment record."""
+                           fraud_risk, fraud_details, ocr_data, verification_reason,
+                           fraud_status=None, fraud_score=None, fraud_label=None, fraud_model=None, fraud_checked_at=None):
+    """Helper to persist or update a Payment record with AI fraud audit fields."""
     payment = Payment.query.filter_by(registration_id=registration.id).first()
     if not payment:
         payment = Payment(
@@ -566,6 +609,11 @@ def _upsert_payment_record(registration, event, student, expected_amount, detect
             fraud_details=fraud_details,
             ocr_extracted_data=ocr_data,
             verification_reason=verification_reason,
+            fraud_status=fraud_status,
+            fraud_score=fraud_score,
+            fraud_label=fraud_label,
+            fraud_model=fraud_model,
+            fraud_checked_at=fraud_checked_at or datetime.utcnow(),
             submitted_at=datetime.utcnow()
         )
         db.session.add(payment)
@@ -585,6 +633,16 @@ def _upsert_payment_record(registration, event, student, expected_amount, detect
         payment.fraud_details = fraud_details
         payment.ocr_extracted_data = ocr_data
         payment.verification_reason = verification_reason
+        if fraud_status is not None:
+            payment.fraud_status = fraud_status
+        if fraud_score is not None:
+            payment.fraud_score = fraud_score
+        if fraud_label is not None:
+            payment.fraud_label = fraud_label
+        if fraud_model is not None:
+            payment.fraud_model = fraud_model
+        if fraud_checked_at is not None:
+            payment.fraud_checked_at = fraud_checked_at
         payment.submitted_at = datetime.utcnow()
 
     db.session.commit()

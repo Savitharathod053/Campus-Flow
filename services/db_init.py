@@ -127,6 +127,11 @@ def sync_missing_columns():
             ('webhook_event_id', 'VARCHAR(100)', None, True),
             ('failure_reason', 'TEXT', None, True),
             ('razorpay_status', 'VARCHAR(50)', None, True),
+            ('fraud_status', 'VARCHAR(50)', "'LOW_RISK'", True),
+            ('fraud_score', 'FLOAT', None, True),
+            ('fraud_label', 'VARCHAR(100)', None, True),
+            ('fraud_model', 'VARCHAR(150)', None, True),
+            ('fraud_checked_at', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
         ],
         'events': [
             ('registration_start_date', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
