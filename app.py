@@ -57,10 +57,6 @@ def create_app(config_class=Config):
     app.register_blueprint(hod_bp)
     app.register_blueprint(dean_bp)
 
-    # Razorpay Webhook Global API Endpoint
-    from routes.payment import handle_razorpay_webhook
-    app.add_url_rule('/api/payments/webhook/razorpay', 'api_razorpay_webhook', handle_razorpay_webhook, methods=['POST'])
-
     # HOD Registered but Not Attended Global API Endpoint
     from routes.hod import registered_not_attended_api
     app.add_url_rule('/api/hod/registered-not-attended', 'api_hod_registered_not_attended', registered_not_attended_api, methods=['GET'])

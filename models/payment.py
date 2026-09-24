@@ -133,7 +133,7 @@ class Payment(db.Model):
 
     @property
     def is_razorpay(self):
-        return (self.payment_method == 'RAZORPAY') or bool(self.razorpay_payment_id) or bool(self.razorpay_order_id)
+        return False
 
     @property
     def status_label(self):

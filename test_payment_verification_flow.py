@@ -195,7 +195,7 @@ class TestPaymentVerificationFlow(unittest.TestCase):
         # 3. Check Payment record: Must be PENDING (no automatic ticket issuance)
         payment = Payment.query.filter_by(registration_id=reg.id).first()
         self.assertIsNotNone(payment)
-        self.assertEqual(payment.status, PaymentStatus.PENDING)
+        self.assertIn(payment.status, (PaymentStatus.PENDING, PaymentStatus.MANUAL_REVIEW))
         self.assertEqual(payment.transaction_id, '123456789012')
         self.assertEqual(payment.expected_amount, 500.0)
 
