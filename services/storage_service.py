@@ -52,15 +52,17 @@ def get_supabase_service_key() -> str:
     return val.strip()
 
 
-def get_storage_bucket() -> str:
-    """Returns Supabase storage bucket name (default 'campusflow')."""
+def get_storage_bucket(default: str = 'payment-proofs') -> str:
+    """Returns Supabase storage bucket name (configurable via SUPABASE_STORAGE_BUCKET, default 'payment-proofs')."""
     val = ''
     if current_app:
         val = current_app.config.get('SUPABASE_STORAGE_BUCKET', '')
     if not val:
-        val = os.environ.get('SUPABASE_STORAGE_BUCKET', 'campusflow')
+        val = os.environ.get('SUPABASE_STORAGE_BUCKET', '')
+    if not val:
+        val = default
     clean = val.strip().strip("'\"")
-    return clean or 'campusflow'
+    return clean or default
 
 
 def sanitize_storage_filename(filename: str, prefix: str = "") -> str:
@@ -68,7 +70,7 @@ def sanitize_storage_filename(filename: str, prefix: str = "") -> str:
     Safely sanitizes incoming filenames (especially WhatsApp screenshots like:
     'WhatsApp Image 2026-03-24 at 10.45.12 (1).jpeg').
     Removes spaces, parentheses, brackets, and invalid characters, converting to URL-safe alphanumeric slugs.
-    Appends a timestamp and unique token to prevent collisions.
+    Appends a timestamp and unique token to prevent collisions unless already sanitized.
     """
     if not filename:
         filename = "upload.bin"
@@ -89,6 +91,11 @@ def sanitize_storage_filename(filename: str, prefix: str = "") -> str:
     elif ext == '.pdf':
         ext = '.pdf'
 
+    # Check if already uniquely formatted with timestamp and token
+    if re.search(r'\d{10}_[0-9a-f]{8}_', base):
+        clean_name = re.sub(r'[^a-zA-Z0-9_\.\-]', '_', filename)
+        return clean_name
+
     # Clean base: replace all non-alphanumeric (except underscores and hyphens) with underscore
     clean_base = re.sub(r'[^a-zA-Z0-9_\-]', '_', base)
     clean_base = re.sub(r'_+', '_', clean_base).strip('_')
@@ -101,17 +108,18 @@ def sanitize_storage_filename(filename: str, prefix: str = "") -> str:
     return f"{pfx}{timestamp}_{random_token}_{clean_base[:40]}{ext}"
 
 
-def ensure_bucket_exists(bucket_name: str = None) -> bool:
+def check_bucket_exists(bucket_name: str = None) -> tuple[bool, str | None]:
     """
-    Ensures the specified Supabase storage bucket exists and is marked public.
-    Automatically creates it if it does not exist.
+    Checks if the specified Supabase storage bucket exists.
+    If missing, attempts to create it as a public bucket.
+    Returns (exists: bool, error_message: str | None).
     """
     if not is_cloud_storage_enabled():
-        return False
+        return True, None
 
     bucket = bucket_name or get_storage_bucket()
     if bucket in _BUCKET_VERIFIED:
-        return True
+        return True, None
 
     supabase_url = get_supabase_url()
     service_key = get_supabase_service_key()
@@ -130,10 +138,10 @@ def ensure_bucket_exists(bucket_name: str = None) -> bool:
         )
         if get_res.status_code == 200:
             _BUCKET_VERIFIED.add(bucket)
-            return True
+            return True, None
 
-        if get_res.status_code == 404:
-            # Create bucket with public access
+        if get_res.status_code == 404 or (get_res.status_code == 400 and 'NoSuchBucket' in get_res.text):
+            # Attempt to create bucket with public access
             post_res = requests.post(
                 f"{supabase_url}/storage/v1/bucket",
                 headers=headers,
@@ -147,19 +155,35 @@ def ensure_bucket_exists(bucket_name: str = None) -> bool:
             if post_res.status_code in (200, 201):
                 logger.info(f"[Supabase Storage] Successfully created public bucket '{bucket}'")
                 _BUCKET_VERIFIED.add(bucket)
-                return True
-            elif post_res.status_code in (400, 409):
-                # May already exist concurrently
+                return True, None
+            elif post_res.status_code in (400, 409) and ('already exists' in post_res.text.lower() or 'duplicate' in post_res.text.lower()):
                 _BUCKET_VERIFIED.add(bucket)
-                return True
+                return True, None
             else:
-                logger.error(f"[Supabase Storage] Failed to create bucket '{bucket}': {post_res.status_code} {post_res.text}")
-                return False
-    except Exception as exc:
-        logger.error(f"[Supabase Storage] Error verifying/creating bucket '{bucket}': {exc}")
-        return False
+                err_msg = f"Supabase Storage bucket '{bucket}' does not exist."
+                logger.error(f"[Payment Upload] {err_msg}")
+                return False, err_msg
 
-    return False
+        if get_res.status_code in (401, 403):
+            err_msg = f"Supabase Storage authentication failed (HTTP {get_res.status_code}). Please verify SUPABASE_SERVICE_ROLE_KEY."
+            logger.error(f"[Payment Upload] {err_msg}")
+            return False, err_msg
+
+        err_msg = f"Supabase Storage bucket '{bucket}' check failed (HTTP {get_res.status_code}): {get_res.text}"
+        logger.error(f"[Payment Upload] {err_msg}")
+        return False, err_msg
+    except Exception as exc:
+        err_msg = f"Supabase Storage connection error: {str(exc)}"
+        logger.exception(f"[Payment Upload] Cloud storage upload failed: {err_msg}")
+        return False, err_msg
+
+
+def ensure_bucket_exists(bucket_name: str = None) -> bool:
+    """
+    Ensures the specified Supabase storage bucket exists and is marked public.
+    """
+    exists, _ = check_bucket_exists(bucket_name)
+    return exists
 
 
 def upload_file(
@@ -167,7 +191,8 @@ def upload_file(
     folder: str = "organizer_qrs",
     filename: str = None,
     content_type: str = None,
-    prefix: str = ""
+    prefix: str = "",
+    bucket_name: str = None
 ) -> tuple[bool, str | None, str | None]:
     """
     Uploads a file to persistent storage:
@@ -176,10 +201,11 @@ def upload_file(
 
     Arguments:
     - file_data: bytes, file-like object, Werkzeug FileStorage, or local filesystem path (str/Path)
-    - folder: target directory ('organizer_qrs', 'payment_proofs', 'certificates', 'event_images')
+    - folder: target directory ('organizer_qrs', 'payment_proofs', 'event_1/student_2', etc.)
     - filename: original file name
     - content_type: MIME type (auto-detected if None)
     - prefix: optional prefix for sanitized file name
+    - bucket_name: optional bucket name (defaults to SUPABASE_STORAGE_BUCKET)
 
     Returns:
     - (success: bool, public_url: str | None, error_or_storage_path: str | None)
@@ -222,8 +248,12 @@ def upload_file(
 
     # 2. Upload to Supabase if configured
     if is_cloud_storage_enabled():
-        bucket = get_storage_bucket()
-        ensure_bucket_exists(bucket)
+        bucket = bucket_name or get_storage_bucket()
+        bucket_exists, bucket_err = check_bucket_exists(bucket)
+        if not bucket_exists:
+            err_msg = bucket_err or f"Supabase Storage bucket '{bucket}' does not exist."
+            logger.error(f"[Payment Upload] {err_msg}")
+            return False, None, err_msg
 
         storage_path = f"{clean_folder}/{sanitized_filename}"
         supabase_url = get_supabase_url()
@@ -249,23 +279,30 @@ def upload_file(
                 # Construct public Supabase Storage URL
                 encoded_path = "/".join(quote(p) for p in storage_path.split('/'))
                 public_url = f"{supabase_url}/storage/v1/object/public/{bucket}/{encoded_path}"
-                logger.info(f"[Supabase Storage] Successfully uploaded '{storage_path}' -> {public_url}")
+                logger.info(f"[Payment Upload] Successfully uploaded '{storage_path}' -> {public_url}")
                 return True, public_url, storage_path
+            elif resp.status_code == 404 or (resp.status_code == 400 and 'NoSuchBucket' in resp.text):
+                err_msg = f"Supabase Storage bucket '{bucket}' does not exist."
+                logger.error(f"[Payment Upload] {err_msg}")
+                return False, None, err_msg
+            elif resp.status_code in (401, 403):
+                err_msg = f"Supabase Storage authentication failed (HTTP {resp.status_code}). Please verify SUPABASE_SERVICE_ROLE_KEY."
+                logger.error(f"[Payment Upload] {err_msg}")
+                return False, None, err_msg
             else:
                 err_msg = f"Supabase Storage error {resp.status_code}: {resp.text}"
-                logger.error(f"[Supabase Storage] Upload failed for '{storage_path}': {err_msg}")
+                logger.error(f"[Payment Upload] Upload failed for '{storage_path}': {err_msg}")
                 return False, None, err_msg
         except Exception as exc:
             err_msg = f"Supabase Storage network error: {str(exc)}"
-            logger.error(f"[Supabase Storage] Exception during upload: {err_msg}")
+            logger.exception(f"[Payment Upload] Cloud storage upload failed: {err_msg}")
             return False, None, err_msg
 
     # 3. Fallback: Local Filesystem Storage (Local development workflow)
     if is_production_env():
-        logger.warning(
-            "[Storage] Running in PRODUCTION but SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are not configured! "
-            "Falling back to ephemeral local filesystem storage. Files will be lost upon restart!"
-        )
+        err_msg = "Cloud storage is not configured. Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY."
+        logger.error(f"[Payment Upload] Running in production but: {err_msg}")
+        return False, None, err_msg
 
     try:
         if current_app:
@@ -370,9 +407,13 @@ def get_media_url(file_identifier: str, default: str = None) -> str | None:
     if clean.startswith(('http://', 'https://')):
         return clean
 
-    # 2. Supabase storage path (e.g. 'organizer_qrs/filename.png')
+    # 2. Supabase storage path (e.g. 'organizer_qrs/filename.png', 'event_1/student_2/filename.jpg')
     known_folders = ('organizer_qrs', 'payment_proofs', 'certificates', 'event_images', 'posters', 'qrcodes')
-    is_cloud_path = any(clean.startswith(f"{f}/") for f in known_folders)
+    is_cloud_path = (
+        any(clean.startswith(f"{f}/") for f in known_folders) or
+        clean.startswith('event_') or
+        bool(re.match(r'^event_\d+/', clean))
+    )
 
     if is_cloud_path and is_cloud_storage_enabled():
         bucket = get_storage_bucket()

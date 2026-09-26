@@ -241,4 +241,22 @@
 </div>
 {% endblock %}
 
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('payment-proof-form');
+    const submitBtn = document.getElementById('submitProofBtn');
+    if (form && submitBtn) {
+        form.addEventListener('submit', function(e) {
+            if (!form.checkValidity()) {
+                return;
+            }
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Uploading Payment Proof...';
+        });
+    }
+});
+</script>
+{% endblock %}
+
 

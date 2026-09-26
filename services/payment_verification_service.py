@@ -3,11 +3,15 @@ import re
 import io
 import json
 import hashlib
+import logging
+import mimetypes
 from datetime import datetime
 from pathlib import Path
 from PIL import Image, ImageChops, ImageEnhance, ImageStat
 from werkzeug.utils import secure_filename
 from flask import current_app
+
+logger = logging.getLogger(__name__)
 
 from models import db, Payment, PaymentStatus, FraudRisk, EventRegistration, RegistrationStatus
 from fraud_detection import check_payment_image, FraudStatus
@@ -395,30 +399,54 @@ def verify_payment_submission(registration, entered_transaction_id, uploaded_fil
     expected_amount = float(event.registration_fee or 0.0)
 
     # 2. Secure File Ingestion & Persistent Storage
-    from services.storage_service import upload_file, sanitize_storage_filename
+    from services.storage_service import upload_file, sanitize_storage_filename, get_storage_bucket
 
     upload_dir = Path(current_app.config.get('PAYMENT_PROOF_FOLDER') or (Path(current_app.root_path) / 'static' / 'uploads' / 'payment_proofs'))
     upload_dir.mkdir(parents=True, exist_ok=True)
     
-    local_temp_name = sanitize_storage_filename(uploaded_file.filename, prefix=f"proof_{registration.id}")
-    file_path = upload_dir / local_temp_name
+    unique_filename = sanitize_storage_filename(uploaded_file.filename, prefix=f"proof_{registration.id}")
+    file_path = upload_dir / unique_filename
     uploaded_file.save(str(file_path))
 
     screenshot_hash = calculate_file_hash(str(file_path))
 
+    # Step 2: Diagnostic Logging before cloud upload
+    file_size_bytes = os.path.getsize(str(file_path)) if file_path.exists() else 0
+    content_type = getattr(uploaded_file, 'content_type', '') or getattr(uploaded_file, 'mimetype', '')
+    if not content_type:
+        guessed_type, _ = mimetypes.guess_type(uploaded_file.filename or '')
+        content_type = guessed_type or 'image/jpeg'
+
+    bucket_name = get_storage_bucket()
+    folder_path = f"event_{event.id}/student_{student.id}"
+    storage_path = f"{folder_path}/{unique_filename}"
+
+    logger.info("[Payment Upload] Request received")
+    logger.info(f"[Payment Upload] Filename: {uploaded_file.filename}")
+    logger.info(f"[Payment Upload] MIME type: {content_type}")
+    logger.info(f"[Payment Upload] File size: {file_size_bytes} bytes")
+    logger.info(f"[Payment Upload] Bucket: {bucket_name}")
+    logger.info(f"[Payment Upload] Storage path: {storage_path}")
+
     # Upload to persistent storage (Supabase in production, local fallback in dev)
     success, public_url, storage_err = upload_file(
         str(file_path),
-        folder='payment_proofs',
-        filename=uploaded_file.filename,
-        prefix=f"proof_{registration.id}"
+        folder=folder_path,
+        filename=unique_filename,
+        content_type=content_type,
+        bucket_name=bucket_name
     )
     if not success:
-        current_app.logger.error(f"Failed to upload payment proof to storage: {storage_err}")
+        logger.error(f"[Payment Upload] Cloud storage upload failed: {storage_err}")
+        if file_path.exists():
+            try:
+                file_path.unlink()
+            except Exception:
+                pass
         return None, {
             'status': PaymentStatus.REJECTED,
             'fraud_risk': FraudRisk.HIGH,
-            'message': 'Failed to save payment proof to cloud storage. Please try again.',
+            'message': f"Failed to save payment proof to cloud storage: {storage_err}",
             'reasons': [f"Storage error: {storage_err}"]
         }
 
