@@ -108,9 +108,19 @@ def generate_certificate_image(student_name, roll_number, department, event_titl
     draw.line([(width - 280, height - 170), (width - 100, height - 170)], fill=slate_dark, width=2)
     draw.text((width - 190, height - 145), "Dean / Principal", fill=slate_dark, font=font_sub, anchor="mm")
 
-    # Save
+    # Save locally
     filename = f"cert_{certificate_code}.png"
     file_path = upload_dir / filename
     img.save(file_path, "PNG", quality=95)
+
+    from services.storage_service import upload_file
+    success, public_url, storage_err = upload_file(
+        str(file_path),
+        folder="certificates",
+        filename=filename,
+        content_type="image/png"
+    )
+    if success and public_url:
+        return public_url
 
     return f"uploads/certificates/{filename}"

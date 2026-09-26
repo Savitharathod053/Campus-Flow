@@ -721,15 +721,22 @@ def download_certificate(cert_id):
     if cert.status not in (CertificateStatus.MATCHED, CertificateStatus.MANUALLY_ASSIGNED):
         abort(404)
 
-    full_path = Path(__file__).resolve().parent.parent / 'static' / cert.file_path
-    if not full_path.exists():
-        abort(404)
+    if cert.file_path and cert.file_path.startswith(('http://', 'https://')):
+        return redirect(cert.file_path)
 
-    return send_file(
-        str(full_path),
-        as_attachment=True,
-        download_name=cert.original_filename
-    )
+    full_path = Path(__file__).resolve().parent.parent / 'static' / cert.file_path.replace('static/', '').lstrip('/')
+    if full_path.exists() and full_path.is_file():
+        return send_file(
+            str(full_path),
+            as_attachment=True,
+            download_name=cert.original_filename
+        )
+
+    # Cloud fallback via file_url if available
+    if cert.file_url and cert.file_url.startswith(('http://', 'https://')):
+        return redirect(cert.file_url)
+
+    abort(404)
 
 
 @student_bp.route('/certificates/<int:cert_id>/preview')
@@ -744,13 +751,20 @@ def preview_certificate(cert_id):
     if cert.status not in (CertificateStatus.MATCHED, CertificateStatus.MANUALLY_ASSIGNED):
         abort(404)
 
-    full_path = Path(__file__).resolve().parent.parent / 'static' / cert.file_path
-    if not full_path.exists():
-        abort(404)
+    if cert.file_path and cert.file_path.startswith(('http://', 'https://')):
+        return redirect(cert.file_path)
 
-    mimetype = 'application/pdf' if cert.is_pdf else 'image/png'
-    return send_file(
-        str(full_path),
-        mimetype=mimetype,
-        as_attachment=False
-    )
+    full_path = Path(__file__).resolve().parent.parent / 'static' / cert.file_path.replace('static/', '').lstrip('/')
+    if full_path.exists() and full_path.is_file():
+        mimetype = 'application/pdf' if cert.is_pdf else 'image/png'
+        return send_file(
+            str(full_path),
+            mimetype=mimetype,
+            as_attachment=False
+        )
+
+    # Cloud fallback via file_url if available
+    if cert.file_url and cert.file_url.startswith(('http://', 'https://')):
+        return redirect(cert.file_url)
+
+    abort(404)

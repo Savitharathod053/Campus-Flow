@@ -84,7 +84,7 @@ class Event(db.Model):
     # Content & Media
     description = db.Column(db.Text, nullable=False)
     rules = db.Column(db.Text, nullable=True)
-    poster_image = db.Column(db.String(255), nullable=True)
+    poster_image = db.Column(db.String(500), nullable=True)
     venue = db.Column(db.String(150), nullable=False)
     
     # Timing
@@ -101,7 +101,7 @@ class Event(db.Model):
     # Organizer UPI & Direct Payment Configuration
     upi_id = db.Column(db.String(100), nullable=True)
     upi_number = db.Column(db.String(20), nullable=True)
-    upi_qr_image = db.Column(db.String(255), nullable=True)
+    upi_qr_image = db.Column(db.String(500), nullable=True)
     payment_instructions = db.Column(db.Text, nullable=True)
 
     # Multi-Session Attendance Configuration
@@ -437,6 +437,23 @@ class Event(db.Model):
         if self.is_full:
             return False
         return True
+
+    @property
+    def upi_qr_url(self):
+        """Returns browser-accessible URL for organizer UPI QR, or None if unavailable."""
+        from services.storage_service import get_media_url
+        return get_media_url(self.upi_qr_image)
+
+    @property
+    def is_upi_qr_available(self):
+        """Returns True if a UPI QR image is configured and currently accessible."""
+        return bool(self.upi_qr_url)
+
+    @property
+    def poster_url(self):
+        """Returns browser-accessible URL for event poster, or None if unavailable."""
+        from services.storage_service import get_media_url
+        return get_media_url(self.poster_image)
 
     @property
     def has_organizer_payment_info(self):

@@ -115,10 +115,14 @@
                         <div class="row g-3 mb-3">
                             <div class="col-md-6">
                                 <label class="form-label small fw-bold">Option A: UPI QR Code Image</label>
-                                {% if event.upi_qr_image %}
+                                {% if event.upi_qr_url %}
                                 <div class="mb-2">
-                                    <img src="{{ url_for('static', filename=event.upi_qr_image) }}" alt="Current QR" class="img-thumbnail" style="max-height: 100px;">
-                                    <span class="small text-muted ms-2">Current QR uploaded</span>
+                                    <img src="{{ event.upi_qr_url }}" alt="Current QR" class="img-thumbnail" style="max-height: 100px;">
+                                    <span class="small text-muted ms-2"><i class="bi bi-check-circle-fill text-success"></i> Current QR active</span>
+                                </div>
+                                {% elif event.upi_qr_image %}
+                                <div class="mb-2 text-warning small">
+                                    <i class="bi bi-exclamation-triangle"></i> Previous QR file unavailable. Please upload a new QR code below.
                                 </div>
                                 {% endif %}
                                 <input type="file" name="upi_qr" id="upi_qr" class="form-control" accept="image/*">

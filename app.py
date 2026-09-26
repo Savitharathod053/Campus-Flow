@@ -247,6 +247,18 @@ def create_app(config_class=Config):
         from services.timezone_service import to_ist_input_format
         return to_ist_input_format(value)
 
+    @app.template_filter('media_url')
+    def media_url_filter(value, default=None):
+        """Resolves file identifier (cloud URL, Supabase path, or local path) to accessible URL."""
+        from services.storage_service import get_media_url
+        return get_media_url(value, default=default)
+
+    app.jinja_env.globals['media_url'] = lambda val, default=None: get_media_url_global(val, default)
+
+    def get_media_url_global(value, default=None):
+        from services.storage_service import get_media_url
+        return get_media_url(value, default=default)
+
 
     # Error Handlers
     @app.errorhandler(400)

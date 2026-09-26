@@ -213,23 +213,47 @@ def create_event():
         upi_qr_path = None
         if 'upi_qr' in request.files:
             qr_file = request.files['upi_qr']
-            if qr_file and allowed_file(qr_file.filename):
-                qr_filename = secure_filename(f"upi_qr_{int(datetime.utcnow().timestamp())}_{qr_file.filename}")
-                qr_upload_dir = Path(__file__).resolve().parent.parent / 'static' / 'uploads' / 'organizer_qrs'
-                qr_upload_dir.mkdir(parents=True, exist_ok=True)
-                qr_file.save(qr_upload_dir / qr_filename)
-                upi_qr_path = f"uploads/organizer_qrs/{qr_filename}"
+            if qr_file and qr_file.filename and allowed_file(qr_file.filename):
+                from services.storage_service import upload_file
+                success, public_url, storage_err = upload_file(
+                    qr_file,
+                    folder='organizer_qrs',
+                    filename=qr_file.filename,
+                    prefix="upi_qr"
+                )
+                if not success:
+                    current_app.logger.error(f"Failed to upload organizer UPI QR: {storage_err}")
+                    flash(f"Failed to upload UPI QR image: {storage_err}. Please try again.", 'danger')
+                    return render_template(
+                        'organizer/create_event.html',
+                        user=user,
+                        event_types=EventType.CHOICES,
+                        departments=departments
+                    )
+                upi_qr_path = public_url
 
         # Handle poster upload
         poster_path = None
         if 'poster' in request.files:
             file = request.files['poster']
-            if file and allowed_file(file.filename):
-                filename = secure_filename(f"poster_{int(datetime.utcnow().timestamp())}_{file.filename}")
-                upload_dir = Path(__file__).resolve().parent.parent / 'static' / 'uploads' / 'posters'
-                upload_dir.mkdir(parents=True, exist_ok=True)
-                file.save(upload_dir / filename)
-                poster_path = f"uploads/posters/{filename}"
+            if file and file.filename and allowed_file(file.filename):
+                from services.storage_service import upload_file
+                success, public_url, storage_err = upload_file(
+                    file,
+                    folder='event_images',
+                    filename=file.filename,
+                    prefix="poster"
+                )
+                if not success:
+                    current_app.logger.error(f"Failed to upload event poster: {storage_err}")
+                    flash(f"Failed to upload poster image: {storage_err}. Please try again.", 'danger')
+                    return render_template(
+                        'organizer/create_event.html',
+                        user=user,
+                        event_types=EventType.CHOICES,
+                        departments=departments
+                    )
+                poster_path = public_url
 
         # MANDATORY: Create EventRequest with status PENDING_HOD_APPROVAL
         # The organizer must NEVER directly publish an event!
@@ -416,22 +440,44 @@ def edit_event(event_id):
 
         if 'upi_qr' in request.files:
             qr_file = request.files['upi_qr']
-            if qr_file and allowed_file(qr_file.filename):
-                qr_filename = secure_filename(f"upi_qr_{event.id}_{int(datetime.utcnow().timestamp())}_{qr_file.filename}")
-                qr_upload_dir = Path(__file__).resolve().parent.parent / 'static' / 'uploads' / 'organizer_qrs'
-                qr_upload_dir.mkdir(parents=True, exist_ok=True)
-                qr_file.save(qr_upload_dir / qr_filename)
-                event.upi_qr_image = f"uploads/organizer_qrs/{qr_filename}"
+            if qr_file and qr_file.filename and allowed_file(qr_file.filename):
+                from services.storage_service import upload_file, delete_file
+                success, public_url, storage_err = upload_file(
+                    qr_file,
+                    folder='organizer_qrs',
+                    filename=qr_file.filename,
+                    prefix=f"upi_qr_{event.id}"
+                )
+                if not success:
+                    current_app.logger.error(f"Failed to upload updated UPI QR for event #{event.id}: {storage_err}")
+                    flash(f"Failed to upload new UPI QR image: {storage_err}.", 'danger')
+                else:
+                    if event.upi_qr_image:
+                        delete_file(event.upi_qr_image)
+                    event.upi_qr_image = public_url
+                    if hasattr(event, 'creation_request') and event.creation_request:
+                        event.creation_request.upi_qr_image = public_url
 
         # Handle poster upload
         if 'poster' in request.files:
             file = request.files['poster']
-            if file and allowed_file(file.filename):
-                filename = secure_filename(f"poster_{event.id}_{int(datetime.utcnow().timestamp())}_{file.filename}")
-                upload_dir = Path(__file__).resolve().parent.parent / 'static' / 'uploads' / 'posters'
-                upload_dir.mkdir(parents=True, exist_ok=True)
-                file.save(upload_dir / filename)
-                event.poster_image = f"uploads/posters/{filename}"
+            if file and file.filename and allowed_file(file.filename):
+                from services.storage_service import upload_file, delete_file
+                success, public_url, storage_err = upload_file(
+                    file,
+                    folder='event_images',
+                    filename=file.filename,
+                    prefix=f"poster_{event.id}"
+                )
+                if not success:
+                    current_app.logger.error(f"Failed to upload updated poster for event #{event.id}: {storage_err}")
+                    flash(f"Failed to upload new poster image: {storage_err}.", 'danger')
+                else:
+                    if event.poster_image:
+                        delete_file(event.poster_image)
+                    event.poster_image = public_url
+                    if hasattr(event, 'creation_request') and event.creation_request:
+                        event.creation_request.poster_image = public_url
 
         # Sync associated EventRequest record if present
         if hasattr(event, 'creation_request') and event.creation_request:
@@ -444,6 +490,8 @@ def edit_event(event_id):
             req.end_time = event.end_time
             req.registration_start_date = event.registration_start_date
             req.registration_deadline = event.registration_deadline
+            req.upi_qr_image = event.upi_qr_image
+            req.poster_image = event.poster_image
             req.expected_participants = event.max_participants
             req.registration_fee = event.registration_fee
             req.is_free = event.is_free
@@ -1110,15 +1158,22 @@ def download_certificate(cert_id):
     if cert.event.organizer_id != user.id and not user.is_admin:
         abort(403)
 
-    full_path = Path(__file__).resolve().parent.parent / 'static' / cert.file_path
-    if not full_path.exists():
-        abort(404)
+    if cert.file_path and cert.file_path.startswith(('http://', 'https://')):
+        return redirect(cert.file_path)
 
-    return send_file(
-        str(full_path),
-        as_attachment=True,
-        download_name=cert.original_filename
-    )
+    full_path = Path(__file__).resolve().parent.parent / 'static' / cert.file_path.replace('static/', '').lstrip('/')
+    if full_path.exists() and full_path.is_file():
+        return send_file(
+            str(full_path),
+            as_attachment=True,
+            download_name=cert.original_filename
+        )
+
+    # Cloud fallback via file_url if available
+    if cert.file_url and cert.file_url.startswith(('http://', 'https://')):
+        return redirect(cert.file_url)
+
+    abort(404)
 
 
 @organizer_bp.route('/certificates/<int:cert_id>/preview')
@@ -1130,16 +1185,23 @@ def preview_certificate(cert_id):
     if cert.event.organizer_id != user.id and not user.is_admin:
         abort(403)
 
-    full_path = Path(__file__).resolve().parent.parent / 'static' / cert.file_path
-    if not full_path.exists():
-        abort(404)
+    if cert.file_path and cert.file_path.startswith(('http://', 'https://')):
+        return redirect(cert.file_path)
 
-    mimetype = 'application/pdf' if cert.is_pdf else 'image/png'
-    return send_file(
-        str(full_path),
-        mimetype=mimetype,
-        as_attachment=False
-    )
+    full_path = Path(__file__).resolve().parent.parent / 'static' / cert.file_path.replace('static/', '').lstrip('/')
+    if full_path.exists() and full_path.is_file():
+        mimetype = 'application/pdf' if cert.is_pdf else 'image/png'
+        return send_file(
+            str(full_path),
+            mimetype=mimetype,
+            as_attachment=False
+        )
+
+    # Cloud fallback via file_url if available
+    if cert.file_url and cert.file_url.startswith(('http://', 'https://')):
+        return redirect(cert.file_url)
+
+    abort(404)
 
 
 @organizer_bp.route('/events/<int:event_id>/start', methods=['POST'])

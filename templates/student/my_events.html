@@ -138,7 +138,7 @@
                                             </a>
                                         {% endif %}
                                         {% if reg.certificate %}
-                                            <a href="{{ url_for('static', filename=reg.certificate.certificate_image) }}" class="btn btn-outline-warning text-dark" download title="Download Certificate">
+                                            <a href="{{ reg.certificate.file_url }}" class="btn btn-outline-warning text-dark" download title="Download Certificate">
                                                 <i class="bi bi-award me-1"></i> Certificate
                                             </a>
                                         {% endif %}

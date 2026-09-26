@@ -113,9 +113,9 @@
                     <h5 class="fw-bold text-dark mb-0"><i class="bi bi-file-earmark-text text-primary me-2"></i> Event Specification</h5>
                 </div>
                 <div class="card-body p-4">
-                    {% if req.poster_image %}
+                    {% if req.poster_url %}
                         <div class="mb-4 text-center">
-                            <img src="{{ req.poster_image }}" alt="Poster" class="img-fluid rounded-3 border shadow-sm" style="max-height: 280px; object-fit: cover;">
+                            <img src="{{ req.poster_url }}" alt="Poster" class="img-fluid rounded-3 border shadow-sm" style="max-height: 280px; object-fit: cover;">
                         </div>
                     {% endif %}
 

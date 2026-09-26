@@ -45,6 +45,25 @@ class EventRegistration(db.Model):
         return None
 
     @property
+    def qr_code_url(self):
+        """Returns accessible URL for registration ticket QR, re-generating dynamically if missing."""
+        if not self.registration_code:
+            return None
+        from services.storage_service import get_media_url
+        url = get_media_url(self.qr_code_image)
+        if url:
+            return url
+        # If missing from ephemeral disk, regenerate dynamically on the fly
+        try:
+            from services.qr_service import generate_ticket_qr
+            rel_path = generate_ticket_qr(self.registration_code)
+            self.qr_code_image = rel_path
+            db.session.commit()
+            return get_media_url(rel_path)
+        except Exception:
+            return None
+
+    @property
     def is_confirmed(self):
         return self.status == RegistrationStatus.CONFIRMED
 

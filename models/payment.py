@@ -54,7 +54,7 @@ class Payment(db.Model):
     transaction_id = db.Column(db.String(100), nullable=True, index=True)
     extracted_transaction_id = db.Column(db.String(100), nullable=True)
     payment_method = db.Column(db.String(50), nullable=True)  # UPI_QR, UPI_NUMBER, UPI_ID, RAZORPAY, etc.
-    payment_screenshot = db.Column(db.String(255), nullable=True)
+    payment_screenshot = db.Column(db.String(500), nullable=True)
     screenshot_hash = db.Column(db.String(64), nullable=True, index=True)
 
     # Razorpay Transaction & Verification Fields
@@ -168,6 +168,12 @@ class Payment(db.Model):
         elif status == 'VERIFIED':
             return 'bg-success text-white'
         return 'bg-secondary-subtle text-secondary border'
+
+    @property
+    def proof_url(self):
+        """Returns browser-accessible URL for payment proof screenshot."""
+        from services.storage_service import get_media_url
+        return get_media_url(self.payment_screenshot)
 
     def __repr__(self):
         return f'<Payment {self.id} txn:{self.transaction_id} ({self.status}) - ₹{self.amount}>'

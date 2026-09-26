@@ -36,7 +36,7 @@ class Certificate(db.Model):
     roll_number = db.Column(db.String(50), nullable=True, index=True)
     extracted_name = db.Column(db.String(150), nullable=True)
     confidence_score = db.Column(db.Float, default=0.0, nullable=True)
-    file_path = db.Column(db.String(255), nullable=False)
+    file_path = db.Column(db.String(500), nullable=False)
     original_filename = db.Column(db.String(255), nullable=False)
     file_type = db.Column(db.String(20), default='pdf', nullable=False)  # 'pdf' or 'image'
     extracted_text = db.Column(db.Text, nullable=True)
@@ -86,6 +86,12 @@ class Certificate(db.Model):
     @property
     def is_pdf(self):
         return self.file_type.lower() == 'pdf' or self.file_path.lower().endswith('.pdf')
+
+    @property
+    def file_url(self):
+        """Returns browser-accessible URL for certificate file (cloud or local)."""
+        from services.storage_service import get_media_url
+        return get_media_url(self.file_path)
 
     @property
     def certificate_image(self):

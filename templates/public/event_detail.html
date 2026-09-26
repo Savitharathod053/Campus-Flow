@@ -209,14 +209,18 @@
                     <div class="small fw-bold text-primary mb-2">
                         <i class="bi bi-qr-code-scan me-1"></i> ORGANIZER PAYMENT DETAILS
                     </div>
-                    {% if event.upi_qr_image %}
+                    {% if event.upi_qr_url %}
                         <div class="p-2 border d-inline-block rounded-3 bg-white shadow-sm mb-2">
-                            <img src="{{ url_for('static', filename=event.upi_qr_image.replace('static/', '').lstrip('/')) }}" 
+                            <img src="{{ event.upi_qr_url }}" 
                                  alt="Organizer UPI QR Code" 
                                  class="img-fluid rounded" 
                                  style="max-width: 140px; max-height: 140px; object-fit: contain;">
                         </div>
                         <div class="small text-muted mb-2">Scan with GPay / PhonePe / Paytm</div>
+                    {% elif event.upi_qr_image %}
+                        <div class="alert alert-warning py-1 px-2 small mb-2">
+                            <i class="bi bi-exclamation-triangle me-1"></i> QR Code temporarily unavailable. Please pay using the UPI details below.
+                        </div>
                     {% endif %}
                     {% if event.upi_id %}
                         <div class="small text-muted">UPI ID: <code class="text-dark fw-bold">{{ event.upi_id }}</code></div>

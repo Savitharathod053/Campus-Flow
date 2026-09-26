@@ -195,21 +195,30 @@ def view_proof(payment_id):
     if not payment.payment_screenshot:
         abort(404)
 
-    full_path = Path(current_app.root_path) / 'static' / payment.payment_screenshot
-    if not full_path.exists():
-        # Check relative to base folder
-        full_path = Path(current_app.config.get('PAYMENT_PROOF_FOLDER', '')) / Path(payment.payment_screenshot).name
-        if not full_path.exists():
-            abort(404)
+    # 1. If stored in cloud storage (starts with http/https), redirect directly
+    if payment.payment_screenshot.startswith(('http://', 'https://')):
+        return redirect(payment.payment_screenshot)
 
-    ext = full_path.suffix.lower()
-    mimetype = 'image/png'
-    if ext in ('.jpg', '.jpeg'):
-        mimetype = 'image/jpeg'
-    elif ext == '.webp':
-        mimetype = 'image/webp'
+    # 2. Local filesystem check
+    clean_path = payment.payment_screenshot.replace('static/', '').lstrip('/')
+    full_path = Path(current_app.root_path) / 'static' / clean_path
+    if not full_path.exists() or not full_path.is_file():
+        full_path = Path(current_app.config.get('PAYMENT_PROOF_FOLDER', '')) / Path(clean_path).name
 
-    return send_file(str(full_path), mimetype=mimetype, as_attachment=False)
+    if full_path.exists() and full_path.is_file():
+        ext = full_path.suffix.lower()
+        mimetype = 'image/png'
+        if ext in ('.jpg', '.jpeg'):
+            mimetype = 'image/jpeg'
+        elif ext == '.webp':
+            mimetype = 'image/webp'
+        return send_file(str(full_path), mimetype=mimetype, as_attachment=False)
+
+    # 3. Cloud fallback via proof_url
+    if payment.proof_url and payment.proof_url.startswith(('http://', 'https://')):
+        return redirect(payment.proof_url)
+
+    abort(404)
 
 
 

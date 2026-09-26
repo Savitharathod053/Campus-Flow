@@ -6,12 +6,18 @@ from flask import current_app
 from models import db, Event, EventStatus, EventRegistration, Certificate, AttendanceRecord
 
 def _delete_file_safely(relative_path):
-    """Safely removes a file from static folder if it exists."""
+    """Safely removes a file from cloud storage and local static folder."""
     if not relative_path:
         return
     try:
+        from services.storage_service import delete_file
+        delete_file(relative_path)
+    except Exception:
+        pass
+    try:
+        clean_path = relative_path.replace('static/', '').lstrip('/')
         base_dir = Path(__file__).resolve().parent.parent / 'static'
-        file_path = base_dir / relative_path
+        file_path = base_dir / clean_path
         if file_path.exists() and file_path.is_file():
             file_path.unlink(missing_ok=True)
     except Exception:
@@ -33,12 +39,16 @@ def are_certificates_completed(event):
 
 def delete_event_with_cleanup(event):
     """
-    Deletes an event and all associated generated files (posters, QR codes, certificates),
+    Deletes an event and all associated generated files (posters, QR codes, certificates, UPI QR),
     relying on database cascade deletion for child models.
     """
     # 1. Clean up poster image
     if event.poster_image:
         _delete_file_safely(event.poster_image)
+
+    # 1b. Clean up organizer UPI QR
+    if event.upi_qr_image:
+        _delete_file_safely(event.upi_qr_image)
 
     # 2. Clean up registration QR codes
     for reg in event.registrations:

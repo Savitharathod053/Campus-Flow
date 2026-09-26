@@ -195,6 +195,16 @@ def approve_request(request_id):
         event.max_participants = req.expected_participants
         event.registration_fee = req.registration_fee or 0.0
         event.is_free = req.is_free
+        if req.upi_qr_image:
+            event.upi_qr_image = req.upi_qr_image
+        if req.poster_image:
+            event.poster_image = req.poster_image
+        if req.upi_id:
+            event.upi_id = req.upi_id
+        if req.upi_number:
+            event.upi_number = req.upi_number
+        if req.payment_instructions:
+            event.payment_instructions = req.payment_instructions
 
     # Set dual approval and published flags
     event.is_published = True

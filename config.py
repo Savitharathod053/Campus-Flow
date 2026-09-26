@@ -99,6 +99,11 @@ class Config:
     PAYMENT_PROOF_FOLDER = UPLOAD_FOLDER / 'payment_proofs'
     ORGANIZER_QR_FOLDER = UPLOAD_FOLDER / 'organizer_qrs'
     
+    # Persistent Cloud Storage (Supabase Storage)
+    SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip().rstrip('/')
+    SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
+    SUPABASE_STORAGE_BUCKET = os.environ.get('SUPABASE_STORAGE_BUCKET', 'campusflow').strip().strip("'\"")
+    
     MAX_CONTENT_LENGTH = 64 * 1024 * 1024  # 64 MB max upload for bulk certificates/ZIP
     
     # Certificate Module & OCR Settings

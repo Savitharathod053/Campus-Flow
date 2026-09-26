@@ -215,8 +215,8 @@
                             <td>{{ c.event.title if c.event else 'Unknown' }}</td>
                             <td><span class="badge bg-light text-dark border">{{ c.status }}</span></td>
                             <td class="text-end pe-4">
-                                {% if c.file_path %}
-                                    <a href="{{ url_for('static', filename=c.file_path) }}" target="_blank" class="btn btn-sm btn-outline-primary">
+                                {% if c.file_url %}
+                                    <a href="{{ c.file_url }}" target="_blank" class="btn btn-sm btn-outline-primary">
                                         <i class="bi bi-file-earmark-image"></i> View
                                     </a>
                                 {% endif %}

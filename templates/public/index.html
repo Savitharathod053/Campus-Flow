@@ -154,8 +154,8 @@
                     <div class="col-lg-4 col-md-6">
                         <div class="card ff-card ff-card-interactive event-card tilt-card">
                             <div class="event-poster-wrapper">
-                                {% if event.poster_image %}
-                                    <img src="{{ url_for('static', filename=event.poster_image) }}" alt="{{ event.title }}" class="event-poster-img">
+                                {% if event.poster_url %}
+                                    <img src="{{ event.poster_url }}" alt="{{ event.title }}" class="event-poster-img">
                                 {% else %}
                                     <div class="d-flex flex-column align-items-center justify-content-center h-100 text-white p-3 text-center">
                                         <i class="bi bi-calendar-event fs-1 mb-2 text-warning"></i>

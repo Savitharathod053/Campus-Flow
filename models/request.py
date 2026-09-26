@@ -115,7 +115,7 @@ class EventRequest(db.Model):
     registration_deadline = db.Column(db.DateTime, nullable=True)
     registration_fee = db.Column(db.Float, default=0.0, nullable=False)
     is_free = db.Column(db.Boolean, default=True, nullable=False)
-    poster_image = db.Column(db.String(255), nullable=True)
+    poster_image = db.Column(db.String(500), nullable=True)
     rules = db.Column(db.Text, nullable=True)
     contact_info = db.Column(db.String(200), nullable=True)
     faculty_coordinator = db.Column(db.String(150), nullable=True)
@@ -131,7 +131,7 @@ class EventRequest(db.Model):
     require_full_team = db.Column(db.Boolean, default=False, nullable=False)
     upi_id = db.Column(db.String(100), nullable=True)
     upi_number = db.Column(db.String(20), nullable=True)
-    upi_qr_image = db.Column(db.String(255), nullable=True)
+    upi_qr_image = db.Column(db.String(500), nullable=True)
     payment_instructions = db.Column(db.Text, nullable=True)
     enable_attendance = db.Column(db.Boolean, default=True, nullable=False)
     min_attendance_percentage = db.Column(db.Float, default=0.0, nullable=False)
@@ -190,6 +190,22 @@ class EventRequest(db.Model):
     @event_end_date.setter
     def event_end_date(self, value):
         self.end_time = value
+
+    @property
+    def upi_qr_url(self):
+        """Returns browser-accessible URL for organizer UPI QR, or None if unavailable."""
+        from services.storage_service import get_media_url
+        return get_media_url(self.upi_qr_image)
+
+    @property
+    def is_upi_qr_available(self):
+        return bool(self.upi_qr_url)
+
+    @property
+    def poster_url(self):
+        """Returns browser-accessible URL for event poster, or None if unavailable."""
+        from services.storage_service import get_media_url
+        return get_media_url(self.poster_image)
 
     @property
     def status_label(self):

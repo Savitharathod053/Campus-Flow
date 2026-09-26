@@ -65,10 +65,10 @@
                             <span class="badge bg-white text-primary fs-6">Fee: ₹{{ "%.2f"|format(event.registration_fee) }}</span>
                         </div>
                         <div class="card-body p-4 text-center">
-                            {% if event.upi_qr_image %}
+                            {% if event.upi_qr_url %}
                                 <div class="mb-3">
                                     <div class="p-2 border d-inline-block rounded-3 bg-white shadow-sm">
-                                        <img src="{{ url_for('static', filename=event.upi_qr_image.replace('static/', '').lstrip('/')) }}" 
+                                        <img src="{{ event.upi_qr_url }}" 
                                              alt="Organizer UPI QR Code" 
                                              class="img-fluid rounded" 
                                              style="max-width: 220px; max-height: 220px; object-fit: contain;">
@@ -76,6 +76,10 @@
                                     <p class="small text-muted mt-2 mb-0">
                                         <i class="bi bi-qr-code me-1"></i> Scan with Google Pay, PhonePe, Paytm, or BHIM to pay
                                     </p>
+                                </div>
+                            {% elif event.upi_qr_image %}
+                                <div class="alert alert-warning py-2 px-3 small text-center mb-3">
+                                    <i class="bi bi-exclamation-triangle me-1"></i> QR Code image is unavailable. Please use the UPI ID or Mobile Number below to complete payment.
                                 </div>
                             {% endif %}
 

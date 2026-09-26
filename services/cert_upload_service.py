@@ -114,8 +114,19 @@ def process_single_certificate_file(event, file_path, original_filename, registe
             student = None
             registration = None
 
-    # 4. Generate unique relative path for storage
-    relative_path = f"uploads/certificates/event_{event.id}/{Path(file_path).name}"
+    # 4. Upload to persistent storage (Supabase in production, local fallback in dev)
+    from services.storage_service import upload_file
+    success, public_url, storage_err = upload_file(
+        str(file_path),
+        folder=f"certificates/event_{event.id}",
+        filename=original_filename,
+        prefix=f"cert_{event.id}"
+    )
+    if success:
+        effective_file_path = public_url
+    else:
+        effective_file_path = f"uploads/certificates/event_{event.id}/{Path(file_path).name}"
+
     cert_code = Certificate.generate_certificate_code(event.id, student.id if student else None)
 
     cert = Certificate(
@@ -126,7 +137,7 @@ def process_single_certificate_file(event, file_path, original_filename, registe
         roll_number=extracted_roll,
         extracted_name=extracted_name,
         confidence_score=confidence_score,
-        file_path=relative_path,
+        file_path=effective_file_path,
         original_filename=original_filename,
         file_type=file_type,
         extracted_text=extracted_text[:4000] if extracted_text else "",
@@ -328,12 +339,18 @@ def manual_assign_certificate(cert_id, student_id, roll_number=None, assigned_by
 
 
 def _delete_cert_file(relative_path):
-    """Safely removes a certificate file from static uploads directory."""
+    """Safely removes a certificate file from cloud storage and local directory."""
     if not relative_path:
         return
     try:
+        from services.storage_service import delete_file
+        delete_file(relative_path)
+    except Exception:
+        pass
+    try:
+        clean_path = relative_path.replace('static/', '').lstrip('/')
         base_dir = Path(__file__).resolve().parent.parent / 'static'
-        target = base_dir / relative_path
+        target = base_dir / clean_path
         if target.exists() and target.is_file():
             target.unlink(missing_ok=True)
     except Exception:

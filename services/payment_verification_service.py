@@ -394,15 +394,35 @@ def verify_payment_submission(registration, entered_transaction_id, uploaded_fil
 
     expected_amount = float(event.registration_fee or 0.0)
 
-    # 2. Secure File Ingestion
-    filename = secure_filename(f"proof_{registration.id}_{int(datetime.utcnow().timestamp())}_{uploaded_file.filename}")
+    # 2. Secure File Ingestion & Persistent Storage
+    from services.storage_service import upload_file, sanitize_storage_filename
+
     upload_dir = Path(current_app.config.get('PAYMENT_PROOF_FOLDER') or (Path(current_app.root_path) / 'static' / 'uploads' / 'payment_proofs'))
     upload_dir.mkdir(parents=True, exist_ok=True)
-    file_path = upload_dir / filename
+    
+    local_temp_name = sanitize_storage_filename(uploaded_file.filename, prefix=f"proof_{registration.id}")
+    file_path = upload_dir / local_temp_name
     uploaded_file.save(str(file_path))
 
-    relative_storage_path = f"uploads/payment_proofs/{filename}"
     screenshot_hash = calculate_file_hash(str(file_path))
+
+    # Upload to persistent storage (Supabase in production, local fallback in dev)
+    success, public_url, storage_err = upload_file(
+        str(file_path),
+        folder='payment_proofs',
+        filename=uploaded_file.filename,
+        prefix=f"proof_{registration.id}"
+    )
+    if not success:
+        current_app.logger.error(f"Failed to upload payment proof to storage: {storage_err}")
+        return None, {
+            'status': PaymentStatus.REJECTED,
+            'fraud_risk': FraudRisk.HIGH,
+            'message': 'Failed to save payment proof to cloud storage. Please try again.',
+            'reasons': [f"Storage error: {storage_err}"]
+        }
+
+    relative_storage_path = public_url
 
     # 3. Check for Global Duplicate Payment / Screenshot
     clean_entered_txn = entered_transaction_id.strip() if entered_transaction_id else ""

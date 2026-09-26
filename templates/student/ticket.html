@@ -122,8 +122,8 @@
                 <!-- Right QR Code Column -->
                 <div class="col-sm-5 text-center">
                     <div class="ticket-qr-box mb-3">
-                        {% if registration.qr_code_image %}
-                            <img src="{{ url_for('static', filename=registration.qr_code_image) }}" alt="QR Code Ticket" class="img-fluid rounded" style="max-width: 175px;">
+                        {% if registration.qr_code_url %}
+                            <img src="{{ registration.qr_code_url }}" alt="QR Code Ticket" class="img-fluid rounded" style="max-width: 175px;">
                         {% endif %}
                     </div>
                     
