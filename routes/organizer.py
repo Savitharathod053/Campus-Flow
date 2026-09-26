@@ -449,6 +449,14 @@ def edit_event(event_id):
             req.is_free = event.is_free
 
         db.session.commit()
+
+        # Recalculate alert expiration time using updated event end time
+        try:
+            from services.capacity_notification_service import update_event_capacity_alert_expiration
+            update_event_capacity_alert_expiration(event)
+        except Exception as e:
+            current_app.logger.error(f"Error recalculating alert expiration for event #{event.id}: {e}")
+
         flash('Event updated successfully!', 'success')
         return redirect(url_for('organizer.manage_event', event_id=event.id))
 

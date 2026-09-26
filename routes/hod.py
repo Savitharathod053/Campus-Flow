@@ -113,8 +113,18 @@ def dashboard():
     ).order_by(Announcement.is_pinned.desc(), Announcement.created_at.desc()).limit(5).all()
 
     # In-App Notifications & Capacity Alerts
+    from services.capacity_notification_service import cleanup_expired_capacity_notifications
+    try:
+        cleanup_expired_capacity_notifications()
+    except Exception as cleanup_err:
+        current_app.logger.warning(f"Error during capacity alert cleanup on dashboard view: {cleanup_err}")
+
+    now_utc = datetime.utcnow()
     hod_notifications = Notification.query.filter_by(
-        user_id=user.id
+        user_id=user.id,
+        is_expired=False
+    ).filter(
+        (Notification.expires_at.is_(None)) | (Notification.expires_at > now_utc)
     ).order_by(Notification.created_at.desc()).all()
     unread_capacity_alerts = [n for n in hod_notifications if not n.is_read and n.type == NotificationType.EVENT_CAPACITY_ALERT]
 
@@ -616,10 +626,21 @@ def announcements():
 def get_notifications():
     """
     Returns the list of notifications for the authenticated HOD.
+    Automatically purges expired capacity alerts first.
     """
+    from services.capacity_notification_service import cleanup_expired_capacity_notifications
+    try:
+        cleanup_expired_capacity_notifications()
+    except Exception as cleanup_err:
+        pass
+
     user = get_current_user()
+    now_utc = datetime.utcnow()
     notifs = Notification.query.filter_by(
-        user_id=user.id
+        user_id=user.id,
+        is_expired=False
+    ).filter(
+        (Notification.expires_at.is_(None)) | (Notification.expires_at > now_utc)
     ).order_by(Notification.created_at.desc()).all()
 
     from services.timezone_service import format_ist_datetime
@@ -632,9 +653,27 @@ def get_notifications():
             'type': n.type,
             'link': n.link,
             'is_read': n.is_read,
+            'event_id': n.event_id,
+            'expires_at': format_ist_datetime(n.expires_at) if n.expires_at else None,
+            'expires_at_raw': n.expires_at.isoformat() if n.expires_at else None,
             'created_at': format_ist_datetime(n.created_at) if n.created_at else None,
             'created_at_raw': n.created_at.isoformat() if n.created_at else None
         } for n in notifs]
+    })
+
+
+@hod_bp.route('/notifications/cleanup-expired', methods=['POST'])
+@hod_required
+def cleanup_notifications_api():
+    """
+    Explicit endpoint for HOD frontend client to trigger background cleanup
+    of expired capacity alerts in real time.
+    """
+    from services.capacity_notification_service import cleanup_expired_capacity_notifications
+    removed_count = cleanup_expired_capacity_notifications()
+    return jsonify({
+        'success': True,
+        'removed_count': removed_count
     })
 
 

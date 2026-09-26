@@ -504,3 +504,19 @@ class CustomRegistrationField(db.Model):
 
     def __repr__(self):
         return f'<CustomField {self.field_name} ({self.field_type})>'
+
+
+from sqlalchemy import event as sa_event
+
+@sa_event.listens_for(Event.status, 'set')
+def on_event_status_set(target, value, oldvalue, initiator):
+    """
+    Automatically purges active empty-slot alerts when an event status is set to CANCELLED.
+    """
+    if value == EventStatus.CANCELLED and target.id:
+        try:
+            from services.capacity_notification_service import remove_event_capacity_alerts
+            remove_event_capacity_alerts(target.id)
+        except Exception:
+            pass
+

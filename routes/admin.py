@@ -1162,6 +1162,12 @@ def event_edit(event_id):
         event.is_free = request.form.get('is_free') == 'on'
         if event.is_free:
             event.registration_fee = 0.0
+        if event.status in (EventStatus.CANCELLED, EventStatus.COMPLETED, 'EVENT_COMPLETED'):
+            try:
+                from services.capacity_notification_service import remove_event_capacity_alerts
+                remove_event_capacity_alerts(event.id)
+            except Exception as e:
+                current_app.logger.error(f"Error removing capacity alerts on admin edit: {e}")
 
         db.session.commit()
 
@@ -1198,9 +1204,19 @@ def event_action(event_id):
         flash(f"Event '{event.title}' has been rejected.", 'warning')
     elif action == 'cancel':
         event.status = EventStatus.CANCELLED
+        try:
+            from services.capacity_notification_service import remove_event_capacity_alerts
+            remove_event_capacity_alerts(event.id)
+        except Exception as e:
+            current_app.logger.error(f"Error removing capacity alerts on cancel: {e}")
         flash(f"Event '{event.title}' cancelled.", 'danger')
     elif action == 'complete':
         event.status = EventStatus.EVENT_COMPLETED
+        try:
+            from services.capacity_notification_service import remove_event_capacity_alerts
+            remove_event_capacity_alerts(event.id)
+        except Exception as e:
+            current_app.logger.error(f"Error removing capacity alerts on complete: {e}")
         flash(f"Event '{event.title}' marked as completed.", 'info')
 
     db.session.commit()

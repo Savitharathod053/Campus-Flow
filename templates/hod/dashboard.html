@@ -38,18 +38,18 @@
 <div class="container pb-5">
     <!-- Event Capacity & Empty Slots Alerts Banner -->
     {% if unread_capacity_alerts and unread_capacity_alerts|length > 0 %}
-    <div class="card border-warning border-2 shadow-sm rounded-3 mb-4 overflow-hidden">
+    <div class="card border-warning border-2 shadow-sm rounded-3 mb-4 overflow-hidden" id="capacityAlertsBanner">
         <div class="card-header bg-warning text-dark py-3 px-4 d-flex justify-content-between align-items-center">
             <div class="d-flex align-items-center gap-2">
                 <span class="badge bg-dark text-warning fs-6 px-2 py-1"><i class="bi bi-bell-fill"></i></span>
-                <h5 class="fw-bold mb-0 text-dark">🔔 Event Capacity Alerts ({{ unread_capacity_alerts|length }} Active)</h5>
+                <h5 class="fw-bold mb-0 text-dark">🔔 Event Capacity Alerts (<span id="capacityAlertsActiveCount">{{ unread_capacity_alerts|length }}</span> Active)</h5>
             </div>
             <span class="badge bg-danger rounded-pill px-3 py-2 text-uppercase fw-bold" style="letter-spacing: 0.5px;">Action Recommended</span>
         </div>
         <div class="card-body p-3 bg-warning-subtle">
-            <div class="row g-3">
+            <div class="row g-3" id="capacityAlertsCardContainer">
                 {% for alert in unread_capacity_alerts %}
-                <div class="col-md-6 col-lg-4" id="alert-card-{{ alert.id }}">
+                <div class="col-md-6 col-lg-4 capacity-alert-card" id="alert-card-{{ alert.id }}" data-alert-id="{{ alert.id }}" data-expires-at="{{ alert.expires_at.isoformat() if alert.expires_at else '' }}">
                     <div class="p-3 bg-white rounded-3 border border-warning shadow-sm h-100 d-flex flex-column justify-content-between">
                         <div>
                             <div class="d-flex justify-content-between align-items-start mb-2">
@@ -182,7 +182,7 @@
                     <button class="nav-link {% if active_tab == 'capacity_alerts' %}active fw-bold text-primary{% else %}text-muted{% endif %}" id="capacity-alerts-tab" data-bs-toggle="tab" data-bs-target="#capacity-alerts" type="button" role="tab">
                         <i class="bi bi-bell-fill me-1 text-warning"></i> Empty Slots Alerts
                         {% if unread_capacity_alerts|length > 0 %}
-                            <span class="badge bg-danger ms-1">{{ unread_capacity_alerts|length }}</span>
+                            <span class="badge bg-danger ms-1" id="capacityAlertsTabBadge">{{ unread_capacity_alerts|length }}</span>
                         {% endif %}
                     </button>
                 </li>
@@ -631,68 +631,65 @@
                     </div>
 
                     {% set capacity_alerts = hod_notifications|selectattr('type', 'equalto', 'EVENT_CAPACITY_ALERT')|list %}
-                    {% if capacity_alerts and capacity_alerts|length > 0 %}
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle border mb-0">
-                                <thead class="table-light small text-uppercase">
-                                    <tr>
-                                        <th class="ps-3">Alert / Event</th>
-                                        <th>Details</th>
-                                        <th>Started Time (IST)</th>
-                                        <th>Status</th>
-                                        <th class="text-end pe-3">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for alert in capacity_alerts %}
-                                    <tr id="table-row-{{ alert.id }}" class="{% if not alert.is_read %}table-warning-subtle fw-semibold{% endif %}">
-                                        <td class="ps-3">
-                                            <div class="d-flex align-items-center gap-2">
-                                                <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
-                                                <div>
-                                                    <span class="text-dark">{{ alert.title }}</span>
-                                                </div>
+                    <div class="table-responsive {% if not capacity_alerts or capacity_alerts|length == 0 %}d-none{% endif %}" id="capacityAlertsTableContainer">
+                        <table class="table table-hover align-middle border mb-0">
+                            <thead class="table-light small text-uppercase">
+                                <tr>
+                                    <th class="ps-3">Alert / Event</th>
+                                    <th>Details</th>
+                                    <th>Started Time (IST)</th>
+                                    <th>Status</th>
+                                    <th class="text-end pe-3">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="capacityAlertsTableBody">
+                                {% for alert in capacity_alerts %}
+                                <tr id="table-row-{{ alert.id }}" class="capacity-alert-row {% if not alert.is_read %}table-warning-subtle fw-semibold{% endif %}" data-alert-id="{{ alert.id }}" data-expires-at="{{ alert.expires_at.isoformat() if alert.expires_at else '' }}">
+                                    <td class="ps-3">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <i class="bi bi-exclamation-triangle-fill text-warning fs-5"></i>
+                                            <div>
+                                                <span class="text-dark">{{ alert.title }}</span>
                                             </div>
-                                        </td>
-                                        <td>
-                                            <small class="text-secondary" style="white-space: pre-line;">{{ alert.message }}</small>
-                                        </td>
-                                        <td>
-                                            <small class="text-muted"><i class="bi bi-clock me-1 text-primary"></i>{{ alert.created_at|datetimeformat }} (IST)</small>
-                                        </td>
-                                        <td>
-                                            {% if alert.is_read %}
-                                                <span class="badge bg-light text-secondary border">Read</span>
-                                            {% else %}
-                                                <span class="badge bg-danger">Unread</span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <small class="text-secondary" style="white-space: pre-line;">{{ alert.message }}</small>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted"><i class="bi bi-clock me-1 text-primary"></i>{{ alert.created_at|datetimeformat }} (IST)</small>
+                                    </td>
+                                    <td>
+                                        {% if alert.is_read %}
+                                            <span class="badge bg-light text-secondary border">Read</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">Unread</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-3">
+                                        <div class="btn-group btn-group-sm">
+                                            {% if alert.link %}
+                                            <a href="{{ alert.link }}" class="btn btn-primary">
+                                                <i class="bi bi-eye me-1"></i> View Event
+                                            </a>
                                             {% endif %}
-                                        </td>
-                                        <td class="text-end pe-3">
-                                            <div class="btn-group btn-group-sm">
-                                                {% if alert.link %}
-                                                <a href="{{ alert.link }}" class="btn btn-primary">
-                                                    <i class="bi bi-eye me-1"></i> View Event
-                                                </a>
-                                                {% endif %}
-                                                {% if not alert.is_read %}
-                                                <button type="button" class="btn btn-outline-secondary" onclick="markNotificationRead({{ alert.id }}, this)">
-                                                    <i class="bi bi-check2"></i>
-                                                </button>
-                                                {% endif %}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    {% else %}
-                        <div class="text-center py-5 bg-light rounded-3 border">
-                            <i class="bi bi-check-circle text-success fs-1 mb-2 d-block"></i>
-                            <h6 class="fw-bold text-dark">No Empty Slots Alerts</h6>
-                            <p class="text-muted small mb-0">All department events have full attendance or have not reached start time.</p>
-                        </div>
-                    {% endif %}
+                                            {% if not alert.is_read %}
+                                            <button type="button" class="btn btn-outline-secondary" onclick="markNotificationRead({{ alert.id }}, this)">
+                                                <i class="bi bi-check2"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-center py-5 bg-light rounded-3 border {% if capacity_alerts and capacity_alerts|length > 0 %}d-none{% endif %}" id="noCapacityAlertsMessage">
+                        <i class="bi bi-check-circle text-success fs-1 mb-2 d-block"></i>
+                        <h6 class="fw-bold text-dark">No Empty Slots Alerts</h6>
+                        <p class="text-muted small mb-0">All department events have full attendance or have not reached start time.</p>
+                    </div>
                 </div>
 
                 <!-- TAB 7: REGISTERED BUT NOT ATTENDED -->
@@ -899,6 +896,134 @@
 {# Global markNotificationRead in static/js/app.js handles HOD cards, table rows, and navbar counters #}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // -------------------------------------------------------------
+    // Real-Time Capacity Alert Expiry Monitor (No Page Reload)
+    // -------------------------------------------------------------
+    function checkExpiredCapacityAlerts() {
+        const now = Date.now();
+        let removedAny = false;
+        const expiredIds = new Set();
+
+        // 1. Inspect all DOM elements with data-expires-at
+        const expiringElements = document.querySelectorAll('[data-expires-at]');
+        expiringElements.forEach(el => {
+            const rawExpiry = el.getAttribute('data-expires-at');
+            if (!rawExpiry) return;
+
+            // Normalize timestamp to UTC milliseconds
+            const isoString = (rawExpiry.endsWith('Z') || rawExpiry.includes('+')) ? rawExpiry : rawExpiry + 'Z';
+            const expiryTime = new Date(isoString).getTime();
+
+            if (!isNaN(expiryTime) && expiryTime <= now) {
+                const alertId = el.getAttribute('data-alert-id');
+                if (alertId) expiredIds.add(alertId);
+
+                // Smoothly fade out and remove from DOM
+                el.style.transition = 'opacity 0.35s ease, transform 0.35s ease';
+                el.style.opacity = '0';
+                el.style.transform = 'scale(0.95)';
+                setTimeout(() => {
+                    if (el.parentNode) el.remove();
+                    updateCapacityAlertsDOM();
+                }, 350);
+                removedAny = true;
+            }
+        });
+
+        // 2. Asynchronously notify backend to clean up expired alerts
+        if (expiredIds.size > 0) {
+            fetch('/hod/notifications/cleanup-expired', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
+            }).catch(function(err) {
+                console.debug('Background alert cleanup beacon:', err);
+            });
+        }
+    }
+
+    function updateCapacityAlertsDOM() {
+        // Banner UI Update
+        const banner = document.getElementById('capacityAlertsBanner');
+        const remainingCards = document.querySelectorAll('.capacity-alert-card');
+        const bannerCount = document.getElementById('capacityAlertsActiveCount');
+        const tabBadge = document.getElementById('capacityAlertsTabBadge');
+
+        if (bannerCount) bannerCount.textContent = remainingCards.length;
+        if (tabBadge) {
+            if (remainingCards.length > 0) {
+                tabBadge.textContent = remainingCards.length;
+            } else {
+                tabBadge.remove();
+            }
+        }
+
+        if (remainingCards.length === 0 && banner) {
+            banner.style.transition = 'opacity 0.4s ease';
+            banner.style.opacity = '0';
+            setTimeout(() => {
+                if (banner.parentNode) banner.remove();
+            }, 400);
+        }
+
+        // Tab 6 Table UI Update
+        const remainingRows = document.querySelectorAll('.capacity-alert-row');
+        const tableContainer = document.getElementById('capacityAlertsTableContainer');
+        const emptyMsg = document.getElementById('noCapacityAlertsMessage');
+
+        if (remainingRows.length === 0) {
+            if (tableContainer) tableContainer.classList.add('d-none');
+            if (emptyMsg) emptyMsg.classList.remove('d-none');
+        }
+    }
+
+    // Run check immediately on page load
+    checkExpiredCapacityAlerts();
+
+    // Check periodically every 3 seconds for expired alerts
+    const expiryInterval = setInterval(checkExpiredCapacityAlerts, 3000);
+
+    // Sync with backend every 15 seconds to reflect event edits/cancellations without full reload
+    const pollInterval = setInterval(function() {
+        fetch('/hod/notifications', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success && data.notifications) {
+                const activeAlertIds = new Set(
+                    data.notifications
+                        .filter(function(n) { return n.type === 'EVENT_CAPACITY_ALERT'; })
+                        .map(function(n) { return String(n.id); })
+                );
+
+                document.querySelectorAll('.capacity-alert-card').forEach(function(card) {
+                    const id = card.getAttribute('data-alert-id');
+                    if (id && !activeAlertIds.has(id)) {
+                        card.remove();
+                    }
+                });
+
+                document.querySelectorAll('.capacity-alert-row').forEach(function(row) {
+                    const id = row.getAttribute('data-alert-id');
+                    if (id && !activeAlertIds.has(id)) {
+                        row.remove();
+                    }
+                });
+
+                updateCapacityAlertsDOM();
+            }
+        })
+        .catch(function(err) {
+            console.debug('Capacity alert sync error:', err);
+        });
+    }, 15000);
+
+    // -------------------------------------------------------------
+    // Not Attended Table Filter
+    // -------------------------------------------------------------
     const searchInput = document.getElementById('naSearchInput');
     const eventSelect = document.getElementById('naEventSelect');
     const dateInput = document.getElementById('naDateInput');

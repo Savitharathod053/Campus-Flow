@@ -30,11 +30,17 @@ class Notification(db.Model):
     is_read = db.Column(db.Boolean, default=False, nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
 
+    # Event Capacity Alert Expiration & References
+    event_id = db.Column(db.Integer, db.ForeignKey('events.id', ondelete='CASCADE'), nullable=True, index=True)
+    expires_at = db.Column(db.DateTime, nullable=True, index=True)
+    is_expired = db.Column(db.Boolean, default=False, nullable=False, index=True)
+
     # Relationships
     user = db.relationship('User', backref=db.backref('notifications_received', lazy='dynamic', cascade='all, delete-orphan'))
+    event = db.relationship('Event', foreign_keys=[event_id], backref=db.backref('capacity_notifications', cascade='all, delete-orphan', lazy='dynamic'))
 
     def __repr__(self):
-        return f'<Notification {self.id} (User: {self.user_id}, Title: {self.title[:20]}, Read: {self.is_read})>'
+        return f'<Notification {self.id} (User: {self.user_id}, Title: {self.title[:20]}, Read: {self.is_read}, Expired: {self.is_expired})>'
 
 
 class EventNotificationLog(db.Model):

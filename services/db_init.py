@@ -214,6 +214,11 @@ def sync_missing_columns():
         ],
         'attendance_records': [
             ('session_id', 'INTEGER', None, True),
+        ],
+        'notifications': [
+            ('event_id', 'INTEGER', None, True),
+            ('expires_at', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
+            ('is_expired', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'FALSE' if 'postgres' in dialect else '0', False),
         ]
     }
 
