@@ -19,6 +19,9 @@ def is_production_env() -> bool:
     """Detects whether running in production (Railway, Render, or FLASK_ENV=production)."""
     return bool(
         os.environ.get('RAILWAY_ENVIRONMENT') or
+        os.environ.get('RAILWAY_ENVIRONMENT_NAME') or
+        os.environ.get('RAILWAY_PROJECT_ID') or
+        os.environ.get('RAILWAY_PUBLIC_DOMAIN') or
         os.environ.get('RAILWAY_STATIC_URL') or
         os.environ.get('RENDER') or 
         os.environ.get('FLASK_ENV', '').lower() == 'production' or
@@ -39,19 +42,41 @@ def get_supabase_url() -> str:
     """Returns normalized Supabase project base URL."""
     val = ''
     if current_app:
-        val = current_app.config.get('SUPABASE_URL', '')
+        val = (
+            current_app.config.get('SUPABASE_URL', '') or
+            current_app.config.get('SUPABASE_PROJECT_URL', '') or
+            current_app.config.get('NEXT_PUBLIC_SUPABASE_URL', '')
+        )
     if not val:
-        val = os.environ.get('SUPABASE_URL', '')
+        val = (
+            os.environ.get('SUPABASE_URL', '') or
+            os.environ.get('SUPABASE_PROJECT_URL', '') or
+            os.environ.get('NEXT_PUBLIC_SUPABASE_URL', '')
+        )
     return val.strip().rstrip('/')
 
 
 def get_supabase_service_key() -> str:
-    """Returns Supabase Service Role Key or API Key."""
+    """Returns Supabase Service Role Key, Secret Key, or API Key."""
     val = ''
     if current_app:
-        val = current_app.config.get('SUPABASE_SERVICE_ROLE_KEY', '') or current_app.config.get('SUPABASE_KEY', '')
+        val = (
+            current_app.config.get('SUPABASE_SERVICE_ROLE_KEY', '') or
+            current_app.config.get('SUPABASE_SERVICE_KEY', '') or
+            current_app.config.get('SUPABASE_SECRET_KEY', '') or
+            current_app.config.get('SUPABASE_KEY', '') or
+            current_app.config.get('SUPABASE_ANON_KEY', '') or
+            current_app.config.get('SUPABASE_PUBLISHABLE_KEY', '')
+        )
     if not val:
-        val = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '') or os.environ.get('SUPABASE_KEY', '')
+        val = (
+            os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '') or
+            os.environ.get('SUPABASE_SERVICE_KEY', '') or
+            os.environ.get('SUPABASE_SECRET_KEY', '') or
+            os.environ.get('SUPABASE_KEY', '') or
+            os.environ.get('SUPABASE_ANON_KEY', '') or
+            os.environ.get('SUPABASE_PUBLISHABLE_KEY', '')
+        )
     return val.strip()
 
 
@@ -253,59 +278,45 @@ def upload_file(
     if is_cloud_storage_enabled():
         bucket = bucket_name or get_storage_bucket()
         bucket_exists, bucket_err = check_bucket_exists(bucket)
-        if not bucket_exists:
-            err_msg = bucket_err or f"Supabase Storage bucket '{bucket}' does not exist."
-            logger.error(f"[Payment Upload] {err_msg}")
-            return False, None, err_msg
+        if bucket_exists:
+            storage_path = f"{clean_folder}/{sanitized_filename}"
+            supabase_url = get_supabase_url()
+            service_key = get_supabase_service_key()
 
-        storage_path = f"{clean_folder}/{sanitized_filename}"
-        supabase_url = get_supabase_url()
-        service_key = get_supabase_service_key()
+            upload_endpoint = f"{supabase_url}/storage/v1/object/{bucket}/{storage_path}"
+            headers = {
+                "Authorization": f"Bearer {service_key}",
+                "apikey": service_key,
+                "Content-Type": content_type,
+                "x-upsert": "true"
+            }
 
-        upload_endpoint = f"{supabase_url}/storage/v1/object/{bucket}/{storage_path}"
-        headers = {
-            "Authorization": f"Bearer {service_key}",
-            "apikey": service_key,
-            "Content-Type": content_type,
-            "x-upsert": "true"
-        }
+            try:
+                resp = requests.post(
+                    upload_endpoint,
+                    headers=headers,
+                    data=binary_content,
+                    timeout=30
+                )
 
-        try:
-            resp = requests.post(
-                upload_endpoint,
-                headers=headers,
-                data=binary_content,
-                timeout=30
-            )
+                if resp.status_code in (200, 201):
+                    encoded_path = "/".join(quote(p) for p in storage_path.split('/'))
+                    public_url = f"{supabase_url}/storage/v1/object/public/{bucket}/{encoded_path}"
+                    logger.info(f"[Storage] Successfully uploaded '{storage_path}' to Supabase -> {public_url}")
+                    return True, public_url, storage_path
+                else:
+                    logger.warning(f"[Storage] Supabase upload returned HTTP {resp.status_code}: {resp.text}. Falling back to local storage.")
+            except Exception as exc:
+                logger.warning(f"[Storage] Supabase connection error: {exc}. Falling back to local storage.")
+        else:
+            logger.warning(f"[Storage] Supabase bucket check failed ({bucket_err}). Falling back to local storage.")
 
-            if resp.status_code in (200, 201):
-                # Construct public Supabase Storage URL
-                encoded_path = "/".join(quote(p) for p in storage_path.split('/'))
-                public_url = f"{supabase_url}/storage/v1/object/public/{bucket}/{encoded_path}"
-                logger.info(f"[Payment Upload] Successfully uploaded '{storage_path}' -> {public_url}")
-                return True, public_url, storage_path
-            elif resp.status_code == 404 or (resp.status_code == 400 and 'NoSuchBucket' in resp.text):
-                err_msg = f"Supabase Storage bucket '{bucket}' does not exist."
-                logger.error(f"[Payment Upload] {err_msg}")
-                return False, None, err_msg
-            elif resp.status_code in (401, 403):
-                err_msg = f"Supabase Storage authentication failed (HTTP {resp.status_code}). Please verify SUPABASE_SERVICE_ROLE_KEY."
-                logger.error(f"[Payment Upload] {err_msg}")
-                return False, None, err_msg
-            else:
-                err_msg = f"Supabase Storage error {resp.status_code}: {resp.text}"
-                logger.error(f"[Payment Upload] Upload failed for '{storage_path}': {err_msg}")
-                return False, None, err_msg
-        except Exception as exc:
-            err_msg = f"Supabase Storage network error: {str(exc)}"
-            logger.exception(f"[Payment Upload] Cloud storage upload failed: {err_msg}")
-            return False, None, err_msg
-
-    # 3. Fallback: Local Filesystem Storage (Local development workflow)
+    # 3. Fallback: Local Filesystem Storage (Guarantees uploads never block the user)
     if is_production_env():
-        err_msg = "Cloud storage is not configured. Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY."
-        logger.error(f"[Payment Upload] Running in production but: {err_msg}")
-        return False, None, err_msg
+        logger.warning(
+            "[Storage] Cloud storage not active. Falling back to container local storage. "
+            "To use persistent cloud storage, configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+        )
 
     try:
         if current_app:

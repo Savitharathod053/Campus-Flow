@@ -17,6 +17,10 @@
   ],
   "rewrites": [
     {
+      "source": "/static/uploads/:path*",
+      "destination": "https://web-production-b67d9.up.railway.app/static/uploads/:path*"
+    },
+    {
       "source": "/static/:path*",
       "destination": "/static/:path*"
     },
