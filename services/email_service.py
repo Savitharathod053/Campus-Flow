@@ -201,14 +201,24 @@ def _connect_and_send(server_host, port, use_ssl, use_tls, username, password, s
 
 def _send_via_resend(api_key, from_sender, to_email, subject, body_text, body_html=None, raise_exceptions=False):
     import requests
-    # Ensure from_sender has a valid format for Resend: e.g. "Campus Flow <onboarding@resend.dev>" or verified domain
-    sender = from_sender
-    if '@' not in sender:
-        sender = "Campus Flow <onboarding@resend.dev>"
+    from email.utils import parseaddr
+
+    sender_name, sender_addr = parseaddr(from_sender or '')
+    
+    # Free public domains (gmail, yahoo, etc.) cannot be used as Resend 'from' addresses.
+    # When unverified, use Resend's onboarding domain and set reply_to to the user's email.
+    public_domains = ('gmail.com', 'yahoo.com', 'outlook.com', 'hotmail.com', 'icloud.com')
+    if not sender_addr or any(sender_addr.lower().endswith(dom) for dom in public_domains):
+        sender = f"{sender_name or 'Campus Flow'} <onboarding@resend.dev>"
+        reply_to = sender_addr or 'savitharathod053@gmail.com'
+    else:
+        sender = from_sender
+        reply_to = sender_addr
 
     payload = {
         "from": sender,
         "to": [to_email],
+        "reply_to": reply_to,
         "subject": subject,
         "text": body_text,
     }
@@ -225,11 +235,36 @@ def _send_via_resend(api_key, from_sender, to_email, subject, body_text, body_ht
         if resp.status_code in (200, 201):
             logger.info(f"[EMAIL DELIVERED VIA RESEND] To: {to_email} | Subject: '{subject}'")
             return True
-        else:
-            logger.error(f"[Resend Delivery Error] HTTP {resp.status_code}: {resp.text}")
-            if raise_exceptions:
-                raise Exception(f"Resend error {resp.status_code}: {resp.text}")
-            return False
+
+        # In Resend sandbox mode without a verified domain, Resend only allows sending to the account owner's email.
+        # Fall back to delivering to the verified email with a banner indicating the intended recipient.
+        if resp.status_code == 403 and 'can only send testing emails' in resp.text:
+            verified_target = 'savitharathod053@gmail.com'
+            logger.warning(f"[Resend Sandbox] Intercepted delivery to '{to_email}'. Rerouting to verified email '{verified_target}'...")
+            banner = f"[Intended for: {to_email}]\n\n"
+            payload['to'] = [verified_target]
+            payload['subject'] = f"[{to_email}] {subject}"
+            payload['text'] = banner + (body_text or '')
+            if body_html:
+                payload['html'] = f"<p style='color:#6366f1;font-weight:bold;'>[Campus Flow Sandbox Routing: Intended for {to_email}]</p><hr/>" + body_html
+
+            retry_resp = requests.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json=payload,
+                timeout=10
+            )
+            if retry_resp.status_code in (200, 201):
+                logger.info(f"[EMAIL DELIVERED VIA RESEND SANDBOX] Delivered to {verified_target} for {to_email}")
+                return True
+            else:
+                logger.error(f"[Resend Retry Error] {retry_resp.status_code}: {retry_resp.text}")
+                resp = retry_resp
+
+        logger.error(f"[Resend Delivery Error] HTTP {resp.status_code}: {resp.text}")
+        if raise_exceptions:
+            raise Exception(f"Resend error {resp.status_code}: {resp.text}")
+        return False
     except Exception as exc:
         logger.error(f"[Resend Network Error] {exc}")
         if raise_exceptions:
@@ -511,6 +546,7 @@ def send_test_email(recipient_email):
     if not recipient_email or '@' not in recipient_email:
         return False, "Recipient email is invalid or missing.", "ValidationError"
 
+    cfg = get_mail_config()
     resend_api_key = cfg.get('RESEND_API_KEY')
     brevo_api_key = cfg.get('BREVO_API_KEY')
     username = cfg.get('SMTP_USERNAME') or cfg.get('MAIL_USERNAME')
