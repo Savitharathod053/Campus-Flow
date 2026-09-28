@@ -113,8 +113,20 @@ def get_mail_config():
 
     live_recipient = str(get_val('MAIL_LIVE_TEST_RECIPIENT', 'MAIL_LIVE_TEST_RECIPIENT', username or 'savitharathod053@gmail.com')).strip().strip("'\"")
 
-    resend_api_key = str(get_val('RESEND_API_KEY', 'RESEND_KEY', '')).strip().strip("'\"")
-    brevo_api_key = str(get_val('BREVO_API_KEY', 'SENDINBLUE_API_KEY', '')).strip().strip("'\"")
+    resend_api_key = str(
+        app_cfg.get('RESEND_API_KEY') or
+        os.environ.get('RESEND_API_KEY') or
+        os.environ.get('RESEND_KEY') or
+        os.environ.get('RESEND_TOKEN') or
+        os.environ.get('RESEND') or
+        ''
+    ).strip().strip("'\"")
+    brevo_api_key = str(
+        app_cfg.get('BREVO_API_KEY') or
+        os.environ.get('BREVO_API_KEY') or
+        os.environ.get('SENDINBLUE_API_KEY') or
+        ''
+    ).strip().strip("'\"")
 
     # Populate both sets of keys in config dictionary for 100% interoperability
     config['RESEND_API_KEY'] = resend_api_key

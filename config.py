@@ -150,7 +150,10 @@ class Config:
     SESSION_COOKIE_SAMESITE = 'None' if (_is_production and SESSION_COOKIE_SECURE) else 'Lax'
     PERMANENT_SESSION_LIFETIME = 86400 * 7  # 7 days
 
-    # Email / SMTP Configuration (Supports both SMTP_* and MAIL_* variable conventions)
+    # Email / SMTP & HTTPS API Configuration
+    RESEND_API_KEY = (os.environ.get('RESEND_API_KEY') or os.environ.get('RESEND_KEY') or os.environ.get('RESEND_TOKEN') or os.environ.get('RESEND') or '').strip().strip("'\"")
+    BREVO_API_KEY = (os.environ.get('BREVO_API_KEY') or os.environ.get('SENDINBLUE_API_KEY') or '').strip().strip("'\"")
+
     SMTP_HOST = (os.environ.get('SMTP_HOST') or os.environ.get('MAIL_SERVER') or 'smtp.gmail.com').strip().strip("'\"")
     try:
         SMTP_PORT = int(str(os.environ.get('SMTP_PORT') or os.environ.get('MAIL_PORT') or '587').strip().strip("'\""))
