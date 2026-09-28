@@ -253,67 +253,15 @@ try {
         } catch (e) {}
     }
 
-    const targetBackend = backendUrl || 'https://campus-flow-backend.up.railway.app';
+    const targetBackend = backendUrl || 'https://web-production-b67d9.up.railway.app';
     vercelConfig.rewrites = [
         {
             source: '/static/:path*',
             destination: '/static/:path*'
         },
         {
-            source: '/api/:path*',
-            destination: `${targetBackend}/api/:path*`
-        },
-        {
-            source: '/login',
-            destination: `${targetBackend}/login`
-        },
-        {
-            source: '/register',
-            destination: `${targetBackend}/register`
-        },
-        {
-            source: '/logout',
-            destination: `${targetBackend}/logout`
-        },
-        {
-            source: '/events/:path*',
-            destination: `${targetBackend}/events/:path*`
-        },
-        {
-            source: '/student/:path*',
-            destination: `${targetBackend}/student/:path*`
-        },
-        {
-            source: '/organizer/:path*',
-            destination: `${targetBackend}/organizer/:path*`
-        },
-        {
-            source: '/admin/:path*',
-            destination: `${targetBackend}/admin/:path*`
-        },
-        {
-            source: '/payment/:path*',
-            destination: `${targetBackend}/payment/:path*`
-        },
-        {
-            source: '/certificates/:path*',
-            destination: `${targetBackend}/certificates/:path*`
-        },
-        {
-            source: '/faculty/:path*',
-            destination: `${targetBackend}/faculty/:path*`
-        },
-        {
-            source: '/hod/:path*',
-            destination: `${targetBackend}/hod/:path*`
-        },
-        {
-            source: '/dean/:path*',
-            destination: `${targetBackend}/dean/:path*`
-        },
-        {
-            source: '/health',
-            destination: `${targetBackend}/health`
+            source: '/:path*',
+            destination: `${targetBackend}/:path*`
         }
     ];
 
