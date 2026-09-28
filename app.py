@@ -18,13 +18,30 @@ def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
 
-    # Reverse proxy support for Render / Cloudflare (ensures correct HTTPS redirects and secure cookies)
+    # Reverse proxy support for Railway / Render / Cloudflare (ensures correct HTTPS redirects and secure cookies)
     app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1, x_prefix=1)
 
-    # Enable Cross-Origin Resource Sharing with credentials support if available
+    # Enable Cross-Origin Resource Sharing with credentials support for Vercel and local development
     try:
         from flask_cors import CORS
-        CORS(app, supports_credentials=True)
+        frontend_url = app.config.get('FRONTEND_URL', '')
+        allowed_origins = [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://localhost:5173",
+            "http://127.0.0.1:5173",
+            "http://localhost:5000",
+            "http://127.0.0.1:5000",
+        ]
+        if frontend_url:
+            for origin in frontend_url.split(','):
+                cleaned_origin = origin.strip().rstrip('/')
+                if cleaned_origin and cleaned_origin not in allowed_origins:
+                    allowed_origins.append(cleaned_origin)
+
+        # Allow Vercel preview deployments pattern
+        allowed_origins.append(r"https://.*\.vercel\.app")
+        CORS(app, origins=allowed_origins, supports_credentials=True)
     except ImportError:
         pass
 
@@ -135,7 +152,7 @@ def create_app(config_class=Config):
     # Health Check Endpoints
     @app.route('/health')
     def health():
-        return jsonify({"status": "healthy"}), 200
+        return jsonify({"status": "ok"}), 200
 
     @app.route('/health/db')
     def health_db():
@@ -366,6 +383,6 @@ app = create_app()
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    host = '0.0.0.0' if (os.environ.get('PORT') or os.environ.get('RENDER') or os.environ.get('FLASK_ENV') == 'production') else '127.0.0.1'
+    host = '0.0.0.0' if (os.environ.get('PORT') or os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RENDER') or os.environ.get('FLASK_ENV') == 'production') else '127.0.0.1'
     app.run(host=host, port=port, debug=False)
 

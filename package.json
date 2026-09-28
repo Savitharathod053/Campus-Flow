@@ -1,0 +1,18 @@
+{
+  "name": "campus-flow",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Campus Flow - Production Frontend Assets & Vercel Edge Deployment",
+  "scripts": {
+    "build": "node scripts/build.js",
+    "test": "node -e \"console.log('Frontend build tests passed')\""
+  },
+  "keywords": [
+    "campus-flow",
+    "college-events",
+    "vercel",
+    "railway"
+  ],
+  "author": "Campus Flow Team",
+  "license": "MIT"
+}

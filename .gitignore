@@ -29,6 +29,14 @@ requirements-full-backup.txt
 static/uploads/*/*
 !static/uploads/*/.gitkeep
 
+# Node / Frontend Build
+node_modules/
+dist/
+.vercel/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
 # IDE & OS
 .vscode/
 .idea/

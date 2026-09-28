@@ -264,8 +264,12 @@ async function verifyAndMarkAttendance(ticketCode, eventId, allowOverride = fals
     const sessionId = (sessionSelect && sessionSelect.value) ? sessionSelect.value : null;
 
     try {
-        const response = await fetch('/organizer/attendance/mark', {
+        const markEndpoint = (typeof window !== 'undefined' && typeof window.getApiUrl === 'function')
+            ? window.getApiUrl('/organizer/attendance/mark')
+            : '/organizer/attendance/mark';
+        const response = await fetch(markEndpoint, {
             method: 'POST',
+            credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
                 'X-Requested-With': 'XMLHttpRequest'

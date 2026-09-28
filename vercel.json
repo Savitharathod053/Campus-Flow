@@ -1,0 +1,79 @@
+{
+  "version": 2,
+  "cleanUrls": true,
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/static/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/static/:path*",
+      "destination": "/static/:path*"
+    },
+    {
+      "source": "/api/:path*",
+      "destination": "https://campus-flow-backend.up.railway.app/api/:path*"
+    },
+    {
+      "source": "/login",
+      "destination": "https://campus-flow-backend.up.railway.app/login"
+    },
+    {
+      "source": "/register",
+      "destination": "https://campus-flow-backend.up.railway.app/register"
+    },
+    {
+      "source": "/logout",
+      "destination": "https://campus-flow-backend.up.railway.app/logout"
+    },
+    {
+      "source": "/events/:path*",
+      "destination": "https://campus-flow-backend.up.railway.app/events/:path*"
+    },
+    {
+      "source": "/student/:path*",
+      "destination": "https://campus-flow-backend.up.railway.app/student/:path*"
+    },
+    {
+      "source": "/organizer/:path*",
+      "destination": "https://campus-flow-backend.up.railway.app/organizer/:path*"
+    },
+    {
+      "source": "/admin/:path*",
+      "destination": "https://campus-flow-backend.up.railway.app/admin/:path*"
+    },
+    {
+      "source": "/payment/:path*",
+      "destination": "https://campus-flow-backend.up.railway.app/payment/:path*"
+    },
+    {
+      "source": "/certificates/:path*",
+      "destination": "https://campus-flow-backend.up.railway.app/certificates/:path*"
+    },
+    {
+      "source": "/faculty/:path*",
+      "destination": "https://campus-flow-backend.up.railway.app/faculty/:path*"
+    },
+    {
+      "source": "/hod/:path*",
+      "destination": "https://campus-flow-backend.up.railway.app/hod/:path*"
+    },
+    {
+      "source": "/dean/:path*",
+      "destination": "https://campus-flow-backend.up.railway.app/dean/:path*"
+    },
+    {
+      "source": "/health",
+      "destination": "https://campus-flow-backend.up.railway.app/health"
+    }
+  ]
+}

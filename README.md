@@ -224,31 +224,103 @@ python create_admin.py --name "Dean of Academics" --email "admin@college.edu" --
 
 ---
 
-## Running Locally
+## Production Deployment Architecture
 
-### Development Server
-```powershell
-python run.py
+Campus Flow is architected for modern cloud deployment across three decoupled services:
+- **Frontend**: Vercel (Global Edge CDN, static asset caching, SPA/API rewrites)
+- **Backend**: Railway (Python Flask WSGI container with Gunicorn)
+- **Database & Storage**: Supabase (Hosted PostgreSQL database + persistent Cloud Storage)
+
 ```
-Access the application in your browser at: `http://127.0.0.1:5000`
-
-### Production Server on Windows (Waitress)
-```powershell
-waitress-serve --listen=127.0.0.1:5000 wsgi:app
-```
-
-### Production Server on Linux / Docker (Gunicorn)
-```bash
-gunicorn wsgi:app --bind 0.0.0.0:5000 --workers 4 --threads 2 --timeout 120
+[Browser / Mobile] 
+        │
+        ├── (Static Assets / HTML) ──────────► [Vercel Edge]
+        │
+        └── (API / Auth / Logic / Forms) ────► [Railway Flask Backend]
+                                                       │
+                           ┌───────────────────────────┴───────────────────────────┐
+                           ▼                                                       ▼
+            [Supabase PostgreSQL DB]                                [Supabase Storage Bucket]
+            (Registrations, Users, Events)                           (Payment Proofs, QRs, Posters)
 ```
 
 ---
 
-## Health Check Endpoint
+### Step 1: Setting Up Supabase (Database & Storage)
 
-Campus Flow includes a production health monitor endpoint:
-- **URL**: `GET /health`
-- **Response**: `{"status": "healthy"}` (HTTP 200)
+1. **Create Supabase Project**:
+   - Go to [Supabase](https://supabase.com) and create a new project.
+   - Note your database password and project reference ID.
+2. **Obtain Database Connection String**:
+   - Navigate to **Project Settings** -> **Database**.
+   - Under **Connection string**, select **URI**.
+   - Copy the URI (use port 6543 pooler or port 5432 direct):
+     ```
+     postgresql://postgres.[project-id]:[password]@aws-0-[region].pooler.supabase.com:6543/postgres?sslmode=require
+     ```
+3. **Configure Storage Bucket**:
+   - Go to **Storage** -> **New Bucket**.
+   - Name the bucket `payment-proofs` (or custom name configured in `SUPABASE_STORAGE_BUCKET`).
+   - Toggle **Public Bucket** to **ON** (allows browser display of verified payment receipts and QR codes).
+   - Under **Policies**, ensure public read access is enabled.
+4. **Obtain API Credentials**:
+   - Go to **Project Settings** -> **API**.
+   - Copy **Project URL** (`SUPABASE_URL`).
+   - Copy the `service_role` secret key (`SUPABASE_SERVICE_ROLE_KEY`). *Do not use the publishable anon key.*
+
+---
+
+### Step 2: Deploying Backend to Railway
+
+1. **Create Railway Project**:
+   - Log into [Railway](https://railway.app) and click **New Project** -> **Deploy from GitHub repo**.
+   - Select the `Campus-Flow` repository.
+2. **Set Environment Variables on Railway**:
+   In your Railway service dashboard under **Variables**, set:
+   - `DATABASE_URL`: Your Supabase PostgreSQL connection URI.
+   - `SECRET_KEY`: A secure 64-character random string (`python -c "import secrets; print(secrets.token_hex(32))"`).
+   - `FRONTEND_URL`: Your Vercel frontend URL (e.g. `https://your-campus-flow.vercel.app`).
+   - `SESSION_COOKIE_SECURE`: `True`
+   - `SUPABASE_URL`: Your Supabase Project URL.
+   - `SUPABASE_SERVICE_ROLE_KEY`: Your Supabase Service Role Key.
+   - `SUPABASE_STORAGE_BUCKET`: `payment-proofs`
+   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`: Your email SMTP settings.
+   - `MAIL_DEV_REDIRECT_ENABLED`: `False`
+3. **Deployment**:
+   - Railway will automatically detect `railway.json` and `Procfile`.
+   - The deployment command runs database migrations (`python migrate_production_schema.py`) and binds Gunicorn to `0.0.0.0:$PORT`.
+   - Healthcheck endpoint: `GET /health` (returns `{"status": "ok"}`).
+4. **Copy Railway Public Domain**:
+   - Under **Settings** -> **Networking**, generate a Railway public domain (e.g. `https://campus-flow-backend.up.railway.app`).
+
+---
+
+### Step 3: Deploying Frontend to Vercel
+
+1. **Import Project to Vercel**:
+   - Go to [Vercel](https://vercel.com) and click **Add New...** -> **Project**.
+   - Import your `Campus-Flow` repository.
+2. **Configure Build Settings**:
+   - **Framework Preset**: Other / None
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+3. **Set Environment Variables on Vercel**:
+   Under **Environment Variables**, add:
+   - `VITE_API_URL`: Your Railway backend domain (e.g. `https://campus-flow-backend.up.railway.app`).
+   - `BACKEND_URL`: Your Railway backend domain (e.g. `https://campus-flow-backend.up.railway.app`).
+4. **Deploy**:
+   - Click **Deploy**. Vercel will build the static assets, generate the runtime configuration, and configure edge rewrites pointing dynamic routes to Railway.
+5. **Update Backend CORS**:
+   - Copy your assigned Vercel URL (e.g. `https://campus-flow.vercel.app`).
+   - In your Railway dashboard, verify `FRONTEND_URL` is set to this domain.
+
+---
+
+## Health Check Endpoints
+
+Campus Flow provides built-in health monitoring endpoints for cloud uptime checks:
+- **Application Health**: `GET /health` -> `{"status": "ok"}` (HTTP 200)
+- **Database Connectivity**: `GET /health/db` -> `{"status": "connected", "dialect": "postgresql"}` (HTTP 200)
 
 ---
 

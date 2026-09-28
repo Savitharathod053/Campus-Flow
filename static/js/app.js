@@ -1,5 +1,24 @@
 // Campus Flow — Interactive Modern Platform JavaScript
 
+// Base API URL configuration (supports Vercel frontend pointing to Railway backend)
+const API_BASE_URL = (
+    (typeof window !== 'undefined' && (window.CAMPUS_FLOW_API_URL || window.API_URL || window.VITE_API_URL)) ||
+    (typeof process !== 'undefined' && process.env && (process.env.VITE_API_URL || process.env.NEXT_PUBLIC_API_URL || process.env.REACT_APP_API_URL)) ||
+    ''
+).replace(/\/+$/, '');
+
+function getApiUrl(endpoint) {
+    if (!endpoint) return API_BASE_URL;
+    if (endpoint.startsWith('http://') || endpoint.startsWith('https://')) return endpoint;
+    const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    return API_BASE_URL ? `${API_BASE_URL}${cleanEndpoint}` : cleanEndpoint;
+}
+
+if (typeof window !== 'undefined') {
+    window.API_BASE_URL = API_BASE_URL;
+    window.getApiUrl = getApiUrl;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     // ---------------------------------------------------------
     // 1. Alert Auto-Dismissal & Form Toggles
@@ -478,8 +497,9 @@ function markNotificationRead(notificationId, btnElement, event) {
     }
 
     // 2. Transmit to Backend API
-    fetch(`/notifications/${notificationId}/read`, {
+    fetch(getApiUrl(`/notifications/${notificationId}/read`), {
         method: 'POST',
+        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest'
@@ -564,8 +584,9 @@ function markAllNotificationsRead(event) {
     updateNotificationBadgeUI(0);
 
     // 2. Transmit to Backend API
-    fetch('/notifications/read-all', {
+    fetch(getApiUrl('/notifications/read-all'), {
         method: 'POST',
+        credentials: 'include',
         headers: {
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest'

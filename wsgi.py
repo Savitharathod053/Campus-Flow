@@ -1,7 +1,7 @@
 """
 Campus Flow - Production WSGI Entry Point
 Directly imports the single pre-configured application instance to ensure instant,
-sub-second worker boots and immediate port binding on Render.
+sub-second worker boots and immediate port binding on Railway / Cloud.
 """
 
 import os
@@ -9,7 +9,7 @@ import sys
 import traceback
 
 # 1. Startup Diagnostics & Dynamic Port Logging
-port = os.environ.get("PORT", "10000")
+port = os.environ.get("PORT", "5000")
 print("[Campus Flow] Starting application", flush=True)
 print(f"[Campus Flow] PORT={port}", flush=True)
 

@@ -8,10 +8,10 @@ load_dotenv(BASE_DIR / '.env')
 def get_database_uri():
     """
     Retrieve and normalize the relational database connection URI.
-    Supports Render PostgreSQL (internal & external), Microsoft SQL Server (local SSMS / MSSQL), MySQL, and SQLite.
+    Supports Supabase PostgreSQL, Railway PostgreSQL, and local environments.
     Automatically handles driver, SSL negotiation, and connection parameters.
     """
-    # Check all standard environment variable names used by cloud providers (Render, Supabase, Neon, Railway)
+    # Check all standard environment variable names used by cloud providers (Railway, Supabase, Neon, Render)
     raw_uri = (
         os.environ.get('DATABASE_URL') or
         os.environ.get('DATABASE_INTERNAL_URL') or
@@ -23,11 +23,24 @@ def get_database_uri():
         os.environ.get('DB_URI')
     )
     
+    is_prod = bool(
+        os.environ.get('RAILWAY_ENVIRONMENT') or
+        os.environ.get('RAILWAY_STATIC_URL') or
+        os.environ.get('RENDER') or
+        os.environ.get('FLASK_ENV', '').lower() == 'production' or
+        os.environ.get('ENVIRONMENT', '').lower() == 'production'
+    )
+    
     if not raw_uri or not raw_uri.strip():
+        if is_prod:
+            raise RuntimeError(
+                "[Campus Flow Configuration Error] Database configuration missing: DATABASE_URL is not set. "
+                "Please configure DATABASE_URL in your Railway / cloud environment variables."
+            )
         # If running locally on Windows without cloud DATABASE_URL, use local SQL Server
-        if os.name == 'nt' and not os.environ.get('RENDER'):
+        if os.name == 'nt':
             return 'mssql+pyodbc://@localhost/fastfest?driver=ODBC+Driver+18+for+SQL+Server&trusted_connection=yes&TrustServerCertificate=yes'
-        # On Linux / Cloud container fallback to SQLite instance database
+        # On Linux / Local container fallback to SQLite instance database
         db_path = BASE_DIR / 'instance' / 'fastfest.db'
         db_path.parent.mkdir(parents=True, exist_ok=True)
         return f'sqlite:///{db_path}'
@@ -47,9 +60,8 @@ def get_database_uri():
         uri = uri.replace("mysql://", "mysql+pymysql://", 1)
 
     # SSL Mode handling for PostgreSQL:
-    # Render internal database connections (e.g. dpg-xxxx:5432) do NOT support SSL and will fail with
-    # "psycopg2.OperationalError: server does not support SSL, but SSL was required" if sslmode=require is set.
-    # External hosts (e.g. *.render.com, *.neon.tech, *.supabase.co) require SSL.
+    # Supabase and external remote hosts require TLS/SSL.
+    # Internal private networks (e.g. Docker / internal localhost) allow non-SSL.
     if uri.startswith("postgresql") and "sslmode=" not in uri:
         from urllib.parse import urlparse
         try:
@@ -57,7 +69,7 @@ def get_database_uri():
             parsed = urlparse(cleaned_target)
             host = (parsed.hostname or '').lower()
             
-            # An internal host on Render/Docker has no dots in hostname (e.g. 'dpg-cxxxxxx-a') or is localhost
+            # An internal host on a local container has no dots in hostname or is localhost
             is_internal_network = (
                 host in ('localhost', '127.0.0.1') or
                 ('.' not in host and host != '') or
@@ -67,14 +79,13 @@ def get_database_uri():
             
             delimiter = "&" if "?" in uri else "?"
             if is_internal_network:
-                # Internal private network: use prefer so connection succeeds whether SSL is present or not
                 uri = f"{uri}{delimiter}sslmode=prefer"
             else:
-                # External remote host across public internet: enforce TLS
+                # Supabase / External hosted PostgreSQL: enforce TLS
                 uri = f"{uri}{delimiter}sslmode=require"
         except Exception:
             delimiter = "&" if "?" in uri else "?"
-            uri = f"{uri}{delimiter}sslmode=prefer"
+            uri = f"{uri}{delimiter}sslmode=require"
     
     return uri
 
@@ -83,12 +94,13 @@ def get_database_uri():
 class Config:
     SECRET_KEY = os.environ.get('SECRET_KEY', 'campus-flow-secure-college-event-secret-key-2026')
     
-    # Relational Database URI (Render PostgreSQL / Microsoft SQL Server)
+    # Relational Database URI (Supabase PostgreSQL / Hosted PostgreSQL)
     SQLALCHEMY_DATABASE_URI = get_database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_pre_ping': True,
         'pool_recycle': 300,
+        'pool_timeout': 30,
     }
     
     # Upload Directories
@@ -101,8 +113,13 @@ class Config:
     
     # Persistent Cloud Storage (Supabase Storage)
     SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip().rstrip('/')
-    SUPABASE_SERVICE_ROLE_KEY = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '').strip()
-    SUPABASE_STORAGE_BUCKET = os.environ.get('SUPABASE_STORAGE_BUCKET', 'payment-proofs').strip().strip("'\"")
+    SUPABASE_SERVICE_ROLE_KEY = (os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_KEY') or '').strip()
+    SUPABASE_KEY = SUPABASE_SERVICE_ROLE_KEY
+    SUPABASE_STORAGE_BUCKET = (os.environ.get('SUPABASE_STORAGE_BUCKET') or os.environ.get('STORAGE_BUCKET') or 'payment-proofs').strip().strip("'\"")
+    STORAGE_BUCKET = SUPABASE_STORAGE_BUCKET
+    
+    # Frontend URL (Vercel deployment URL or comma-separated origins for CORS)
+    FRONTEND_URL = os.environ.get('FRONTEND_URL', '').strip()
     
     MAX_CONTENT_LENGTH = 64 * 1024 * 1024  # 64 MB max upload for bulk certificates/ZIP
     
@@ -116,10 +133,18 @@ class Config:
     )
     TESSERACT_CMD = os.environ.get('TESSERACT_CMD', '')
     
-    # Session Configuration
+    # Session & Cookie Configuration (Optimized for cross-domain Vercel frontend <-> Railway backend)
+    _is_production = bool(
+        os.environ.get('RAILWAY_ENVIRONMENT') or
+        os.environ.get('RAILWAY_STATIC_URL') or
+        os.environ.get('RENDER') or
+        os.environ.get('FLASK_ENV', '').lower() == 'production' or
+        os.environ.get('ENVIRONMENT', '').lower() == 'production'
+    )
     SESSION_COOKIE_HTTPONLY = True
-    SESSION_COOKIE_SECURE = os.environ.get('FLASK_ENV', '').lower() == 'production' and os.environ.get('SESSION_COOKIE_SECURE', 'False').lower() in ('true', '1', 't')
-    SESSION_COOKIE_SAMESITE = 'Lax'
+    SESSION_COOKIE_SECURE = True if _is_production else (os.environ.get('SESSION_COOKIE_SECURE', 'False').lower() in ('true', '1', 't'))
+    # Cross-site cookie (None) requires Secure=True; for local development over HTTP Lax is used
+    SESSION_COOKIE_SAMESITE = 'None' if (_is_production and SESSION_COOKIE_SECURE) else 'Lax'
     PERMANENT_SESSION_LIFETIME = 86400 * 7  # 7 days
 
     # Email / SMTP Configuration (Supports both SMTP_* and MAIL_* variable conventions)
@@ -148,8 +173,7 @@ class Config:
     MAIL_PASSWORD = SMTP_PASSWORD
     MAIL_DEFAULT_SENDER = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>" if SMTP_FROM_NAME and '<' not in SMTP_FROM_EMAIL else SMTP_FROM_EMAIL
 
-    # Dev redirection: strictly disabled by default in production (Render) so college emails reach recipients
-    _is_production = bool(os.environ.get('RENDER') or os.environ.get('FLASK_ENV', '').lower() == 'production')
+    # Dev redirection: strictly disabled by default in production so college emails reach recipients
     _default_redirect = 'False' if _is_production else 'True'
     MAIL_DEV_REDIRECT_ENABLED = os.environ.get('MAIL_DEV_REDIRECT_ENABLED', _default_redirect).strip().lower() in ('true', '1', 't', 'yes')
     MAIL_LIVE_TEST_RECIPIENT = (os.environ.get('MAIL_LIVE_TEST_RECIPIENT') or SMTP_USERNAME or '').strip().strip("'\"")

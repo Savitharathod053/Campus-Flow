@@ -932,8 +932,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // 2. Asynchronously notify backend to clean up expired alerts
         if (expiredIds.size > 0) {
-            fetch('/hod/notifications/cleanup-expired', {
+            const cleanupUrl = (typeof window !== 'undefined' && typeof window.getApiUrl === 'function')
+                ? window.getApiUrl('/hod/notifications/cleanup-expired')
+                : '/hod/notifications/cleanup-expired';
+            fetch(cleanupUrl, {
                 method: 'POST',
+                credentials: 'include',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-Requested-With': 'XMLHttpRequest'
@@ -987,7 +991,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Sync with backend every 15 seconds to reflect event edits/cancellations without full reload
     const pollInterval = setInterval(function() {
-        fetch('/hod/notifications', {
+        const pollUrl = (typeof window !== 'undefined' && typeof window.getApiUrl === 'function')
+            ? window.getApiUrl('/hod/notifications')
+            : '/hod/notifications';
+        fetch(pollUrl, {
+            credentials: 'include',
             headers: { 'X-Requested-With': 'XMLHttpRequest' }
         })
         .then(function(r) { return r.json(); })

@@ -16,10 +16,13 @@ _BUCKET_VERIFIED = set()
 
 
 def is_production_env() -> bool:
-    """Detects whether running in production (e.g. Render)."""
+    """Detects whether running in production (Railway, Render, or FLASK_ENV=production)."""
     return bool(
+        os.environ.get('RAILWAY_ENVIRONMENT') or
+        os.environ.get('RAILWAY_STATIC_URL') or
         os.environ.get('RENDER') or 
-        os.environ.get('FLASK_ENV', '').lower() == 'production'
+        os.environ.get('FLASK_ENV', '').lower() == 'production' or
+        os.environ.get('ENVIRONMENT', '').lower() == 'production'
     )
 
 
@@ -43,22 +46,22 @@ def get_supabase_url() -> str:
 
 
 def get_supabase_service_key() -> str:
-    """Returns Supabase Service Role Key."""
+    """Returns Supabase Service Role Key or API Key."""
     val = ''
     if current_app:
-        val = current_app.config.get('SUPABASE_SERVICE_ROLE_KEY', '')
+        val = current_app.config.get('SUPABASE_SERVICE_ROLE_KEY', '') or current_app.config.get('SUPABASE_KEY', '')
     if not val:
-        val = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '')
+        val = os.environ.get('SUPABASE_SERVICE_ROLE_KEY', '') or os.environ.get('SUPABASE_KEY', '')
     return val.strip()
 
 
 def get_storage_bucket(default: str = 'payment-proofs') -> str:
-    """Returns Supabase storage bucket name (configurable via SUPABASE_STORAGE_BUCKET, default 'payment-proofs')."""
+    """Returns Supabase storage bucket name (configurable via SUPABASE_STORAGE_BUCKET or STORAGE_BUCKET, default 'payment-proofs')."""
     val = ''
     if current_app:
-        val = current_app.config.get('SUPABASE_STORAGE_BUCKET', '')
+        val = current_app.config.get('SUPABASE_STORAGE_BUCKET', '') or current_app.config.get('STORAGE_BUCKET', '')
     if not val:
-        val = os.environ.get('SUPABASE_STORAGE_BUCKET', '')
+        val = os.environ.get('SUPABASE_STORAGE_BUCKET', '') or os.environ.get('STORAGE_BUCKET', '')
     if not val:
         val = default
     clean = val.strip().strip("'\"")
