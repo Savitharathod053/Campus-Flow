@@ -163,7 +163,8 @@ def create_app(config_class=Config):
             "status": "connected" if info.get('connected') else "disconnected",
             "dialect": info.get('dialect'),
             "database": info.get('database'),
-            "server": info.get('server')
+            "server": info.get('server'),
+            "tables": info.get('tables')
         }), status_code
 
     # Pre-request schema assurance (idempotent, ensures tables exist on first request)

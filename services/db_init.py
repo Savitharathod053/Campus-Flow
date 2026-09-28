@@ -78,7 +78,10 @@ def init_db_and_seed(app, force=False):
                 # 5. Seed baseline Dean and HOD accounts if missing
                 _seed_baseline_officials()
 
-                # 6. Ensure all active departments have their responsible HOD linked
+                # 6. Seed demo Organizer and Student accounts
+                _seed_demo_accounts()
+
+                # 7. Ensure all active departments have their responsible HOD linked
                 _link_department_hods()
 
                 db.session.commit()
@@ -307,32 +310,22 @@ def _seed_super_admin():
         admin_name = os.environ.get('SUPER_ADMIN_NAME', 'Chief Super Admin').strip()
         admin_phone = os.environ.get('SUPER_ADMIN_PHONE', '+91 9840001122').strip()
 
-        # Check if ANY super admin exists or if the specific email exists
-        super_admin_exists = User.query.filter(
-            (User.role == UserRole.SUPER_ADMIN) |
-            (User.role == 'superadmin')
-        ).first()
-
         target_user = User.query.filter_by(email=admin_email).first()
 
         if target_user:
-            # If account exists but is not super_admin, promote it
-            if not target_user.is_super_admin:
-                target_user.role = UserRole.SUPER_ADMIN
-                target_user.is_active = True
-                if not target_user.faculty_profile:
-                    db.session.add(FacultyProfile(
-                        user_id=target_user.id,
-                        employee_id="SUPER-ADMIN-01",
-                        department="General",
-                        designation="Super Administrator"
-                    ))
-                db.session.commit()
-                logger.info(f"Promoted existing account {admin_email} to SUPER_ADMIN.")
-            return
-
-        if not super_admin_exists:
-            # Create the initial Super Admin account
+            target_user.role = UserRole.SUPER_ADMIN
+            target_user.is_active = True
+            target_user.set_password(admin_pass)
+            if not target_user.faculty_profile:
+                db.session.add(FacultyProfile(
+                    user_id=target_user.id,
+                    employee_id="SUPER-ADMIN-01",
+                    department="General",
+                    designation="Super Administrator"
+                ))
+            db.session.commit()
+            logger.info(f"Verified/updated credentials for Super Admin: {admin_email}")
+        else:
             new_admin = User(
                 name=admin_name,
                 email=admin_email,
@@ -364,67 +357,145 @@ def _seed_baseline_officials():
     """
     try:
         # Dean of Student Affairs
-        dean_exists = User.query.filter(
-            (User.role == UserRole.STUDENTS_AFFAIRS_DEAN) |
-            (User.role == 'dean')
-        ).first()
+        dean_email = os.environ.get('DEAN_EMAIL', 'dean@college.edu').strip().lower()
+        dean_pass = os.environ.get('DEAN_PASSWORD', 'Dean@123')
+        dean_name = os.environ.get('DEAN_NAME', 'Dr. S. K. Sharma (Dean)').strip()
 
-        if not dean_exists:
-            dean_email = os.environ.get('DEAN_EMAIL', 'dean@college.edu').strip().lower()
-            dean_pass = os.environ.get('DEAN_PASSWORD', 'Dean@123')
-            dean_name = os.environ.get('DEAN_NAME', 'Dr. S. K. Sharma (Dean)').strip()
-
-            dean_user = User.query.filter_by(email=dean_email).first()
-            if not dean_user:
-                dean_user = User(
-                    name=dean_name,
-                    email=dean_email,
-                    phone="+91 9840001133",
-                    role=UserRole.STUDENTS_AFFAIRS_DEAN,
-                    is_active=True
-                )
-                dean_user.set_password(dean_pass)
-                db.session.add(dean_user)
-                db.session.flush()
-                db.session.add(FacultyProfile(
-                    user_id=dean_user.id,
-                    employee_id="DEAN-SA-01",
-                    department="General",
-                    designation="Dean of Student Affairs"
-                ))
-                db.session.commit()
-                logger.info(f"Successfully provisioned baseline Dean: {dean_email}")
+        dean_user = User.query.filter_by(email=dean_email).first()
+        if not dean_user:
+            dean_user = User(
+                name=dean_name,
+                email=dean_email,
+                phone="+91 9840001133",
+                role=UserRole.STUDENTS_AFFAIRS_DEAN,
+                is_active=True
+            )
+            dean_user.set_password(dean_pass)
+            db.session.add(dean_user)
+            db.session.flush()
+            db.session.add(FacultyProfile(
+                user_id=dean_user.id,
+                employee_id="DEAN-SA-01",
+                department="General",
+                designation="Dean of Student Affairs"
+            ))
+            db.session.commit()
+            logger.info(f"Successfully provisioned baseline Dean: {dean_email}")
+        else:
+            dean_user.role = UserRole.STUDENTS_AFFAIRS_DEAN
+            dean_user.is_active = True
+            dean_user.set_password(dean_pass)
+            db.session.commit()
 
         # CSE Head of Department (HOD)
         cse_dept = CollegeDepartment.query.filter_by(code='CSE').first()
-        if cse_dept and not cse_dept.hod_id:
-            hod_email = os.environ.get('HOD_EMAIL', 'hod.cse@college.edu').strip().lower()
-            hod_pass = os.environ.get('HOD_PASSWORD', 'Hod@123')
-            hod_name = os.environ.get('HOD_NAME', 'Dr. K. Ramanathan (HOD CSE)').strip()
+        hod_email = os.environ.get('HOD_EMAIL', 'hod.cse@college.edu').strip().lower()
+        hod_pass = os.environ.get('HOD_PASSWORD', 'Hod@123')
+        hod_name = os.environ.get('HOD_NAME', 'Dr. K. Ramanathan (HOD CSE)').strip()
 
-            hod_user = User.query.filter_by(email=hod_email).first()
-            if not hod_user:
-                hod_user = User(
-                    name=hod_name,
-                    email=hod_email,
-                    phone="+91 9840001144",
-                    role=UserRole.HOD,
-                    is_active=True
-                )
-                hod_user.set_password(hod_pass)
-                db.session.add(hod_user)
-                db.session.flush()
-                db.session.add(FacultyProfile(
-                    user_id=hod_user.id,
-                    employee_id="HOD-CSE-01",
-                    department="CSE",
-                    designation="Head of Department"
-                ))
+        hod_user = User.query.filter_by(email=hod_email).first()
+        if not hod_user:
+            hod_user = User(
+                name=hod_name,
+                email=hod_email,
+                phone="+91 9840001144",
+                role=UserRole.HOD,
+                is_active=True
+            )
+            hod_user.set_password(hod_pass)
+            db.session.add(hod_user)
+            db.session.flush()
+            db.session.add(FacultyProfile(
+                user_id=hod_user.id,
+                employee_id="HOD-CSE-01",
+                department="CSE",
+                designation="Head of Department"
+            ))
+            if cse_dept:
                 cse_dept.hod_id = hod_user.id
-                db.session.commit()
-                logger.info(f"Successfully provisioned baseline CSE HOD: {hod_email}")
+            db.session.commit()
+            logger.info(f"Successfully provisioned baseline CSE HOD: {hod_email}")
+        else:
+            hod_user.role = UserRole.HOD
+            hod_user.is_active = True
+            hod_user.set_password(hod_pass)
+            if cse_dept:
+                cse_dept.hod_id = hod_user.id
+            db.session.commit()
     except Exception as e:
         logger.warning(f"Baseline officials seeding note: {e}")
+        db.session.rollback()
+
+
+def _seed_demo_accounts():
+    """
+    Seeds baseline Organizer and Student accounts so all user roles can be tested.
+    """
+    try:
+        # Demo Organizer
+        org_email = 'organizer@college.edu'
+        org_user = User.query.filter_by(email=org_email).first()
+        if not org_user:
+            org_user = User(
+                name="Campus Event Organizer",
+                email=org_email,
+                phone="+91 9840001155",
+                role=UserRole.ORGANIZER,
+                is_active=True
+            )
+            org_user.set_password('Organizer@123')
+            db.session.add(org_user)
+            db.session.flush()
+            db.session.add(OrganizerProfile(
+                user_id=org_user.id,
+                roll_number="ORG-CSE-01",
+                organization_name="ACM Student Chapter",
+                department="CSE",
+                designation="Lead Organizer",
+                is_verified=True,
+                status="APPROVED"
+            ))
+            db.session.commit()
+            logger.info(f"Provisioned demo organizer: {org_email}")
+        else:
+            org_user.role = UserRole.ORGANIZER
+            org_user.is_active = True
+            org_user.set_password('Organizer@123')
+            if org_user.organizer_profile:
+                org_user.organizer_profile.is_verified = True
+                org_user.organizer_profile.status = "APPROVED"
+            db.session.commit()
+
+        # Demo Student
+        stud_email = 'student@college.edu'
+        stud_user = User.query.filter_by(email=stud_email).first()
+        if not stud_user:
+            stud_user = User(
+                name="Alex Student",
+                email=stud_email,
+                phone="+91 9840001166",
+                role=UserRole.STUDENT,
+                is_active=True
+            )
+            stud_user.set_password('Student@123')
+            db.session.add(stud_user)
+            db.session.flush()
+            db.session.add(StudentProfile(
+                user_id=stud_user.id,
+                roll_number="21CS101",
+                department="CSE",
+                year=3,
+                section="A"
+            ))
+            db.session.commit()
+            logger.info(f"Provisioned demo student: {stud_email}")
+        else:
+            stud_user.role = UserRole.STUDENT
+            stud_user.is_active = True
+            stud_user.set_password('Student@123')
+            db.session.commit()
+    except Exception as e:
+        logger.warning(f"Demo accounts seeding note: {e}")
         db.session.rollback()
 
 

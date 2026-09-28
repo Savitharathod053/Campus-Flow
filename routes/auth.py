@@ -138,27 +138,31 @@ def login():
         user = None
 
         # Resolution order:
-        # 1. First try StudentProfile.query.filter_by(roll_number=identifier).first() -> use .user
-        student_profile = StudentProfile.query.filter_by(roll_number=identifier).first()
-        if not student_profile and hasattr(identifier, 'upper'):
-            student_profile = StudentProfile.query.filter_by(roll_number=identifier.upper()).first()
-
-        if student_profile:
-            user = student_profile.user
+        # 1. First check if identifier is an email (Super Admin, Dean, HOD, and users logging in by email)
+        if '@' in identifier:
+            user = User.query.filter_by(email=identifier.lower()).first()
+            if not user:
+                user = User.query.filter_by(email=identifier).first()
         else:
-            # 2. Then try OrganizerProfile.query.filter_by(roll_number=identifier).first() -> use .user
-            organizer_profile = OrganizerProfile.query.filter_by(roll_number=identifier).first()
-            if not organizer_profile and hasattr(identifier, 'upper'):
-                organizer_profile = OrganizerProfile.query.filter_by(roll_number=identifier.upper()).first()
+            # 2. Check by student roll number
+            student_profile = StudentProfile.query.filter_by(roll_number=identifier).first()
+            if not student_profile and hasattr(identifier, 'upper'):
+                student_profile = StudentProfile.query.filter_by(roll_number=identifier.upper()).first()
 
-            if organizer_profile:
-                user = organizer_profile.user
-                # 3. Fall back to User.query.filter_by(email=identifier).first() (supports Email login for all roles)
-                candidate_user = User.query.filter_by(email=identifier.lower()).first()
-                if not candidate_user:
-                    candidate_user = User.query.filter_by(email=identifier).first()
-                if candidate_user:
-                    user = candidate_user
+            if student_profile:
+                user = student_profile.user
+            else:
+                # 3. Check by organizer roll number
+                organizer_profile = OrganizerProfile.query.filter_by(roll_number=identifier).first()
+                if not organizer_profile and hasattr(identifier, 'upper'):
+                    organizer_profile = OrganizerProfile.query.filter_by(roll_number=identifier.upper()).first()
+                if organizer_profile:
+                    user = organizer_profile.user
+                else:
+                    # 4. Fallback check email in case identifier has no @
+                    user = User.query.filter_by(email=identifier.lower()).first()
+                    if not user:
+                        user = User.query.filter_by(email=identifier).first()
 
         if not user or not user.check_password(password):
             flash('Invalid email or password credentials.', 'danger')

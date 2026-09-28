@@ -136,6 +136,9 @@ class Config:
     # Session & Cookie Configuration (Optimized for cross-domain Vercel frontend <-> Railway backend)
     _is_production = bool(
         os.environ.get('RAILWAY_ENVIRONMENT') or
+        os.environ.get('RAILWAY_ENVIRONMENT_NAME') or
+        os.environ.get('RAILWAY_PROJECT_ID') or
+        os.environ.get('RAILWAY_PUBLIC_DOMAIN') or
         os.environ.get('RAILWAY_STATIC_URL') or
         os.environ.get('RENDER') or
         os.environ.get('FLASK_ENV', '').lower() == 'production' or
