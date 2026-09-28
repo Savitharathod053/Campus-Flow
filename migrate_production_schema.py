@@ -175,6 +175,8 @@ def main():
         print("\n" + "=" * 75)
         print("MIGRATION COMPLETED SUCCESSFULLY. PRODUCTION SCHEMA IS FULLY SYNCHRONIZED.")
         print("=" * 75)
+        import os
+        os._exit(0)
 
 if __name__ == '__main__':
     main()
