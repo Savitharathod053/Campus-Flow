@@ -171,19 +171,32 @@ def create_app(config_class=Config):
     def health_email():
         from services.email_service import get_mail_config
         cfg = get_mail_config()
+        resend_key = cfg.get('RESEND_API_KEY')
+        brevo_key = cfg.get('BREVO_API_KEY')
+        smtp_configured = bool(cfg.get('SMTP_USERNAME') and cfg.get('SMTP_PASSWORD'))
+        is_configured = bool(resend_key or brevo_key or smtp_configured)
+
+        provider = "smtp"
+        if resend_key: provider = "resend_api (HTTPS)"
+        elif brevo_key: provider = "brevo_api (HTTPS)"
+
         missing = []
-        if not cfg.get('SMTP_HOST'): missing.append('SMTP_HOST')
-        if not cfg.get('SMTP_USERNAME'): missing.append('SMTP_USERNAME')
-        if not cfg.get('SMTP_PASSWORD'): missing.append('SMTP_PASSWORD')
-        return jsonify({
-            "status": "configured" if not missing else "unconfigured",
-            "host": cfg.get('SMTP_HOST'),
-            "port": cfg.get('SMTP_PORT'),
-            "use_tls": cfg.get('SMTP_USE_TLS'),
+        if not is_configured:
+            missing = ["SMTP_USERNAME/SMTP_PASSWORD", "or RESEND_API_KEY", "or BREVO_API_KEY"]
+
+        response_data = {
+            "status": "configured" if is_configured else "unconfigured",
+            "provider": provider,
             "sender": cfg.get('SMTP_FROM_EMAIL') or cfg.get('MAIL_DEFAULT_SENDER'),
-            "username_configured": bool(cfg.get('SMTP_USERNAME')),
+            "https_api_active": bool(resend_key or brevo_key),
             "missing_variables": missing
-        }), (200 if not missing else 503)
+        }
+        if provider == "smtp":
+            response_data["smtp_host"] = cfg.get('SMTP_HOST')
+            response_data["smtp_port"] = cfg.get('SMTP_PORT')
+            response_data["note"] = "Railway default firewall blocks outbound SMTP ports (587, 465, 25). For guaranteed delivery, configure RESEND_API_KEY (recommended) or contact Railway to unblock SMTP."
+
+        return jsonify(response_data), (200 if is_configured else 503)
 
     # Pre-request schema assurance (idempotent, ensures tables exist on first request)
     @app.before_request

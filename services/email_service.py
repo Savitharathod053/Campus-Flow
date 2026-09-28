@@ -113,7 +113,12 @@ def get_mail_config():
 
     live_recipient = str(get_val('MAIL_LIVE_TEST_RECIPIENT', 'MAIL_LIVE_TEST_RECIPIENT', username or 'savitharathod053@gmail.com')).strip().strip("'\"")
 
+    resend_api_key = str(get_val('RESEND_API_KEY', 'RESEND_KEY', '')).strip().strip("'\"")
+    brevo_api_key = str(get_val('BREVO_API_KEY', 'SENDINBLUE_API_KEY', '')).strip().strip("'\"")
+
     # Populate both sets of keys in config dictionary for 100% interoperability
+    config['RESEND_API_KEY'] = resend_api_key
+    config['BREVO_API_KEY'] = brevo_api_key
     config['SMTP_HOST'] = host
     config['SMTP_PORT'] = port
     config['SMTP_USE_TLS'] = use_tls
@@ -194,11 +199,82 @@ def _connect_and_send(server_host, port, use_ssl, use_tls, username, password, s
     return True
 
 
+def _send_via_resend(api_key, from_sender, to_email, subject, body_text, body_html=None, raise_exceptions=False):
+    import requests
+    # Ensure from_sender has a valid format for Resend: e.g. "Campus Flow <onboarding@resend.dev>" or verified domain
+    sender = from_sender
+    if '@' not in sender:
+        sender = "Campus Flow <onboarding@resend.dev>"
+
+    payload = {
+        "from": sender,
+        "to": [to_email],
+        "subject": subject,
+        "text": body_text,
+    }
+    if body_html:
+        payload["html"] = body_html
+
+    try:
+        resp = requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            json=payload,
+            timeout=10
+        )
+        if resp.status_code in (200, 201):
+            logger.info(f"[EMAIL DELIVERED VIA RESEND] To: {to_email} | Subject: '{subject}'")
+            return True
+        else:
+            logger.error(f"[Resend Delivery Error] HTTP {resp.status_code}: {resp.text}")
+            if raise_exceptions:
+                raise Exception(f"Resend error {resp.status_code}: {resp.text}")
+            return False
+    except Exception as exc:
+        logger.error(f"[Resend Network Error] {exc}")
+        if raise_exceptions:
+            raise
+        return False
+
+
+def _send_via_brevo(api_key, from_email, from_name, to_email, subject, body_text, body_html=None, raise_exceptions=False):
+    import requests
+    payload = {
+        "sender": {"name": from_name or "Campus Flow", "email": from_email or "noreply@campusflow.edu"},
+        "to": [{"email": to_email}],
+        "subject": subject,
+        "textContent": body_text,
+    }
+    if body_html:
+        payload["htmlContent"] = body_html
+
+    try:
+        resp = requests.post(
+            "https://api.brevo.com/v3/smtp/email",
+            headers={"api-key": api_key, "Content-Type": "application/json"},
+            json=payload,
+            timeout=10
+        )
+        if resp.status_code in (200, 201):
+            logger.info(f"[EMAIL DELIVERED VIA BREVO] To: {to_email} | Subject: '{subject}'")
+            return True
+        else:
+            logger.error(f"[Brevo Delivery Error] HTTP {resp.status_code}: {resp.text}")
+            if raise_exceptions:
+                raise Exception(f"Brevo error {resp.status_code}: {resp.text}")
+            return False
+    except Exception as exc:
+        logger.error(f"[Brevo Network Error] {exc}")
+        if raise_exceptions:
+            raise
+        return False
+
+
 def _send_smtp_worker(to_email, subject, body_text, body_html=None, config=None, raise_exceptions=False):
     """
-    Worker function executed to transmit email via SMTP.
-    Uses port 587 with STARTTLS (or port 465 with SSL), with automatic failover
-    between 587 and 465 to handle cloud platform firewall restrictions (e.g. Render).
+    Worker function executed to transmit email via HTTPS APIs (Resend, Brevo) or SMTP.
+    Uses Resend/Brevo over HTTPS if configured (bypassing cloud container firewall blocks on SMTP ports),
+    or falls back to SMTP with automatic failover between 587 and 465.
     """
     if not config:
         config = get_mail_config()
@@ -210,11 +286,23 @@ def _send_smtp_worker(to_email, subject, body_text, body_html=None, config=None,
     username = config.get('SMTP_USERNAME') or config.get('MAIL_USERNAME', '')
     password = config.get('SMTP_PASSWORD') or config.get('MAIL_PASSWORD', '')
     sender = config.get('SMTP_FROM_EMAIL') or config.get('MAIL_DEFAULT_SENDER') or username or 'noreply@campusflow.edu'
+    from_name = config.get('SMTP_FROM_NAME') or 'Campus Flow'
+    sender_display = config.get('MAIL_DEFAULT_SENDER') or sender
+
+    # 1. Check for Resend HTTPS API Key
+    resend_api_key = config.get('RESEND_API_KEY')
+    if resend_api_key:
+        return _send_via_resend(resend_api_key, sender_display, to_email, subject, body_text, body_html, raise_exceptions)
+
+    # 2. Check for Brevo HTTPS API Key
+    brevo_api_key = config.get('BREVO_API_KEY')
+    if brevo_api_key:
+        return _send_via_brevo(brevo_api_key, sender, from_name, to_email, subject, body_text, body_html, raise_exceptions)
 
     if not username or not password:
         logger.warning(
             f"[EMAIL NOT SENT - MISSING CREDENTIALS] To: {to_email} | Subject: '{subject}'. "
-            "Please configure SMTP_USERNAME and SMTP_PASSWORD in production environment variables."
+            "Please configure SMTP_USERNAME and SMTP_PASSWORD (or RESEND_API_KEY) in production environment variables."
         )
         if raise_exceptions:
             raise smtplib.SMTPAuthenticationError(535, b"SMTP credentials missing (SMTP_USERNAME / SMTP_PASSWORD)")
@@ -423,18 +511,20 @@ def send_test_email(recipient_email):
     if not recipient_email or '@' not in recipient_email:
         return False, "Recipient email is invalid or missing.", "ValidationError"
 
-    cfg = get_mail_config()
+    resend_api_key = cfg.get('RESEND_API_KEY')
+    brevo_api_key = cfg.get('BREVO_API_KEY')
     username = cfg.get('SMTP_USERNAME') or cfg.get('MAIL_USERNAME')
     password = cfg.get('SMTP_PASSWORD') or cfg.get('MAIL_PASSWORD')
-    if not username or not password:
+    if not resend_api_key and not brevo_api_key and (not username or not password):
         return False, "Email sending failed: Missing credentials", "MissingCredentialsError"
 
-    subject = "Campus Flow - Production SMTP Verification Test"
+    subject = "Campus Flow - Production Email Verification Test"
+    provider = "Resend (HTTPS)" if resend_api_key else ("Brevo (HTTPS)" if brevo_api_key else f"SMTP ({cfg.get('SMTP_HOST')}:{cfg.get('SMTP_PORT')})")
     body_text = (
         "Hello,\n\n"
         "This is a verified test email from Campus Flow event management platform.\n"
         f"Dispatched At: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}\n"
-        f"SMTP Server: {cfg.get('SMTP_HOST')}:{cfg.get('SMTP_PORT')}\n\n"
+        f"Delivery Provider: {provider}\n\n"
         "If you received this message, your production email system is 100% operational.\n\n"
         "— Campus Flow Automated Test Service"
     )
@@ -448,16 +538,19 @@ def send_test_email(recipient_email):
             raise_exceptions=True
         )
         if sent:
-            return True, "Test email sent successfully", None
-        return False, "Email sending failed", "SMTPDeliveryError"
-    except smtplib.SMTPAuthenticationError:
-        return False, "Email sending failed", "SMTPAuthenticationError"
-    except (smtplib.SMTPConnectError, socket.timeout, TimeoutError, OSError):
-        return False, "Email sending failed", "SMTPConnectError"
+            return True, f"Test email sent successfully via {provider}", None
+        return False, "Email sending failed: Delivery worker returned False", "SMTPDeliveryError"
+    except smtplib.SMTPAuthenticationError as e:
+        return False, f"Email authentication failed: {e}", "SMTPAuthenticationError"
+    except (smtplib.SMTPConnectError, socket.timeout, TimeoutError, OSError) as e:
+        return False, (
+            f"SMTP connection error: {e}. Railway blocks raw outbound SMTP ports 25, 465, and 587. "
+            "To send emails from Railway, configure RESEND_API_KEY or BREVO_API_KEY."
+        ), "SMTPConnectError"
     except smtplib.SMTPException as e:
-        return False, "Email sending failed", type(e).__name__
+        return False, f"SMTP error: {e}", type(e).__name__
     except Exception as e:
-        return False, "Email sending failed", type(e).__name__
+        return False, f"Email delivery error: {e}", type(e).__name__
 
 
 def send_registration_confirmation(user, event, registration):
