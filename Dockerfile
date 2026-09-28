@@ -34,6 +34,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application source code
 COPY . /app/
 
-# Run migrations and start with Gunicorn WSGI server (binds dynamically to deployment platform's assigned $PORT)
-CMD python migrate_production_schema.py && exec gunicorn wsgi:app --bind 0.0.0.0:${PORT:-5000} --workers 1 --threads 2 --timeout 120
+# Start Gunicorn WSGI server (binds dynamically to deployment platform's assigned $PORT)
+CMD exec gunicorn wsgi:app --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 2 --timeout 120
 
