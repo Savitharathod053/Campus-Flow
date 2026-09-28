@@ -232,6 +232,7 @@ try {
         version: 2,
         cleanUrls: true,
         buildCommand: 'npm run build',
+        installCommand: "echo 'Frontend build, skipping Python dependencies'",
         outputDirectory: 'dist',
         headers: [
             {

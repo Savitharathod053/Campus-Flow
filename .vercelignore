@@ -1,0 +1,18 @@
+# Vercel Frontend Deployment Ignore File
+# Tells Vercel to ignore Python backend files and dependencies
+
+requirements.txt
+runtime.txt
+Dockerfile
+Procfile
+railway.json
+*.py
+models/
+routes/
+services/
+migrations/
+instance/
+backups/
+.venv/
+.venv-1/
+__pycache__/
