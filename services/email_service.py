@@ -113,14 +113,24 @@ def get_mail_config():
 
     live_recipient = str(get_val('MAIL_LIVE_TEST_RECIPIENT', 'MAIL_LIVE_TEST_RECIPIENT', username or 'savitharathod053@gmail.com')).strip().strip("'\"")
 
-    resend_api_key = str(
-        app_cfg.get('RESEND_API_KEY') or
-        os.environ.get('RESEND_API_KEY') or
-        os.environ.get('RESEND_KEY') or
-        os.environ.get('RESEND_TOKEN') or
-        os.environ.get('RESEND') or
-        ''
-    ).strip().strip("'\"")
+    # Resend API Key resolution (supports RESEND_API_KEY, case-insensitive, or any key starting with re_)
+    resend_api_key = ''
+    for candidate in ('RESEND_API_KEY', 'RESEND_KEY', 'RESEND_TOKEN', 'RESEND'):
+        if app_cfg.get(candidate):
+            resend_api_key = str(app_cfg[candidate]).strip().strip("'\"")
+            break
+    if not resend_api_key:
+        for k, v in os.environ.items():
+            if 'resend' in k.lower():
+                resend_api_key = str(v).strip().strip("'\"")
+                break
+    if not resend_api_key:
+        for k, v in os.environ.items():
+            val = str(v).strip().strip("'\"")
+            if val.startswith('re_') and len(val) >= 20:
+                resend_api_key = val
+                break
+
     brevo_api_key = str(
         app_cfg.get('BREVO_API_KEY') or
         os.environ.get('BREVO_API_KEY') or
