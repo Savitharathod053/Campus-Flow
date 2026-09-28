@@ -167,11 +167,29 @@ def create_app(config_class=Config):
             "tables": info.get('tables')
         }), status_code
 
+    @app.route('/health/email')
+    def health_email():
+        from services.email_service import get_mail_config
+        cfg = get_mail_config()
+        missing = []
+        if not cfg.get('SMTP_HOST'): missing.append('SMTP_HOST')
+        if not cfg.get('SMTP_USERNAME'): missing.append('SMTP_USERNAME')
+        if not cfg.get('SMTP_PASSWORD'): missing.append('SMTP_PASSWORD')
+        return jsonify({
+            "status": "configured" if not missing else "unconfigured",
+            "host": cfg.get('SMTP_HOST'),
+            "port": cfg.get('SMTP_PORT'),
+            "use_tls": cfg.get('SMTP_USE_TLS'),
+            "sender": cfg.get('SMTP_FROM_EMAIL') or cfg.get('MAIL_DEFAULT_SENDER'),
+            "username_configured": bool(cfg.get('SMTP_USERNAME')),
+            "missing_variables": missing
+        }), (200 if not missing else 503)
+
     # Pre-request schema assurance (idempotent, ensures tables exist on first request)
     @app.before_request
     def ensure_database_ready():
         from flask import request
-        if request.endpoint in ('static', 'health', 'health_db', 'public.home', 'public.index'):
+        if request.endpoint in ('static', 'health', 'health_db', 'health_email', 'public.home', 'public.index'):
             return
         from services.db_init import ensure_db_initialized
         try:

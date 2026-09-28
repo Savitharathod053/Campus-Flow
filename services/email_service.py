@@ -96,8 +96,17 @@ def get_mail_config():
 
     testing = bool(app_cfg.get('TESTING', os.environ.get('TESTING', 'False').strip().lower() in ('true', '1')))
     
-    # Dev redirection: strictly False in production (Render) so college emails reach recipients
-    is_prod = bool(os.environ.get('RENDER') or os.environ.get('FLASK_ENV', '').lower() == 'production')
+    # Dev redirection: strictly False in production (Railway / Render) so college emails reach recipients
+    is_prod = bool(
+        os.environ.get('RAILWAY_ENVIRONMENT') or
+        os.environ.get('RAILWAY_ENVIRONMENT_NAME') or
+        os.environ.get('RAILWAY_PROJECT_ID') or
+        os.environ.get('RAILWAY_PUBLIC_DOMAIN') or
+        os.environ.get('RAILWAY_STATIC_URL') or
+        os.environ.get('RENDER') or
+        os.environ.get('FLASK_ENV', '').lower() == 'production' or
+        os.environ.get('ENVIRONMENT', '').lower() == 'production'
+    )
     default_redirect = 'False' if is_prod else 'True'
     dev_redirect_val = get_val('MAIL_DEV_REDIRECT_ENABLED', 'MAIL_DEV_REDIRECT_ENABLED', default_redirect)
     dev_redirect = str(dev_redirect_val).strip().lower() in ('true', '1', 't', 'yes')
