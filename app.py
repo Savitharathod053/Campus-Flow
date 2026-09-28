@@ -180,6 +180,21 @@ def create_app(config_class=Config):
 
 
 
+    @app.route('/login')
+    def login_redirect():
+        from flask import redirect, url_for
+        return redirect(url_for('auth.login'))
+
+    @app.route('/register')
+    def register_redirect():
+        from flask import redirect, url_for
+        return redirect(url_for('auth.register'))
+
+    @app.route('/logout')
+    def logout_redirect():
+        from flask import redirect, url_for
+        return redirect(url_for('auth.logout'))
+
     @app.route('/faculty/dashboard')
     def faculty_dashboard():
         from flask import redirect, url_for

@@ -153,13 +153,11 @@ def login():
 
             if organizer_profile:
                 user = organizer_profile.user
-            else:
-                # 3. Fall back to User.query.filter_by(email=identifier).first() (kept only for HOD/Dean/Super Admin, who have no roll number)
+                # 3. Fall back to User.query.filter_by(email=identifier).first() (supports Email login for all roles)
                 candidate_user = User.query.filter_by(email=identifier.lower()).first()
                 if not candidate_user:
                     candidate_user = User.query.filter_by(email=identifier).first()
-                # Email is no longer a valid login credential for students and organizers
-                if candidate_user and not (candidate_user.is_student or candidate_user.is_organizer):
+                if candidate_user:
                     user = candidate_user
 
         if not user or not user.check_password(password):
