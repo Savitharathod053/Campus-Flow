@@ -189,6 +189,7 @@ def create_app(config_class=Config):
             "provider": provider,
             "sender": cfg.get('SMTP_FROM_EMAIL') or cfg.get('MAIL_DEFAULT_SENDER'),
             "https_api_active": bool(resend_key or brevo_key),
+            "relevant_env_keys": sorted([k for k in os.environ.keys() if any(w in k.upper() for w in ('API', 'KEY', 'RESEND', 'BREVO', 'MAIL', 'SMTP'))]),
             "missing_variables": missing
         }
         if provider == "smtp":
