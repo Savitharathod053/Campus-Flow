@@ -13,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 # In-memory flag so bucket check runs once per application lifecycle
 _BUCKET_VERIFIED = set()
+_RESOLVED_BUCKETS = {}
 
 
 def is_production_env() -> bool:
@@ -80,8 +81,8 @@ def get_supabase_service_key() -> str:
     return val.strip()
 
 
-def get_storage_bucket(default: str = 'payment-proof') -> str:
-    """Returns Supabase storage bucket name (configurable via SUPABASE_STORAGE_BUCKET or STORAGE_BUCKET, default 'payment-proof')."""
+def get_storage_bucket(default: str = 'payment-proofs') -> str:
+    """Returns Supabase storage bucket name (configurable via SUPABASE_STORAGE_BUCKET or STORAGE_BUCKET, default 'payment-proofs')."""
     val = ''
     if current_app:
         val = current_app.config.get('SUPABASE_STORAGE_BUCKET', '') or current_app.config.get('STORAGE_BUCKET', '')
@@ -203,6 +204,24 @@ def check_bucket_exists(bucket_name: str = None) -> tuple[bool, str | None]:
             return False, err_msg
 
         if get_res.status_code == 404 or (get_res.status_code == 400 and 'NoSuchBucket' in get_res.text):
+            # Check if plural or singular counterpart bucket exists in Supabase
+            alt_bucket = 'payment-proofs' if bucket == 'payment-proof' else ('payment-proof' if bucket == 'payment-proofs' else None)
+            if alt_bucket:
+                try:
+                    alt_res = requests.get(
+                        f"{supabase_url}/storage/v1/bucket/{alt_bucket}",
+                        headers=headers,
+                        timeout=8
+                    )
+                    if alt_res.status_code == 200:
+                        _BUCKET_VERIFIED.add(bucket)
+                        _BUCKET_VERIFIED.add(alt_bucket)
+                        _RESOLVED_BUCKETS[bucket] = alt_bucket
+                        logger.info(f"[Supabase Storage] Resolved requested bucket '{bucket}' to existing bucket '{alt_bucket}'")
+                        return True, None
+                except Exception:
+                    pass
+
             # Attempt to create bucket with public access
             post_res = requests.post(
                 f"{supabase_url}/storage/v1/bucket",
@@ -316,11 +335,12 @@ def upload_file(
             logger.error(f"[Storage] Cloud storage upload blocked: {err_msg}")
             return False, None, err_msg
 
+        actual_bucket = _RESOLVED_BUCKETS.get(bucket, bucket)
         storage_path = f"{clean_folder}/{sanitized_filename}"
         supabase_url = get_supabase_url()
         service_key = get_supabase_service_key()
 
-        upload_endpoint = f"{supabase_url}/storage/v1/object/{bucket}/{storage_path}"
+        upload_endpoint = f"{supabase_url}/storage/v1/object/{actual_bucket}/{storage_path}"
         headers = {
             "Authorization": f"Bearer {service_key}",
             "apikey": service_key,
@@ -338,7 +358,7 @@ def upload_file(
 
             if resp.status_code in (200, 201):
                 encoded_path = "/".join(quote(p) for p in storage_path.split('/'))
-                public_url = f"{supabase_url}/storage/v1/object/public/{bucket}/{encoded_path}"
+                public_url = f"{supabase_url}/storage/v1/object/public/{actual_bucket}/{encoded_path}"
                 logger.info(f"[Storage] Successfully uploaded '{storage_path}' to Supabase -> {public_url}")
                 return True, public_url, storage_path
             else:
@@ -400,7 +420,7 @@ def delete_file(file_identifier: str) -> bool:
 
     # 1. Check if Supabase Storage URL or path
     supabase_url = get_supabase_url()
-    bucket = get_storage_bucket()
+    bucket = _RESOLVED_BUCKETS.get(get_storage_bucket(), get_storage_bucket())
 
     is_supabase_url = supabase_url and file_identifier.startswith(supabase_url)
     known_storage_folders = (
@@ -413,11 +433,14 @@ def delete_file(file_identifier: str) -> bool:
     ) or file_identifier.startswith('event_')
 
     if (is_supabase_url or is_supabase_path) and is_cloud_storage_enabled():
+        target_bucket = bucket
         if is_supabase_url:
-            # Extract storage path from URL: .../object/public/<bucket>/<storage_path>
-            marker = f"/object/public/{bucket}/"
-            if marker in file_identifier:
-                storage_path = file_identifier.split(marker, 1)[-1]
+            for b in (bucket, 'payment-proofs', 'payment-proof'):
+                marker = f"/object/public/{b}/"
+                if marker in file_identifier:
+                    storage_path = file_identifier.split(marker, 1)[-1]
+                    target_bucket = b
+                    break
             else:
                 storage_path = Path(urlparse(file_identifier).path).name
         else:
@@ -428,7 +451,7 @@ def delete_file(file_identifier: str) -> bool:
             "Authorization": f"Bearer {service_key}",
             "apikey": service_key
         }
-        delete_endpoint = f"{supabase_url}/storage/v1/object/{bucket}/{storage_path}"
+        delete_endpoint = f"{supabase_url}/storage/v1/object/{target_bucket}/{storage_path}"
         try:
             resp = requests.delete(delete_endpoint, headers=headers, timeout=10)
             if resp.status_code in (200, 204):
@@ -482,7 +505,7 @@ def get_media_url(file_identifier: str, default: str = None) -> str | None:
     )
 
     if is_cloud_path and is_cloud_storage_enabled():
-        bucket = get_storage_bucket()
+        bucket = _RESOLVED_BUCKETS.get(get_storage_bucket(), get_storage_bucket())
         supabase_url = get_supabase_url()
         encoded = "/".join(quote(p) for p in clean.split('/'))
         return f"{supabase_url}/storage/v1/object/public/{bucket}/{encoded}"
@@ -510,7 +533,7 @@ def get_media_url(file_identifier: str, default: str = None) -> str | None:
     # 4. If missing from local disk, check if it can be resolved via Supabase Storage
     # (e.g., an old record 'uploads/organizer_qrs/xyz.jpg' where file is in Supabase 'organizer_qrs/xyz.jpg')
     if is_cloud_storage_enabled():
-        bucket = get_storage_bucket()
+        bucket = _RESOLVED_BUCKETS.get(get_storage_bucket(), get_storage_bucket())
         supabase_url = get_supabase_url()
         stripped = clean_local.replace('uploads/', '')
         encoded = "/".join(quote(p) for p in stripped.split('/'))
