@@ -15,6 +15,7 @@ logger = logging.getLogger(__name__)
 
 from models import db, Payment, PaymentStatus, FraudRisk, EventRegistration, RegistrationStatus
 from fraud_detection import check_payment_image, FraudStatus
+from services.storage_service import upload_file, sanitize_storage_filename, get_storage_bucket
 
 try:
     import pytesseract
@@ -279,8 +280,8 @@ def analyze_image_fraud(image_path, ocr_text="", parsed_details=None):
                 suspicious_score += 2
 
             # Check 4: Error Level Analysis (ELA)
+            temp_ela_path = str(image_path) + ".ela.jpg"
             try:
-                temp_ela_path = str(image_path) + ".ela.jpg"
                 img.save(temp_ela_path, 'JPEG', quality=90)
                 with Image.open(temp_ela_path) as resaved_img:
                     diff = ImageChops.difference(img.convert('RGB'), resaved_img.convert('RGB'))
@@ -289,10 +290,14 @@ def analyze_image_fraud(image_path, ocr_text="", parsed_details=None):
                     if diff_mean > 35.0:
                         indicators.append("Significant compression inconsistency detected (Error Level Analysis anomaly).")
                         suspicious_score += 4
-                if os.path.exists(temp_ela_path):
-                    os.remove(temp_ela_path)
             except Exception:
                 pass
+            finally:
+                if os.path.exists(temp_ela_path):
+                    try:
+                        os.remove(temp_ela_path)
+                    except Exception:
+                        pass
 
     except Exception as e:
         indicators.append(f"Image analysis warning: {str(e)}")
@@ -399,8 +404,6 @@ def verify_payment_submission(registration, entered_transaction_id, uploaded_fil
     expected_amount = float(event.registration_fee or 0.0)
 
     # 2. Secure File Ingestion & Persistent Storage
-    from services.storage_service import upload_file, sanitize_storage_filename, get_storage_bucket
-
     upload_dir = Path(current_app.config.get('PAYMENT_PROOF_FOLDER') or (Path(current_app.root_path) / 'static' / 'uploads' / 'payment_proofs'))
     upload_dir.mkdir(parents=True, exist_ok=True)
     
@@ -418,7 +421,7 @@ def verify_payment_submission(registration, entered_transaction_id, uploaded_fil
         content_type = guessed_type or 'image/jpeg'
 
     bucket_name = get_storage_bucket()
-    folder_path = f"event_{event.id}/student_{student.id}"
+    folder_path = f"payment-proofs/event_{event.id}/student_{student.id}"
     storage_path = f"{folder_path}/{unique_filename}"
 
     logger.info("[Payment Upload] Request received")
@@ -446,8 +449,8 @@ def verify_payment_submission(registration, entered_transaction_id, uploaded_fil
         return None, {
             'status': PaymentStatus.REJECTED,
             'fraud_risk': FraudRisk.HIGH,
-            'message': f"Failed to save payment proof to cloud storage: {storage_err}",
-            'reasons': [f"Storage error: {storage_err}"]
+            'message': f"Failed to upload payment proof to cloud storage: {storage_err}",
+            'reasons': [f"Cloud storage upload error: {storage_err}"]
         }
 
     relative_storage_path = public_url
@@ -486,6 +489,12 @@ def verify_payment_submission(registration, entered_transaction_id, uploaded_fil
             fraud_model="DUPLICATE_RULE",
             fraud_checked_at=datetime.utcnow()
         )
+        if file_path.exists():
+            try:
+                file_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+
         return payment, {
             'status': PaymentStatus.REJECTED,
             'fraud_risk': FraudRisk.HIGH,
@@ -618,6 +627,13 @@ def verify_payment_submission(registration, entered_transaction_id, uploaded_fil
         fraud_model=ai_model,
         fraud_checked_at=datetime.utcnow()
     )
+
+    if file_path.exists():
+        try:
+            file_path.unlink(missing_ok=True)
+            logger.info(f"[Payment Upload] Cleaned up temporary local proof file: {file_path}")
+        except Exception:
+            pass
 
     return payment, {
         'status': final_status,

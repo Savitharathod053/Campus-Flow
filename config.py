@@ -115,7 +115,7 @@ class Config:
     SUPABASE_URL = os.environ.get('SUPABASE_URL', '').strip().rstrip('/')
     SUPABASE_SERVICE_ROLE_KEY = (os.environ.get('SUPABASE_SERVICE_ROLE_KEY') or os.environ.get('SUPABASE_KEY') or '').strip()
     SUPABASE_KEY = SUPABASE_SERVICE_ROLE_KEY
-    SUPABASE_STORAGE_BUCKET = (os.environ.get('SUPABASE_STORAGE_BUCKET') or os.environ.get('STORAGE_BUCKET') or 'payment-proofs').strip().strip("'\"")
+    SUPABASE_STORAGE_BUCKET = (os.environ.get('SUPABASE_STORAGE_BUCKET') or os.environ.get('STORAGE_BUCKET') or 'payment-proof').strip().strip("'\"")
     STORAGE_BUCKET = SUPABASE_STORAGE_BUCKET
     
     # Frontend URL (Vercel deployment URL or comma-separated origins for CORS)

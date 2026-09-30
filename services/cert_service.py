@@ -108,14 +108,19 @@ def generate_certificate_image(student_name, roll_number, department, event_titl
     draw.line([(width - 280, height - 170), (width - 100, height - 170)], fill=slate_dark, width=2)
     draw.text((width - 190, height - 145), "Dean / Principal", fill=slate_dark, font=font_sub, anchor="mm")
 
-    # Save locally
+    # Upload directly to persistent cloud storage from in-memory buffer
+    import io
+    import logging
+    _logger = logging.getLogger(__name__)
+
     filename = f"cert_{certificate_code}.png"
-    file_path = upload_dir / filename
-    img.save(file_path, "PNG", quality=95)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG", quality=95)
+    buf.seek(0)
 
     from services.storage_service import upload_file
     success, public_url, storage_err = upload_file(
-        str(file_path),
+        buf.getvalue(),
         folder="certificates",
         filename=filename,
         content_type="image/png"
@@ -123,4 +128,6 @@ def generate_certificate_image(student_name, roll_number, department, event_titl
     if success and public_url:
         return public_url
 
-    return f"uploads/certificates/{filename}"
+    err_msg = f"Failed to upload certificate image '{filename}' to persistent cloud storage: {storage_err}"
+    _logger.error(err_msg)
+    raise RuntimeError(err_msg)

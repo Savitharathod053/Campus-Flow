@@ -217,7 +217,7 @@ def create_event():
                 from services.storage_service import upload_file
                 success, public_url, storage_err = upload_file(
                     qr_file,
-                    folder='organizer_qrs',
+                    folder='organizer-qrs',
                     filename=qr_file.filename,
                     prefix="upi_qr"
                 )
@@ -240,7 +240,7 @@ def create_event():
                 from services.storage_service import upload_file
                 success, public_url, storage_err = upload_file(
                     file,
-                    folder='event_images',
+                    folder='event-images',
                     filename=file.filename,
                     prefix="poster"
                 )
@@ -444,7 +444,7 @@ def edit_event(event_id):
                 from services.storage_service import upload_file, delete_file
                 success, public_url, storage_err = upload_file(
                     qr_file,
-                    folder='organizer_qrs',
+                    folder='organizer-qrs',
                     filename=qr_file.filename,
                     prefix=f"upi_qr_{event.id}"
                 )
@@ -465,7 +465,7 @@ def edit_event(event_id):
                 from services.storage_service import upload_file, delete_file
                 success, public_url, storage_err = upload_file(
                     file,
-                    folder='event_images',
+                    folder='event-images',
                     filename=file.filename,
                     prefix=f"poster_{event.id}"
                 )

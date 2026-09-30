@@ -122,10 +122,11 @@ def process_single_certificate_file(event, file_path, original_filename, registe
         filename=original_filename,
         prefix=f"cert_{event.id}"
     )
-    if success:
+    if success and public_url:
         effective_file_path = public_url
     else:
-        effective_file_path = f"uploads/certificates/event_{event.id}/{Path(file_path).name}"
+        logger.error(f"[Certificate Upload] Failed to upload {original_filename} to cloud storage: {storage_err}")
+        raise RuntimeError(f"Cloud storage upload failed: {storage_err}")
 
     cert_code = Certificate.generate_certificate_code(event.id, student.id if student else None)
 
@@ -240,11 +241,10 @@ def process_certificate_uploads(event_id, files_list=None, zip_file=None, custom
             created_certs.append(cert_obj)
         except Exception as e:
             # Handle individual processing failure
-            rel_path = f"uploads/certificates/event_{event.id}/{local_path.name}"
             fail_cert = Certificate(
                 event_id=event.id,
                 certificate_code=Certificate.generate_certificate_code(event.id),
-                file_path=rel_path,
+                file_path="",
                 original_filename=original_name,
                 file_type='pdf' if original_name.lower().endswith('.pdf') else 'image',
                 extracted_text=f"Error: {str(e)}",
@@ -253,6 +253,20 @@ def process_certificate_uploads(event_id, files_list=None, zip_file=None, custom
             )
             db.session.add(fail_cert)
             created_certs.append(fail_cert)
+        finally:
+            # Clean up temporary local certificate file after OCR and cloud upload
+            try:
+                if Path(local_path).exists():
+                    Path(local_path).unlink(missing_ok=True)
+            except Exception:
+                pass
+
+    # Clean up temporary event certificate directory if empty
+    try:
+        if dest_dir.exists() and not any(dest_dir.iterdir()):
+            dest_dir.rmdir()
+    except Exception:
+        pass
 
     db.session.commit()
 

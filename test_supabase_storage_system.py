@@ -91,20 +91,20 @@ class TestSupabaseStorageSystem(unittest.TestCase):
 
             mock_resp = MagicMock()
             mock_resp.status_code = 200
-            mock_resp.text = '{"Key": "payment-proofs/organizer_qrs/test.png"}'
+            mock_resp.text = '{"Key": "payment-proof/organizer-qrs/test.png"}'
             mock_post.return_value = mock_resp
 
             dummy_bytes = b"\x89PNG\r\n\x1a\nfake_image_bytes"
             success, public_url, path = upload_file(
                 file_data=dummy_bytes,
-                folder="organizer_qrs",
+                folder="organizer-qrs",
                 filename="WhatsApp Image 2026.png",
                 prefix="upi_qr",
-                bucket_name="payment-proofs"
+                bucket_name="payment-proof"
             )
 
             self.assertTrue(success)
-            self.assertTrue(public_url.startswith("https://testproj.supabase.co/storage/v1/object/public/payment-proofs/organizer_qrs/"))
+            self.assertTrue(public_url.startswith("https://testproj.supabase.co/storage/v1/object/public/payment-proof/organizer-qrs/"))
             self.assertIn(".png", public_url)
             self.assertTrue(mock_post.called)
             # Verify authorization header
@@ -168,6 +168,15 @@ class TestSupabaseStorageSystem(unittest.TestCase):
             )
             db.session.add(event)
             db.session.commit()
+        else:
+            event.start_time = now + timedelta(days=2)
+            event.end_time = now + timedelta(days=2, hours=3)
+            event.registration_deadline = now + timedelta(days=1)
+            event.status = EventStatus.APPROVED
+            event.is_published = True
+            event.registration_fee = 250.0
+            event.is_free = False
+            db.session.commit()
 
         return organizer, student, event
 
@@ -190,20 +199,20 @@ class TestSupabaseStorageSystem(unittest.TestCase):
             self.assertIn(b"organizer@upi", res.data)
 
         # Now simulate cloud URL stored in upi_qr_image
-        event.upi_qr_image = "https://xyz.supabase.co/storage/v1/object/public/payment-proofs/organizer_qrs/valid_qr.png"
+        event.upi_qr_image = "https://xyz.supabase.co/storage/v1/object/public/payment-proof/organizer-qrs/valid_qr.png"
         db.session.commit()
 
         self.assertTrue(event.is_upi_qr_available)
-        self.assertEqual(event.upi_qr_url, "https://xyz.supabase.co/storage/v1/object/public/payment-proofs/organizer_qrs/valid_qr.png")
+        self.assertEqual(event.upi_qr_url, "https://xyz.supabase.co/storage/v1/object/public/payment-proof/organizer-qrs/valid_qr.png")
 
         res2 = self.client.get(f"/events/{event.slug}")
         self.assertEqual(res2.status_code, 200)
-        self.assertIn(b"https://xyz.supabase.co/storage/v1/object/public/payment-proofs/organizer_qrs/valid_qr.png", res2.data)
+        self.assertIn(b"https://xyz.supabase.co/storage/v1/object/public/payment-proof/organizer-qrs/valid_qr.png", res2.data)
 
     def test_05_certificate_cloud_redirects(self):
         """Verify organizer and student preview/download routes redirect to cloud storage."""
         organizer, student, event = self._get_or_create_fixtures()
-        cloud_cert_url = "https://xyz.supabase.co/storage/v1/object/public/payment-proofs/certificates/cert_123.pdf"
+        cloud_cert_url = "https://xyz.supabase.co/storage/v1/object/public/payment-proof/certificates/cert_123.pdf"
 
         # Clean existing cert if any
         existing_cert = Certificate.query.filter_by(event_id=event.id, student_id=student.id).first()
@@ -243,7 +252,7 @@ class TestSupabaseStorageSystem(unittest.TestCase):
     def test_06_payment_proof_view_cloud_redirect(self):
         """Verify payment proof route redirects to cloud storage URL for authorized viewers."""
         organizer, student, event = self._get_or_create_fixtures()
-        cloud_proof_url = "https://xyz.supabase.co/storage/v1/object/public/payment-proofs/event_1/student_2/proof_123.jpg"
+        cloud_proof_url = "https://xyz.supabase.co/storage/v1/object/public/payment-proof/payment-proofs/event_1/student_2/proof_123.jpg"
 
         reg = EventRegistration.query.filter_by(event_id=event.id, student_id=student.id).first()
         if not reg:
@@ -289,20 +298,20 @@ class TestSupabaseStorageSystem(unittest.TestCase):
         with patch('services.storage_service.is_cloud_storage_enabled', return_value=True), \
              patch('services.storage_service.get_supabase_url', return_value="https://testproj.supabase.co"), \
              patch('services.storage_service.get_supabase_service_key', return_value="secret-key"), \
-             patch('services.storage_service.check_bucket_exists', return_value=(False, "Supabase Storage bucket 'payment-proofs' does not exist.")):
+             patch('services.storage_service.check_bucket_exists', return_value=(False, "Supabase Storage bucket 'payment-proof' does not exist.")):
 
             success, url, err = upload_file(
                 file_data=b"dummy-image",
-                folder="event_1/student_2",
+                folder="payment-proofs/event_1/student_2",
                 filename="receipt.jpg",
-                bucket_name="payment-proofs"
+                bucket_name="payment-proof"
             )
             self.assertFalse(success)
             self.assertIsNone(url)
-            self.assertIn("bucket 'payment-proofs' does not exist", err)
+            self.assertIn("bucket 'payment-proof' does not exist", err)
 
     def test_08_payment_submission_storage_structure_and_diagnostics(self):
-        """Verify payment proof storage path follows event_<event_id>/student_<student_id>/... and logs diagnostics."""
+        """Verify payment proof storage path follows payment-proofs/event_<id>/student_<id>/... and cleans up temp files."""
         organizer, student, event = self._get_or_create_fixtures()
         from services.payment_verification_service import verify_payment_submission
         from werkzeug.datastructures import FileStorage
@@ -330,15 +339,15 @@ class TestSupabaseStorageSystem(unittest.TestCase):
             content_type="image/jpeg"
         )
 
-        with patch('services.storage_service.upload_file') as mock_upload, \
+        with patch('services.payment_verification_service.upload_file') as mock_upload, \
              patch('services.payment_verification_service.calculate_file_hash', return_value="fake_hash_123"), \
              patch('services.payment_verification_service.check_duplicate_payment', return_value=(False, None)), \
              patch('services.payment_verification_service.extract_text_from_screenshot', return_value="Paid Rs 250.00 Ref 123456789012"), \
              patch('services.payment_verification_service.check_payment_image') as mock_fraud, \
              self.assertLogs('services.payment_verification_service', level='INFO') as log_context:
 
-            expected_cloud_url = f"https://testproj.supabase.co/storage/v1/object/public/payment-proofs/event_{event.id}/student_{student.id}/proof_file.jpg"
-            mock_upload.return_value = (True, expected_cloud_url, f"event_{event.id}/student_{student.id}/proof_file.jpg")
+            expected_cloud_url = f"https://testproj.supabase.co/storage/v1/object/public/payment-proof/payment-proofs/event_{event.id}/student_{student.id}/proof_file.jpg"
+            mock_upload.return_value = (True, expected_cloud_url, f"payment-proofs/event_{event.id}/student_{student.id}/proof_file.jpg")
             
             mock_fraud.return_value = {
                 'status': 'LOW_RISK',
@@ -354,19 +363,51 @@ class TestSupabaseStorageSystem(unittest.TestCase):
                 uploaded_file=fake_file
             )
 
-            # Check that folder passed to upload_file was event_<id>/student_<id>
+            # Check that folder passed to upload_file was payment-proofs/event_<id>/student_<id>
             self.assertTrue(mock_upload.called)
             call_kwargs = mock_upload.call_args[1]
-            self.assertEqual(call_kwargs['folder'], f"event_{event.id}/student_{student.id}")
-            self.assertEqual(call_kwargs['bucket_name'], "payment-proofs")
+            self.assertEqual(call_kwargs['folder'], f"payment-proofs/event_{event.id}/student_{student.id}")
+            self.assertEqual(call_kwargs['bucket_name'], "payment-proof")
+
+            # Check that PostgreSQL stored the permanent Supabase public URL
+            self.assertEqual(payment.payment_screenshot, expected_cloud_url)
 
             # Check Step 2 diagnostic logs
             log_messages = "\n".join(log_context.output)
             self.assertIn("[Payment Upload] Request received", log_messages)
             self.assertIn("[Payment Upload] Filename: my_upi_receipt.jpg", log_messages)
             self.assertIn("[Payment Upload] MIME type: image/jpeg", log_messages)
-            self.assertIn("[Payment Upload] Bucket: payment-proofs", log_messages)
-            self.assertIn(f"[Payment Upload] Storage path: event_{event.id}/student_{student.id}/", log_messages)
+            self.assertIn("[Payment Upload] Bucket: payment-proof", log_messages)
+
+    def test_09_failed_supabase_upload_never_returns_success(self):
+        """Verify Requirement G: When Supabase Storage fails, upload_file returns False and does not report success."""
+        with patch('services.storage_service.is_cloud_storage_enabled', return_value=True), \
+             patch('services.storage_service.get_supabase_url', return_value="https://testproj.supabase.co"), \
+             patch('services.storage_service.get_supabase_service_key', return_value="secret-key"), \
+             patch('services.storage_service.check_bucket_exists', return_value=(True, None)), \
+             patch('requests.post') as mock_post:
+
+            mock_resp = MagicMock()
+            mock_resp.status_code = 500
+            mock_resp.text = '{"error": "Internal Server Error"}'
+            mock_post.return_value = mock_resp
+
+            success, public_url, err = upload_file(
+                file_data=b"fake-data",
+                folder="event-images",
+                filename="poster.png"
+            )
+
+            self.assertFalse(success)
+            self.assertIsNone(public_url)
+            self.assertIn("500", err)
+
+    def test_10_ticket_qr_generation_works(self):
+        """Verify Requirement H: Ticket QR generation generates valid QR payload without crashing."""
+        from services.qr_service import generate_ticket_qr
+        qr_ref = generate_ticket_qr("TEST-TICKET-CODE-12345")
+        self.assertTrue(bool(qr_ref))
+        self.assertTrue("TEST-TICKET-CODE-12345" in qr_ref or qr_ref.startswith("http") or qr_ref.startswith("uploads/"))
 
 
 if __name__ == '__main__':

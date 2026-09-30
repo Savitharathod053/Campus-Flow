@@ -80,8 +80,8 @@ def get_supabase_service_key() -> str:
     return val.strip()
 
 
-def get_storage_bucket(default: str = 'payment-proofs') -> str:
-    """Returns Supabase storage bucket name (configurable via SUPABASE_STORAGE_BUCKET or STORAGE_BUCKET, default 'payment-proofs')."""
+def get_storage_bucket(default: str = 'payment-proof') -> str:
+    """Returns Supabase storage bucket name (configurable via SUPABASE_STORAGE_BUCKET or STORAGE_BUCKET, default 'payment-proof')."""
     val = ''
     if current_app:
         val = current_app.config.get('SUPABASE_STORAGE_BUCKET', '') or current_app.config.get('STORAGE_BUCKET', '')
@@ -91,6 +91,31 @@ def get_storage_bucket(default: str = 'payment-proofs') -> str:
         val = default
     clean = val.strip().strip("'\"")
     return clean or default
+
+
+def normalize_storage_folder(folder: str) -> str:
+    """
+    Normalizes folder names into consistent logical folders inside the single 'payment-proof' Supabase bucket:
+    - payment-proofs (student receipts)
+    - event-images (event posters)
+    - organizer-qrs (organizer UPI payment QR codes)
+    - certificates (student certificates)
+    - qrcodes (ticket QR codes)
+    """
+    clean = (folder or '').strip().strip('/')
+    if not clean:
+        return 'event-images'
+
+    if clean in ('event_images', 'posters'):
+        return 'event-images'
+    elif clean in ('organizer_qrs', 'organizer_qr'):
+        return 'organizer-qrs'
+    elif clean in ('payment_proofs', 'payment_proof'):
+        return 'payment-proofs'
+    elif clean.startswith('event_') and ('/student_' in clean or 'student_' in clean):
+        # Format: event_{event_id}/student_{student_id} -> payment-proofs/event_{event_id}/student_{student_id}
+        return f"payment-proofs/{clean}"
+    return clean
 
 
 def sanitize_storage_filename(filename: str, prefix: str = "") -> str:
@@ -168,6 +193,15 @@ def check_bucket_exists(bucket_name: str = None) -> tuple[bool, str | None]:
             _BUCKET_VERIFIED.add(bucket)
             return True, None
 
+        if get_res.status_code in (401, 403):
+            err_msg = (
+                f"Supabase Storage authentication failed (HTTP {get_res.status_code}). "
+                "Please verify SUPABASE_SERVICE_ROLE_KEY is configured with your service_role secret key (starts with 'eyJ...'), "
+                "not the client publishable/anon key."
+            )
+            logger.error(f"[Storage] {err_msg}")
+            return False, err_msg
+
         if get_res.status_code == 404 or (get_res.status_code == 400 and 'NoSuchBucket' in get_res.text):
             # Attempt to create bucket with public access
             post_res = requests.post(
@@ -188,21 +222,19 @@ def check_bucket_exists(bucket_name: str = None) -> tuple[bool, str | None]:
                 _BUCKET_VERIFIED.add(bucket)
                 return True, None
             else:
-                err_msg = f"Supabase Storage bucket '{bucket}' does not exist."
-                logger.error(f"[Payment Upload] {err_msg}")
+                err_msg = (
+                    f"Supabase Storage bucket '{bucket}' was not found and automatic creation failed (HTTP {post_res.status_code}: {post_res.text}). "
+                    f"Please ensure bucket '{bucket}' exists and is marked Public in your Supabase Dashboard."
+                )
+                logger.error(f"[Storage] {err_msg}")
                 return False, err_msg
 
-        if get_res.status_code in (401, 403):
-            err_msg = f"Supabase Storage authentication failed (HTTP {get_res.status_code}). Please verify SUPABASE_SERVICE_ROLE_KEY."
-            logger.error(f"[Payment Upload] {err_msg}")
-            return False, err_msg
-
         err_msg = f"Supabase Storage bucket '{bucket}' check failed (HTTP {get_res.status_code}): {get_res.text}"
-        logger.error(f"[Payment Upload] {err_msg}")
+        logger.error(f"[Storage] {err_msg}")
         return False, err_msg
     except Exception as exc:
         err_msg = f"Supabase Storage connection error: {str(exc)}"
-        logger.exception(f"[Payment Upload] Cloud storage upload failed: {err_msg}")
+        logger.exception(f"[Storage] Cloud storage bucket check failed: {err_msg}")
         return False, err_msg
 
 
@@ -216,24 +248,25 @@ def ensure_bucket_exists(bucket_name: str = None) -> bool:
 
 def upload_file(
     file_data,
-    folder: str = "organizer_qrs",
+    folder: str = "event-images",
     filename: str = None,
     content_type: str = None,
     prefix: str = "",
     bucket_name: str = None
 ) -> tuple[bool, str | None, str | None]:
     """
-    Uploads a file to persistent storage:
-    - In production or when Supabase credentials are set: uploads to Supabase Storage.
-    - In local development without credentials: saves to local static/uploads/ directory.
+    Uploads a file directly to persistent Supabase Cloud Storage.
+    - In production or whenever Supabase credentials are configured: uploads strictly to Supabase Storage.
+    - If upload fails, returns (False, None, error_message). NEVER silently falls back to ephemeral disk in production.
+    - Local fallback is permitted ONLY in offline local development environments where no cloud URL is configured.
 
     Arguments:
     - file_data: bytes, file-like object, Werkzeug FileStorage, or local filesystem path (str/Path)
-    - folder: target directory ('organizer_qrs', 'payment_proofs', 'event_1/student_2', etc.)
+    - folder: logical folder ('payment-proofs', 'event-images', 'organizer-qrs', 'certificates', etc.)
     - filename: original file name
     - content_type: MIME type (auto-detected if None)
     - prefix: optional prefix for sanitized file name
-    - bucket_name: optional bucket name (defaults to SUPABASE_STORAGE_BUCKET)
+    - bucket_name: optional bucket name (defaults to SUPABASE_STORAGE_BUCKET or 'payment-proof')
 
     Returns:
     - (success: bool, public_url: str | None, error_or_storage_path: str | None)
@@ -271,54 +304,66 @@ def upload_file(
         guessed_type, _ = mimetypes.guess_type(sanitized_filename)
         content_type = guessed_type or 'application/octet-stream'
 
-    # Clean folder path (remove leading/trailing slashes)
-    clean_folder = folder.strip('/')
+    # Normalize folder path to target logical folders within the single 'payment-proof' bucket
+    clean_folder = normalize_storage_folder(folder)
 
-    # 2. Upload to Supabase if configured
+    # 2. Upload to Supabase Storage
     if is_cloud_storage_enabled():
         bucket = bucket_name or get_storage_bucket()
         bucket_exists, bucket_err = check_bucket_exists(bucket)
-        if bucket_exists:
-            storage_path = f"{clean_folder}/{sanitized_filename}"
-            supabase_url = get_supabase_url()
-            service_key = get_supabase_service_key()
+        if not bucket_exists:
+            err_msg = bucket_err or f"Supabase Storage bucket '{bucket}' is not available."
+            logger.error(f"[Storage] Cloud storage upload blocked: {err_msg}")
+            return False, None, err_msg
 
-            upload_endpoint = f"{supabase_url}/storage/v1/object/{bucket}/{storage_path}"
-            headers = {
-                "Authorization": f"Bearer {service_key}",
-                "apikey": service_key,
-                "Content-Type": content_type,
-                "x-upsert": "true"
-            }
+        storage_path = f"{clean_folder}/{sanitized_filename}"
+        supabase_url = get_supabase_url()
+        service_key = get_supabase_service_key()
 
-            try:
-                resp = requests.post(
-                    upload_endpoint,
-                    headers=headers,
-                    data=binary_content,
-                    timeout=30
-                )
+        upload_endpoint = f"{supabase_url}/storage/v1/object/{bucket}/{storage_path}"
+        headers = {
+            "Authorization": f"Bearer {service_key}",
+            "apikey": service_key,
+            "Content-Type": content_type,
+            "x-upsert": "true"
+        }
 
-                if resp.status_code in (200, 201):
-                    encoded_path = "/".join(quote(p) for p in storage_path.split('/'))
-                    public_url = f"{supabase_url}/storage/v1/object/public/{bucket}/{encoded_path}"
-                    logger.info(f"[Storage] Successfully uploaded '{storage_path}' to Supabase -> {public_url}")
-                    return True, public_url, storage_path
-                else:
-                    logger.warning(f"[Storage] Supabase upload returned HTTP {resp.status_code}: {resp.text}. Falling back to local storage.")
-            except Exception as exc:
-                logger.warning(f"[Storage] Supabase connection error: {exc}. Falling back to local storage.")
-        else:
-            logger.warning(f"[Storage] Supabase bucket check failed ({bucket_err}). Falling back to local storage.")
+        try:
+            resp = requests.post(
+                upload_endpoint,
+                headers=headers,
+                data=binary_content,
+                timeout=30
+            )
 
-    # 3. Fallback: Local Filesystem Storage (Guarantees uploads never block the user)
-    if is_production_env():
-        logger.warning(
-            "[Storage] Cloud storage not active. Falling back to container local storage. "
-            "To use persistent cloud storage, configure SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+            if resp.status_code in (200, 201):
+                encoded_path = "/".join(quote(p) for p in storage_path.split('/'))
+                public_url = f"{supabase_url}/storage/v1/object/public/{bucket}/{encoded_path}"
+                logger.info(f"[Storage] Successfully uploaded '{storage_path}' to Supabase -> {public_url}")
+                return True, public_url, storage_path
+            else:
+                err_msg = f"Supabase upload failed (HTTP {resp.status_code}): {resp.text}"
+                logger.error(f"[Storage] {err_msg}")
+                # STRICT: Do NOT silently fall back to local ephemeral container disk!
+                return False, None, err_msg
+        except Exception as exc:
+            err_msg = f"Supabase Storage network error: {str(exc)}"
+            logger.exception(f"[Storage] {err_msg}")
+            # STRICT: Do NOT silently fall back to local ephemeral container disk!
+            return False, None, err_msg
+
+    # 3. Production check: If running in production but cloud storage is not configured, FAIL explicitly
+    if is_production_env() or get_supabase_url():
+        err_msg = (
+            "Persistent Cloud Storage error: SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required for file storage. "
+            "Railway ephemeral container filesystem cannot be used for permanent uploads."
         )
+        logger.error(f"[Storage] {err_msg}")
+        return False, None, err_msg
 
+    # 4. Offline local development fallback only (when neither production nor cloud URL is active)
     try:
+        logger.warning("[Storage] Cloud storage not configured. Saving to local development uploads directory.")
         if current_app:
             base_upload_dir = Path(current_app.config.get('UPLOAD_FOLDER') or (Path(current_app.root_path) / 'static' / 'uploads'))
         else:
@@ -337,7 +382,7 @@ def upload_file(
         except Exception:
             local_url = f"/static/{relative_path}"
 
-        logger.info(f"[LocalStorage] Saved '{relative_path}'")
+        logger.info(f"[LocalStorage] Saved '{relative_path}' for offline development")
         return True, local_url, relative_path
     except Exception as exc:
         err_msg = f"Failed to save file to local filesystem: {str(exc)}"
@@ -358,10 +403,14 @@ def delete_file(file_identifier: str) -> bool:
     bucket = get_storage_bucket()
 
     is_supabase_url = supabase_url and file_identifier.startswith(supabase_url)
+    known_storage_folders = (
+        'payment-proofs', 'event-images', 'organizer-qrs', 'certificates', 'qrcodes',
+        'organizer_qrs', 'payment_proofs', 'event_images', 'posters'
+    )
     is_supabase_path = any(
         file_identifier.startswith(f"{folder}/") 
-        for folder in ('organizer_qrs', 'payment_proofs', 'certificates', 'event_images')
-    )
+        for folder in known_storage_folders
+    ) or file_identifier.startswith('event_')
 
     if (is_supabase_url or is_supabase_path) and is_cloud_storage_enabled():
         if is_supabase_url:
@@ -421,8 +470,11 @@ def get_media_url(file_identifier: str, default: str = None) -> str | None:
     if clean.startswith(('http://', 'https://')):
         return clean
 
-    # 2. Supabase storage path (e.g. 'organizer_qrs/filename.png', 'event_1/student_2/filename.jpg')
-    known_folders = ('organizer_qrs', 'payment_proofs', 'certificates', 'event_images', 'posters', 'qrcodes')
+    # 2. Supabase storage path (e.g. 'organizer-qrs/filename.png', 'payment-proofs/event_1/student_2/filename.jpg')
+    known_folders = (
+        'payment-proofs', 'event-images', 'organizer-qrs', 'certificates', 'qrcodes',
+        'organizer_qrs', 'payment_proofs', 'event_images', 'posters'
+    )
     is_cloud_path = (
         any(clean.startswith(f"{f}/") for f in known_folders) or
         clean.startswith('event_') or
