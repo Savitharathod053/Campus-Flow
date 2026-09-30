@@ -5,7 +5,12 @@
   "description": "Campus Flow - Production Frontend Assets & Vercel Edge Deployment",
   "scripts": {
     "build": "node scripts/build.js",
-    "test": "node -e \"console.log('Frontend build tests passed')\""
+    "test": "node -e \"console.log('Frontend build tests passed')\"",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:debug": "playwright test --debug",
+    "test:e2e:report": "playwright show-report"
   },
   "keywords": [
     "campus-flow",
@@ -14,5 +19,12 @@
     "railway"
   ],
   "author": "Campus Flow Team",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.3",
+    "dotenv": "^18.0.4",
+    "typescript": "^7.0.2"
+  }
 }
