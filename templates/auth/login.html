@@ -16,12 +16,12 @@
 
                 <form method="POST" action="{{ url_for('auth.login', next=request.args.get('next')) }}">
                     <div class="mb-3">
-                        <label for="identifier" class="form-label small fw-bold">Roll Number</label>
+                        <label for="identifier" class="form-label small fw-bold">Roll Number / Email</label>
                         <div class="input-group">
                             <span class="input-group-text bg-light"><i class="bi bi-person-badge text-muted"></i></span>
-                            <input type="text" class="form-control" id="identifier" name="identifier" required placeholder="Enter roll number (or email for faculty/admin)">
+                            <input type="text" class="form-control" id="identifier" name="identifier" required placeholder="Roll Number (Students/Organizers) or Email (Staff/Admins)">
                         </div>
-                        <div class="form-text small text-muted">Students and organizers log in using Roll Number. Faculty, HOD, and Admins use Email.</div>
+                        <div class="form-text small text-muted">Students &amp; Organizers: log in using <strong>Roll Number only</strong>. Admin, HOD &amp; Super Admin: log in using <strong>Email only</strong>.</div>
                     </div>
 
                     <div class="mb-3">

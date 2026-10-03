@@ -138,13 +138,22 @@ def login():
         user = None
 
         # Resolution order:
-        # 1. First check if identifier is an email (Super Admin, Dean, HOD, and users logging in by email)
+        # - Students & Organizers MUST log in using Roll Number only.
+        # - Super Admin, Dean, HOD, and Administrators MUST log in using Email only.
         if '@' in identifier:
-            user = User.query.filter_by(email=identifier.lower()).first()
-            if not user:
-                user = User.query.filter_by(email=identifier).first()
+            found_user = User.query.filter_by(email=identifier.lower()).first()
+            if not found_user:
+                found_user = User.query.filter_by(email=identifier).first()
+
+            if found_user:
+                # Disallow students and organizers from logging in with email
+                if found_user.is_student or found_user.is_organizer:
+                    flash('Invalid email or password credentials. Students and organizers must log in using their roll number.', 'danger')
+                    return render_template('auth/login.html')
+                user = found_user
         else:
-            # 2. Check by student roll number
+            # Roll number login attempted -> Only Students and Organizers
+            # 1. Check student roll number
             student_profile = StudentProfile.query.filter_by(roll_number=identifier).first()
             if not student_profile and hasattr(identifier, 'upper'):
                 student_profile = StudentProfile.query.filter_by(roll_number=identifier.upper()).first()
@@ -152,17 +161,20 @@ def login():
             if student_profile:
                 user = student_profile.user
             else:
-                # 3. Check by organizer roll number
+                # 2. Check organizer roll number
                 organizer_profile = OrganizerProfile.query.filter_by(roll_number=identifier).first()
                 if not organizer_profile and hasattr(identifier, 'upper'):
                     organizer_profile = OrganizerProfile.query.filter_by(roll_number=identifier.upper()).first()
                 if organizer_profile:
                     user = organizer_profile.user
                 else:
-                    # 4. Fallback check email in case identifier has no @
-                    user = User.query.filter_by(email=identifier.lower()).first()
-                    if not user:
-                        user = User.query.filter_by(email=identifier).first()
+                    # Check if an admin/faculty employee ID was mistakenly used
+                    faculty_profile = FacultyProfile.query.filter_by(employee_id=identifier).first()
+                    if not faculty_profile and hasattr(identifier, 'upper'):
+                        faculty_profile = FacultyProfile.query.filter_by(employee_id=identifier.upper()).first()
+                    if faculty_profile:
+                        flash('Invalid credentials. Administrators, HODs, and Super Admins must log in using their email address.', 'danger')
+                        return render_template('auth/login.html')
 
         if not user or not user.check_password(password):
             flash('Invalid email or password credentials.', 'danger')
