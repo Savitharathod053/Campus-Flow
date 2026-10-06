@@ -12,6 +12,17 @@ def main():
     bind_addr = f"0.0.0.0:{port}"
     print(f"[Campus Flow] Launching Gunicorn on {bind_addr} (PORT={port})...", flush=True)
 
+    # Run database schema migration/sync synchronously before launching Gunicorn
+    try:
+        print("[Campus Flow] Running pre-launch database schema synchronization...", flush=True)
+        from app import app
+        from services.db_init import sync_missing_columns
+        with app.app_context():
+            sync_missing_columns()
+        print("[Campus Flow] Database schema verified and synchronized.", flush=True)
+    except Exception as mig_err:
+        print(f"[Campus Flow] Schema synchronization note: {mig_err}", file=sys.stderr, flush=True)
+
     args = [
         "gunicorn",
         "wsgi:app",
