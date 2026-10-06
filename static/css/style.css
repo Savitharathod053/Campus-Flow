@@ -1413,8 +1413,24 @@ body:not(.modal-open) .modal-backdrop {
   line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  font-size: 1.1rem;
+  font-weight: 700;
   line-height: 1.35;
+  min-height: 2.7em;
   margin-bottom: 0.5rem;
+}
+
+.event-card-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  min-height: 2.9em;
+  color: var(--ff-text-muted);
+  margin-bottom: 0.85rem;
 }
 
 .event-card-meta {
@@ -1428,6 +1444,57 @@ body:not(.modal-open) .modal-backdrop {
   margin-top: auto;
   padding-top: 0.85rem;
   border-top: 1px solid rgba(226, 232, 240, 0.8);
+}
+
+/* Explore Events Page Layout Polish */
+.explore-filter-card {
+  position: static;
+  border-radius: var(--ff-radius-lg);
+}
+
+@media (min-width: 992px) {
+  .explore-filter-card {
+    position: sticky;
+    top: 75px;
+    z-index: 10;
+  }
+}
+
+.category-chip {
+  transition: all 0.2s ease;
+  font-weight: 500;
+  border-radius: 9999px;
+  letter-spacing: 0.2px;
+}
+
+.category-chip:hover {
+  transform: translateY(-1px);
+}
+
+.category-chip.active {
+  background-color: var(--ff-primary) !important;
+  color: #ffffff !important;
+  box-shadow: 0 4px 12px -2px rgba(37, 99, 235, 0.4) !important;
+  border-color: transparent !important;
+}
+
+.explore-filter-label {
+  font-size: 0.72rem;
+  letter-spacing: 0.6px;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 0.35rem;
+  display: block;
+  text-transform: uppercase;
+}
+
+.venue-text-truncate {
+  max-width: 155px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  vertical-align: middle;
 }
 
 /* Mobile & Tablet Responsive Fine-Tuning */

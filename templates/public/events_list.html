@@ -4,11 +4,13 @@
 {% block content %}
 <!-- Page Header Banner -->
 <div class="py-4 mb-4 text-white position-relative overflow-hidden" style="background: linear-gradient(135deg, #090d16 0%, #1e3a8a 60%, #1e1b4b 100%);">
-    <div class="hero-orb hero-orb-2" style="width: 250px; height: 250px; bottom: -80px; right: 5%; opacity: 0.4;" aria-hidden="true"></div>
+    <div class="hero-orb hero-orb-2" style="width: 250px; height: 250px; bottom: -80px; right: 5%; opacity: 0.35;" aria-hidden="true"></div>
     <div class="container position-relative" style="z-index: 2;">
         <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
             <div>
-                <span class="badge bg-warning text-dark fw-bold px-3 py-1 mb-2"><i class="bi bi-compass me-1"></i> DISCOVERY PORTAL</span>
+                <span class="badge bg-warning text-dark fw-bold px-3 py-1 mb-2">
+                    <i class="bi bi-compass me-1"></i> DISCOVERY PORTAL
+                </span>
                 <h2 class="fw-bold mb-1 text-white">Explore Campus Events</h2>
                 <p class="text-light opacity-90 mb-0">Discover and register for upcoming university workshops, coding hackathons, technical seminars, and cultural festivals.</p>
             </div>
@@ -23,39 +25,45 @@
 
 <div class="container pb-5">
     <!-- Category Filter Chips Bar -->
-    <div class="d-flex flex-wrap gap-2 mb-4 pb-2 border-bottom align-items-center">
-        <span class="small text-muted fw-bold text-uppercase me-2"><i class="bi bi-tag-fill me-1 text-primary"></i> Category:</span>
+    <div class="d-flex flex-wrap gap-2 mb-4 pb-3 border-bottom align-items-center">
+        <span class="small text-muted fw-bold text-uppercase me-1 d-inline-flex align-items-center">
+            <i class="bi bi-tag-fill me-1 text-primary"></i> Category:
+        </span>
         <a href="{{ url_for('public.events', q=search_query, department=selected_dept, year=selected_year, pricing=pricing_filter, status=status_filter) }}" 
-           class="badge text-decoration-none {% if not selected_type or selected_type == 'ALL' %}bg-primary text-white shadow-sm{% else %}bg-light text-dark border{% endif %} px-3 py-2">
+           class="badge category-chip text-decoration-none {% if not selected_type or selected_type == 'ALL' %}active{% else %}bg-light text-dark border{% endif %} px-3 py-2">
            All Categories
         </a>
         {% for t in event_types %}
             <a href="{{ url_for('public.events', type=t, q=search_query, department=selected_dept, year=selected_year, pricing=pricing_filter, status=status_filter) }}" 
-               class="badge text-decoration-none {% if selected_type == t %}bg-primary text-white shadow-sm{% else %}bg-light text-dark border{% endif %} px-3 py-2">
+               class="badge category-chip text-decoration-none {% if selected_type == t %}active{% else %}bg-light text-dark border{% endif %} px-3 py-2">
                {{ t }}
             </a>
         {% endfor %}
     </div>
 
-    <div class="row g-4">
+    <div class="row g-4 align-items-start">
         <!-- Sidebar Filters Column -->
         <div class="col-lg-3">
-            <div class="card p-4 sticky-top shadow-sm card-static" style="top: 85px; z-index: 10;">
-                <h5 class="fw-bold mb-3 d-flex align-items-center justify-content-between">
-                    <span><i class="bi bi-funnel text-primary me-2"></i> Filters</span>
-                    <a href="{{ url_for('public.events') }}" class="small text-muted text-decoration-none fw-normal">Reset All</a>
-                </h5>
+            <div class="card p-4 shadow-sm card-static explore-filter-card">
+                <div class="d-flex align-items-center justify-content-between pb-2 mb-3 border-bottom">
+                    <h6 class="fw-bold mb-0 text-dark d-flex align-items-center">
+                        <i class="bi bi-funnel-fill text-primary me-2"></i> Filters
+                    </h6>
+                    <a href="{{ url_for('public.events') }}" class="small text-muted text-decoration-none fw-semibold">
+                        <i class="bi bi-arrow-counterclockwise me-1"></i>Reset
+                    </a>
+                </div>
                 <form action="{{ url_for('public.events') }}" method="GET">
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">SEARCH</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
-                            <input type="text" name="q" class="form-control form-control-sm border-start-0" placeholder="Title, venue, dept..." value="{{ search_query }}">
+                        <label class="explore-filter-label">Search Keyword</label>
+                        <div class="input-group input-group-sm">
+                            <span class="input-group-text bg-light border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                            <input type="text" name="q" class="form-control border-start-0" placeholder="Title, venue, dept..." value="{{ search_query }}">
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">CATEGORY</label>
+                        <label class="explore-filter-label">Category</label>
                         <select name="type" class="form-select form-select-sm">
                             <option value="ALL">All Categories</option>
                             {% for t in event_types %}
@@ -65,7 +73,7 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">DEPARTMENT</label>
+                        <label class="explore-filter-label">Department</label>
                         <select name="department" class="form-select form-select-sm">
                             <option value="ALL">All Departments</option>
                             {% for d in departments %}
@@ -79,7 +87,7 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">TARGET YEAR</label>
+                        <label class="explore-filter-label">Target Year</label>
                         <select name="year" class="form-select form-select-sm">
                             <option value="ALL">All Years</option>
                             <option value="1" {% if selected_year == '1' %}selected{% endif %}>1st Year</option>
@@ -90,25 +98,29 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label small fw-bold text-muted">PRICING</label>
-                        <div class="d-flex flex-column gap-2">
-                            <div class="form-check">
+                        <label class="explore-filter-label">Pricing</label>
+                        <div class="d-flex flex-column gap-2 pt-1">
+                            <div class="form-check form-check-inline m-0">
                                 <input class="form-check-input" type="radio" name="pricing" id="priceAll" value="" {% if not pricing_filter %}checked{% endif %}>
                                 <label class="form-check-label small" for="priceAll">All Events</label>
                             </div>
-                            <div class="form-check">
+                            <div class="form-check form-check-inline m-0">
                                 <input class="form-check-input" type="radio" name="pricing" id="priceFree" value="free" {% if pricing_filter == 'free' %}checked{% endif %}>
-                                <label class="form-check-label small text-success fw-semibold" for="priceFree"><i class="bi bi-tag-fill me-1"></i> Free Only</label>
+                                <label class="form-check-label small text-success fw-semibold" for="priceFree">
+                                    <i class="bi bi-tag-fill me-1"></i> Free Only
+                                </label>
                             </div>
-                            <div class="form-check">
+                            <div class="form-check form-check-inline m-0">
                                 <input class="form-check-input" type="radio" name="pricing" id="pricePaid" value="paid" {% if pricing_filter == 'paid' %}checked{% endif %}>
-                                <label class="form-check-label small text-primary fw-semibold" for="pricePaid"><i class="bi bi-currency-rupee me-1"></i> Paid Only</label>
+                                <label class="form-check-label small text-primary fw-semibold" for="pricePaid">
+                                    <i class="bi bi-currency-rupee me-1"></i> Paid Only
+                                </label>
                             </div>
                         </div>
                     </div>
 
                     <div class="mb-4">
-                        <label class="form-label small fw-bold text-muted">TIMELINE</label>
+                        <label class="explore-filter-label">Timeline</label>
                         <select name="status" class="form-select form-select-sm">
                             <option value="upcoming" {% if status_filter == 'upcoming' %}selected{% endif %}>Upcoming Only</option>
                             <option value="past" {% if status_filter == 'past' %}selected{% endif %}>Past / Concluded</option>
@@ -116,8 +128,8 @@
                         </select>
                     </div>
 
-                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold shadow-sm">
-                        <i class="bi bi-check2-circle me-1"></i> Apply Filters
+                    <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold shadow-sm py-2">
+                        <i class="bi bi-funnel me-1"></i> Apply Filters
                     </button>
                 </form>
             </div>
@@ -125,18 +137,25 @@
 
         <!-- Events Grid Column -->
         <div class="col-lg-9">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <span class="text-muted small">Showing <strong>{{ events|length }}</strong> events</span>
+            <div class="d-flex justify-content-between align-items-center mb-3 pb-1">
+                <span class="text-muted small fw-medium">
+                    Showing <strong class="text-dark">{{ events|length }}</strong> {{ 'event' if events|length == 1 else 'events' }}
+                </span>
+                {% if search_query or (selected_type and selected_type != 'ALL') or (selected_dept and selected_dept != 'ALL') or (selected_year and selected_year != 'ALL') or pricing_filter or status_filter != 'upcoming' %}
+                    <a href="{{ url_for('public.events') }}" class="btn btn-outline-secondary btn-sm py-1 px-2" style="font-size: 0.78rem;">
+                        <i class="bi bi-x-circle me-1"></i> Clear active filters
+                    </a>
+                {% endif %}
             </div>
 
             {% if events %}
                 <div class="row g-4">
                     {% for event in events %}
                         <div class="col-md-6">
-                            <div class="card ff-card ff-card-interactive event-card tilt-card {% if event.is_completed or event.is_expired %}event-concluded{% endif %}">
+                            <div class="card ff-card ff-card-interactive event-card tilt-card h-100 {% if event.is_completed or event.is_expired %}event-concluded{% endif %}">
                                 <div class="event-poster-wrapper">
                                     {% if event.poster_url %}
-                                        <img src="{{ event.poster_url }}" alt="{{ event.title }}" class="event-poster-img">
+                                        <img src="{{ event.poster_url }}" alt="{{ event.title }}" class="event-poster-img" loading="lazy">
                                     {% else %}
                                         <div class="d-flex flex-column align-items-center justify-content-center h-100 text-white p-3 text-center">
                                             <i class="bi bi-calendar-event fs-1 mb-2 text-warning"></i>
@@ -157,12 +176,14 @@
                                         <i class="bi bi-calendar3 text-primary"></i>
                                         <span>{{ event.start_time|dateformat }} &bull; {{ event.start_time|timeformat }}</span>
                                     </div>
-                                    <h5 class="fw-bold mb-2 text-dark event-card-title" title="{{ event.title }}">{{ event.title }}</h5>
-                                    <p class="text-muted small mb-3 flex-grow-1 text-break">{{ event.description|truncate(100) }}</p>
+                                    <h5 class="fw-bold text-dark event-card-title" title="{{ event.title }}">{{ event.title }}</h5>
+                                    <p class="event-card-description">{{ event.description|truncate(120) if event.description else 'Join this campus event to learn, connect, and participate.' }}</p>
                                     
-                                    <div class="border-top pt-3 mt-auto">
+                                    <div class="event-card-footer mt-auto">
                                         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 small text-muted mb-3">
-                                            <span class="text-truncate" style="max-width: 140px;"><i class="bi bi-geo-alt me-1 text-danger"></i> {{ event.venue|truncate(20) }}</span>
+                                            <span class="venue-text-truncate" title="{{ event.venue }}">
+                                                <i class="bi bi-geo-alt-fill me-1 text-danger"></i> {{ event.venue|truncate(22) }}
+                                            </span>
                                             {% if event.is_registration_not_started %}
                                                 <span class="badge bg-warning-subtle text-dark border border-warning-subtle">Reg Starts {{ event.registration_start_date|dateformat }}</span>
                                             {% elif event.is_deadline_passed %}
@@ -175,7 +196,7 @@
                                                 </span>
                                             {% endif %}
                                         </div>
-                                        <a href="{{ url_for('public.event_detail', slug=event.slug) }}" class="btn {% if event.is_completed or event.is_expired %}btn-outline-secondary disabled{% elif event.is_registration_not_started %}btn-outline-primary{% else %}btn-primary{% endif %} w-100 fw-semibold">
+                                        <a href="{{ url_for('public.event_detail', slug=event.slug) }}" class="btn {% if event.is_completed or event.is_expired %}btn-outline-secondary disabled{% elif event.is_registration_not_started %}btn-outline-primary{% else %}btn-primary{% endif %} w-100 fw-semibold py-2">
                                             {% if event.is_completed or event.is_expired %}Event Concluded
                                             {% elif event.is_registration_not_started %}View Details (Opens Soon)
                                             {% elif event.is_deadline_passed %}View Details (Reg Closed)
@@ -188,12 +209,16 @@
                     {% endfor %}
                 </div>
             {% else %}
-                <div class="text-center py-5 card p-5">
-                    <i class="bi bi-search text-muted fs-1 mb-3"></i>
-                    <h5 class="fw-bold">No events matched your criteria</h5>
-                    <p class="text-muted">Try removing some filters or search keywords to view other campus events.</p>
+                <div class="text-center py-5 card p-5 shadow-sm border-0">
+                    <div class="mb-3">
+                        <i class="bi bi-search text-muted display-4"></i>
+                    </div>
+                    <h5 class="fw-bold text-dark mb-2">No events matched your criteria</h5>
+                    <p class="text-muted mb-4 small" style="max-width: 420px; margin: 0 auto;">Try adjusting your search terms, changing the department or category, or clearing the active filters.</p>
                     <div>
-                        <a href="{{ url_for('public.events') }}" class="btn btn-outline-primary btn-sm">Clear All Filters</a>
+                        <a href="{{ url_for('public.events') }}" class="btn btn-outline-primary btn-sm px-4 fw-semibold">
+                            <i class="bi bi-arrow-counterclockwise me-1"></i> Clear All Filters
+                        </a>
                     </div>
                 </div>
             {% endif %}
@@ -201,3 +226,4 @@
     </div>
 </div>
 {% endblock %}
+
