@@ -1448,15 +1448,19 @@ body:not(.modal-open) .modal-backdrop {
 
 /* Explore Events Page Layout Polish */
 .explore-filter-card {
-  position: static;
   border-radius: var(--ff-radius-lg);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: #ffffff;
 }
 
 @media (min-width: 992px) {
-  .explore-filter-card {
+  .explore-filter-sidebar {
     position: sticky;
     top: 75px;
     z-index: 10;
+    max-height: calc(100vh - 90px);
+    overflow-y: auto;
+    scrollbar-width: thin;
   }
 }
 
