@@ -199,11 +199,11 @@ def create_app(config_class=Config):
 
         return jsonify(response_data), (200 if is_configured else 503)
 
-    # Pre-request schema assurance (idempotent, ensures tables exist on first request)
+    # Pre-request schema assurance (idempotent, ensures tables and columns exist)
     @app.before_request
     def ensure_database_ready():
         from flask import request
-        if request.endpoint in ('static', 'health', 'health_db', 'health_email', 'public.home', 'public.index'):
+        if request.endpoint == 'static':
             return
         from services.db_init import ensure_db_initialized
         try:
@@ -417,6 +417,13 @@ def create_app(config_class=Config):
         start_capacity_monitoring_scheduler(app, interval_seconds=60)
     except Exception as sched_err:
         app.logger.warning(f"Note: Could not start capacity monitoring scheduler: {sched_err}")
+
+    # Start background database initialization & schema column sync (idempotent)
+    try:
+        from services.db_init import start_background_db_init
+        start_background_db_init(app)
+    except Exception as db_init_err:
+        app.logger.warning(f"Note: Could not start background db init: {db_init_err}")
 
     # Safe startup port log showing dynamic port configuration without secrets
     configured_port = os.environ.get('PORT', '5000')

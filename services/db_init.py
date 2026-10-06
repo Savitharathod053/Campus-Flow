@@ -161,6 +161,9 @@ def sync_missing_columns():
             ('eligibility_notes', 'VARCHAR(255)', None, True),
             ('empty_slot_notification_sent', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'FALSE' if 'postgres' in dialect else '0', False),
             ('responsible_hod_id', 'INTEGER', None, True),
+            ('spot_registration_slots', 'INTEGER', '0', False),
+            ('spot_registration_closed', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'FALSE' if 'postgres' in dialect else '0', False),
+            ('spot_empty_slot_notification_sent', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'FALSE' if 'postgres' in dialect else '0', False),
         ],
         'event_requests': [
             ('registration_start_date', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
@@ -206,6 +209,7 @@ def sync_missing_columns():
         ],
         'event_registrations': [
             ('team_id', 'INTEGER', None, True),
+            ('registration_type', 'VARCHAR(20)', "'ONLINE'", False),
         ],
         'certificates': [
             ('extracted_name', 'VARCHAR(150)', None, True),
