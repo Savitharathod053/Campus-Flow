@@ -119,6 +119,11 @@ class Event(db.Model):
     empty_slot_notification_sent = db.Column(db.Boolean, default=False, nullable=False)
     responsible_hod_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
 
+    # Spot Registration Configuration
+    spot_registration_slots = db.Column(db.Integer, default=0, nullable=False)
+    spot_registration_closed = db.Column(db.Boolean, default=False, nullable=False)
+    spot_empty_slot_notification_sent = db.Column(db.Boolean, default=False, nullable=False)
+
     # Lifecycle Status
     status = db.Column(db.String(30), default=EventStatus.PENDING_APPROVAL, nullable=False, index=True)
     rejection_reason = db.Column(db.Text, nullable=True)
@@ -192,6 +197,83 @@ class Event(db.Model):
         return self.registrations.filter_by(status='CONFIRMED').count()
 
     @property
+    def online_registrations_count(self):
+        """Number of confirmed registrations through the normal online system."""
+        if not self.id:
+            return 0
+        from .registration import EventRegistration
+        # Online registrations are those with registration_type != 'SPOT' or registration_type == 'ONLINE'
+        return self.registrations.filter(
+            EventRegistration.status == 'CONFIRMED',
+            db.or_(EventRegistration.registration_type == 'ONLINE', EventRegistration.registration_type.is_(None))
+        ).count()
+
+    @property
+    def is_online_registration_closed(self):
+        """
+        True when online registration is closed.
+        Online registration closes when deadline passes, registration is full, or event is completed/cancelled.
+        """
+        if self.is_completed or self.status in (EventStatus.CANCELLED, EventStatus.REJECTED):
+            return True
+        if self.is_deadline_passed:
+            return True
+        if self.is_full:
+            return True
+        return False
+
+    @property
+    def spot_registrations_count(self):
+        """Number of confirmed registrations through spot registration."""
+        if not self.id:
+            return 0
+        return self.registrations.filter_by(status='CONFIRMED', registration_type='SPOT').count()
+
+    @property
+    def spot_registration_capacity(self):
+        """
+        Effective on-spot capacity based on core slot logic:
+        1. Every event has ONE Total Event Capacity (self.max_participants).
+        2. Before online registration closes:
+           - All slots are available for online registration.
+           - On-spot registration slots = 0.
+        3. When online registration closes:
+           - Unused online slots = Total Event Capacity - Online Registrations.
+           - If spot_registration_slots is explicitly configured (non-zero or edited), use it up to unused capacity.
+           - Otherwise automatically make those unused slots available for on-spot registration.
+        """
+        if not self.is_online_registration_closed:
+            return 0
+
+        total_cap = self.max_participants or 0
+        online_count = self.online_registrations_count
+        unused_online = max(0, total_cap - online_count)
+
+        # If organizer has customized spot_registration_slots:
+        custom_slots = self.spot_registration_slots or 0
+        if custom_slots > 0:
+            # Cannot exceed unused online slots
+            return min(custom_slots, unused_online)
+
+        # Default automatically becomes all unused online slots
+        return unused_online
+
+    @property
+    def spot_slots_remaining(self):
+        """Available unfilled spot registration slots."""
+        cap = self.spot_registration_capacity
+        return max(0, cap - self.spot_registrations_count)
+
+    @property
+    def is_spot_registration_open(self):
+        """True if spot registration is enabled, not closed, online reg is closed, and has slots remaining."""
+        if self.spot_registration_closed:
+            return False
+        if not self.is_online_registration_closed:
+            return False
+        return self.spot_slots_remaining > 0
+
+    @property
     def allows_individual_registration(self):
         return self.registration_type in (EventRegistrationType.INDIVIDUAL, EventRegistrationType.BOTH)
 
@@ -205,12 +287,15 @@ class Event(db.Model):
 
     @property
     def available_seats(self):
-        count = self.confirmed_registrations_count
-        return max(0, self.max_participants - count)
+        """Available online seats before online registration closes."""
+        if self.is_deadline_passed:
+            return 0
+        count = self.online_registrations_count
+        return max(0, (self.max_participants or 0) - count)
 
     @property
     def empty_slots(self):
-        """Calculates unfilled registration slots: total capacity - confirmed registrations (excludes cancelled)."""
+        """Calculates unfilled online registration slots: total capacity - confirmed online registrations."""
         return self.available_seats
 
     @property

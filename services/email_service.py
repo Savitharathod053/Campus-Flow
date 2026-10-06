@@ -1508,7 +1508,6 @@ def send_empty_slots_hod_email(hod, event, empty_slots, total_capacity, confirme
         f"- Total Capacity: {total_capacity}\n"
         f"- Confirmed Registrations: {confirmed_count}\n"
         f"- Empty Slots Remaining: {empty_slots}\n\n"
-        f"Please review the event status in your Campus Flow dashboard.\n\n"
         f"Campus Flow Event Monitoring System"
     )
 
@@ -1522,5 +1521,83 @@ def send_empty_slots_hod_email(hod, event, empty_slots, total_capacity, confirme
     logger.info(f"[EMAIL SENT] Empty slots alert to HOD {hod.email} for event {event.id}")
     dispatch_email(hod.email, subject, body)
     return True
+
+
+def send_dept_event_started_hod_email(hod, event, dept_name, total_slots, online_count, spot_count, occupied_count, empty_slots):
+    """
+    Sends an email notification to the respective department HOD when an organizer starts an event.
+    Formatted with:
+    Event Started: [Event Name]
+    Department: [Department Name]
+    Total Event Slots: [number]
+    Online Registrations: [number]
+    On-Spot Registrations: [number]
+    Total Occupied: [number]
+    Empty Slots: [number]
+    """
+    if not hod or not hod.email:
+        return False
+
+    hod_display = hod.name if (hod.name and hod.name.strip().lower().startswith("dr.")) else f"Dr. {hod.name if hod else 'HOD'}"
+    subject = f"Event Started: {event.title} - {dept_name}"
+    body = (
+        f"Hello {hod_display},\n\n"
+        f"Event Started: {event.title}\n"
+        f"Department: {dept_name}\n"
+        f"Total Event Slots: {total_slots}\n"
+        f"Online Registrations: {online_count}\n"
+        f"On-Spot Registrations: {spot_count}\n"
+        f"Total Occupied: {occupied_count}\n"
+        f"Empty Slots: {empty_slots}\n\n"
+        f"Campus Flow Event Monitoring System"
+    )
+
+    email_record = {
+        'to': hod.email,
+        'subject': subject,
+        'body': body,
+        'type': 'EVENT_CAPACITY_ALERT',
+        'department': dept_name
+    }
+    SENT_EMAILS.append(email_record)
+    logger.info(f"[EMAIL SENT] Department event started alert to HOD {hod.email} for {dept_name} (Event #{event.id})")
+    dispatch_email(hod.email, subject, body)
+    return True
+
+
+def send_spot_empty_slots_hod_email(hod, event, spot_slots, spot_registered, unused_slots):
+    """
+    Sends an email notification to the responsible HOD when spot registration is completed/closed
+    with unused spot slots.
+    """
+    if not hod or not hod.email:
+        return False
+
+    hod_display = hod.name if (hod.name and hod.name.strip().lower().startswith("dr.")) else f"Dr. {hod.name if hod else 'HOD'}"
+
+    subject = f"Spot Registration Completed: {unused_slots} Unused Slots - {event.title}"
+    body = (
+        f"Hello {hod_display},\n\n"
+        f"Spot registration for \"{event.title}\" has been completed and closed by the organizer.\n\n"
+        f"Event: {event.title}\n"
+        f"Spot Registration Completed\n"
+        f"Spot slots provided by organizer: {spot_slots}\n"
+        f"Students registered through spot registration: {spot_registered}\n"
+        f"Unused spot slots: {unused_slots}\n\n"
+        f"{unused_slots} spot-registration slots remained unused.\n\n"
+        f"Campus Flow Spot Registration Monitoring System"
+    )
+
+    email_record = {
+        'to': hod.email,
+        'subject': subject,
+        'body': body,
+        'type': 'SPOT_CAPACITY_ALERT'
+    }
+    SENT_EMAILS.append(email_record)
+    logger.info(f"[EMAIL SENT] Spot empty slots alert to HOD {hod.email} for event {event.id}")
+    dispatch_email(hod.email, subject, body)
+    return True
+
 
 

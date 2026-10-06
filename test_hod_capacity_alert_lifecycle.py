@@ -74,6 +74,16 @@ class TestHODCapacityAlertLifecycle(unittest.TestCase):
                     designation="Head of Department"
                 )
                 db.session.add(fp)
+
+            if role == UserRole.STUDENT:
+                sp = StudentProfile(
+                    user_id=user.id,
+                    roll_number=f"ROLL-LIFECYCLE-{user.id}",
+                    department=dept or "CSE",
+                    year=3,
+                    section="A"
+                )
+                db.session.add(sp)
         return user
 
     def _get_or_create_dept(self, code, name, hod_user):
@@ -148,7 +158,8 @@ class TestHODCapacityAlertLifecycle(unittest.TestCase):
         # Trigger event started notification
         res = notify_hod_event_started(event)
         self.assertIsNotNone(res)
-        self.assertEqual(res['empty_slots'], 40)
+        self.assertGreater(len(res), 0)
+        self.assertEqual(res[0]['empty_slots'], 40)
 
         # Retrieve created notification
         notif = Notification.query.filter_by(
@@ -160,12 +171,13 @@ class TestHODCapacityAlertLifecycle(unittest.TestCase):
         self.assertIsNotNone(notif)
         # 1. Event Name
         self.assertIn("AI/ML National Hackathon", notif.title)
-        self.assertIn("AI/ML National Hackathon", notif.message)
-        # 2. Number of empty slots
-        self.assertIn("40 empty slots remaining", notif.message)
-        # 3. Event start time in IST
-        expected_ist_start = format_ist_datetime(start_time)
-        self.assertIn(expected_ist_start, notif.message)
+        self.assertIn("Event Started: AI/ML National Hackathon", notif.message)
+        # 2. Number of empty slots and department format
+        self.assertIn("Department: Computer Science & Engineering", notif.message)
+        self.assertIn("Total Event Slots: 100", notif.message)
+        self.assertIn("Online Registrations: 60", notif.message)
+        self.assertIn("Total Occupied: 60", notif.message)
+        self.assertIn("Empty Slots: 40", notif.message)
         # 4. Database references
         self.assertEqual(notif.event_id, event.id)
         self.assertLess(abs((notif.expires_at - end_time).total_seconds()), 2)
@@ -173,7 +185,7 @@ class TestHODCapacityAlertLifecycle(unittest.TestCase):
 
         # Prevent duplicate alert for the same event
         dup_res = notify_hod_event_started(event)
-        self.assertIsNone(dup_res)
+        self.assertEqual(dup_res, [])
         alert_count = Notification.query.filter_by(
             user_id=hod_cse.id,
             event_id=event.id,

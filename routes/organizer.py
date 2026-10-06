@@ -1,6 +1,7 @@
 from datetime import datetime
 import io
 import os
+import uuid
 from pathlib import Path
 from werkzeug.utils import secure_filename
 from flask import (
@@ -13,7 +14,7 @@ from models import (
     AttendanceRecord, VerificationMethod, AttendanceStatus, AttendanceSession, AttendanceSessionStatus,
     Announcement, Certificate, CertificateStatus, User, StudentProfile, OrganizerProfile,
     Team, TeamStatus, TeamPaymentStatus, TeamRole, TeamMemberStatus, InvitationStatus, TeamMember, TeamInvitation,
-    EventRegistrationType, TeamPaymentType, CollegeDepartment,
+    EventRegistrationType, TeamPaymentType, Department, CollegeDepartment,
     EventRequest, EventRequestStatus, NotificationType
 )
 from routes.auth import organizer_required, get_current_user
@@ -583,20 +584,441 @@ def manage_event(event_id):
     pending_teams_count = len([t for t in teams if t.status == TeamStatus.PENDING])
     full_teams_count = len([t for t in teams if t.status == TeamStatus.FULL])
 
+    spot_regs = [r for r in registrations if r.registration_type == 'SPOT']
+    online_regs = [r for r in registrations if r.registration_type != 'SPOT']
+    spot_confirmed_count = len([r for r in spot_regs if r.is_confirmed])
+    online_confirmed_count = len([r for r in online_regs if r.is_confirmed])
+
     return render_template(
         'organizer/event_manage.html',
         user=user,
         event=event,
         registrations=registrations,
         confirmed_count=len(confirmed_regs),
+        online_confirmed_count=online_confirmed_count,
+        spot_confirmed_count=spot_confirmed_count,
+        spot_registrations=spot_regs,
         attended_count=len(attended_regs),
         total_revenue=total_revenue,
         teams=teams,
         total_teams_count=total_teams_count,
         complete_teams_count=complete_teams_count,
         pending_teams_count=pending_teams_count,
-        full_teams_count=full_teams_count
+        full_teams_count=full_teams_count,
+        departments=Department.ALL_CODES
     )
+
+
+# ==============================================================================
+# SPOT REGISTRATION MANAGEMENT
+# ==============================================================================
+
+@organizer_bp.route('/events/<int:event_id>/spot-slots', methods=['POST'])
+@organizer_required
+def update_spot_slots(event_id):
+    """
+    Organizer sets or updates the number of available On-Spot Registration Slots
+    after online registration closes.
+    Validations:
+    - Online registration must be closed before editing on-spot slots.
+    - Organizer cannot set on-spot slots higher than remaining overall event capacity (Total Capacity - Online Registrations).
+    - Organizer cannot create capacity beyond the Total Event Capacity.
+    - Organizer cannot reduce the available on-spot slots below the number of students already registered on-spot.
+    - Clear validation messages for invalid values.
+    """
+    user = get_current_user()
+    event = Event.query.get_or_404(event_id)
+
+    if event.organizer_id != user.id and not user.is_admin:
+        abort(403)
+
+    total_capacity = event.max_participants or 0
+    online_count = event.online_registrations_count
+    unused_capacity = max(0, total_capacity - online_count)
+    current_spot_registered = event.spot_registrations_count
+
+    if not event.is_online_registration_closed:
+        flash(
+            'Online registration is still open. All slots are currently reserved for online registrations. '
+            'On-spot slots can only be edited after online registration closes.',
+            'warning'
+        )
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    raw_slots = request.form.get('spot_registration_slots', '').strip()
+    try:
+        new_slots = int(raw_slots)
+        if new_slots < 0:
+            raise ValueError()
+    except (ValueError, TypeError):
+        flash('Invalid slot count. Please enter a valid non-negative integer.', 'danger')
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    # Validation 1: Cannot reduce below students already registered on-spot
+    if new_slots < current_spot_registered:
+        flash(
+            f'Cannot set on-spot capacity to {new_slots}. There are already {current_spot_registered} '
+            f'students registered on-spot. You cannot reduce capacity below existing registrations.',
+            'danger'
+        )
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    # Validation 2: Cannot exceed remaining unused capacity after online registration
+    if new_slots > unused_capacity:
+        flash(
+            f'Cannot set on-spot slots to {new_slots}. Only {unused_capacity} slot(s) remain unused '
+            f'out of the Total Event Capacity of {total_capacity} (Online Registrations: {online_count}). '
+            f'You cannot exceed the total event capacity.',
+            'danger'
+        )
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    event.spot_registration_slots = new_slots
+    db.session.commit()
+    flash(f'On-spot registration slots successfully updated to {new_slots}.', 'success')
+    return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+
+@organizer_bp.route('/events/<int:event_id>/spot-registration/add', methods=['POST'])
+@organizer_required
+def add_spot_student(event_id):
+    """
+    Organizer manually registers a student physically attending on the event day.
+    Identifies existing student account or safely creates a new student user without duplicates.
+    Generates confirmed registration with registration_type='SPOT' and ticket QR pass.
+    """
+    user = get_current_user()
+    event = Event.query.get_or_404(event_id)
+
+    if event.organizer_id != user.id and not user.is_admin:
+        abort(403)
+
+    # Check if spot registration is closed
+    if event.spot_registration_closed:
+        flash('Spot registration is closed for this event.', 'danger')
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    if not event.is_online_registration_closed:
+        flash('On-spot registration cannot open while online registration is still active.', 'warning')
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    # Check spot capacity and overall event capacity limits
+    total_capacity = event.max_participants or 0
+    online_count = event.online_registrations_count
+    spot_registered = event.spot_registrations_count
+    spot_capacity = event.spot_registration_capacity
+    spot_remaining = event.spot_slots_remaining
+
+    if spot_capacity <= 0:
+        flash('Spot registration is not available. No unused slots remain from the Total Event Capacity.', 'warning')
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    if spot_remaining <= 0 or spot_registered >= spot_capacity:
+        flash(f'On-spot slots are full ({spot_registered}/{spot_capacity} full). Registration cannot proceed.', 'danger')
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    # Never allow Total Online + Total On-Spot registrations to exceed Total Event Capacity
+    if (online_count + spot_registered) >= total_capacity:
+        flash(f'Total Event Capacity reached ({total_capacity}/{total_capacity} occupied). Cannot add more registrations.', 'danger')
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    # Collect student details
+    student_name = request.form.get('student_name', '').strip()
+    roll_number = request.form.get('roll_number', '').strip().upper()
+    email = request.form.get('email', '').strip().lower()
+    phone = request.form.get('phone', '').strip()
+    department = request.form.get('department', '').strip().upper()
+    year_str = request.form.get('year', '1').strip()
+    section = request.form.get('section', 'A').strip().upper() or 'A'
+    college = request.form.get('college', '').strip()
+    payment_status_input = request.form.get('payment_status', 'VERIFIED').strip().upper()
+
+    if not student_name or not email or not roll_number:
+        flash('Student Name, Roll Number, and Email are required.', 'danger')
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    try:
+        student_year = int(year_str) if year_str else 1
+    except ValueError:
+        student_year = 1
+
+    # Check if a student with this roll number or email already exists
+    target_user = None
+    existing_profile = StudentProfile.query.filter_by(roll_number=roll_number).first()
+    if existing_profile:
+        target_user = existing_profile.user
+    else:
+        target_user = User.query.filter_by(email=email).first()
+
+    if target_user:
+        # Existing account found - update profile info if needed
+        if student_name and target_user.name != student_name:
+            target_user.name = student_name
+        if email and target_user.email != email:
+            # Check if email is used by another user
+            email_check = User.query.filter(User.email == email, User.id != target_user.id).first()
+            if not email_check:
+                target_user.email = email
+        if phone:
+            target_user.phone = phone
+
+        if not target_user.student_profile:
+            prof = StudentProfile(
+                user_id=target_user.id,
+                roll_number=roll_number,
+                department=department or 'CSE',
+                year=student_year,
+                section=section
+            )
+            db.session.add(prof)
+        else:
+            if roll_number:
+                target_user.student_profile.roll_number = roll_number
+            if department:
+                target_user.student_profile.department = department
+            if student_year:
+                target_user.student_profile.year = student_year
+            if section:
+                target_user.student_profile.section = section
+    else:
+        # Create new student account
+        import uuid
+        from werkzeug.security import generate_password_hash
+        # Temporary default password e.g. RollNumber@123
+        temp_pwd = f"{roll_number}@123" if roll_number else "Student@123"
+        target_user = User(
+            name=student_name,
+            email=email,
+            phone=phone,
+            role='student',
+            password_hash=generate_password_hash(temp_pwd)
+        )
+        db.session.add(target_user)
+        db.session.flush()
+
+        prof = StudentProfile(
+            user_id=target_user.id,
+            roll_number=roll_number,
+            department=department or 'CSE',
+            year=student_year,
+            section=section
+        )
+        db.session.add(prof)
+
+    db.session.flush()
+
+    # Check if already registered for this event
+    existing_reg = EventRegistration.query.filter_by(event_id=event.id, student_id=target_user.id).first()
+    if existing_reg:
+        flash(f"Student '{target_user.name}' ({roll_number}) is already registered for this event (Status: {existing_reg.status}, Type: {getattr(existing_reg, 'registration_type', 'ONLINE')}).", 'warning')
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    # Create spot registration
+    reg_code = EventRegistration.generate_registration_code(event.id, target_user.id)
+    new_reg = EventRegistration(
+        event_id=event.id,
+        student_id=target_user.id,
+        registration_code=reg_code,
+        status=RegistrationStatus.CONFIRMED,
+        registration_type='SPOT'
+    )
+    db.session.add(new_reg)
+    db.session.flush()
+
+    # Generate ticket QR
+    try:
+        from services.qr_service import generate_ticket_qr
+        new_reg.qr_code_image = generate_ticket_qr(reg_code)
+    except Exception as qr_err:
+        current_app.logger.warning(f"QR generation warning for spot reg {reg_code}: {qr_err}")
+
+    # Payment record if event is paid
+    if not event.is_free and (event.registration_fee or 0) > 0:
+        pay = Payment(
+            registration_id=new_reg.id,
+            student_id=target_user.id,
+            event_id=event.id,
+            organizer_id=event.organizer_id,
+            amount=event.registration_fee,
+            status=PaymentStatus.VERIFIED if payment_status_input == 'VERIFIED' else PaymentStatus.PENDING,
+            fraud_status='VERIFIED' if payment_status_input == 'VERIFIED' else 'PENDING',
+            transaction_id=f"SPOT-{uuid.uuid4().hex[:8].upper()}",
+            verified_at=datetime.utcnow() if payment_status_input == 'VERIFIED' else None,
+            verified_by_id=user.id if payment_status_input == 'VERIFIED' else None,
+            verification_reason="Spot Registration payment processed at venue by organizer."
+        )
+        db.session.add(pay)
+
+    # Save custom field responses if submitted
+    for field in event.custom_fields:
+        val = request.form.get(f"custom_field_{field.id}", '').strip()
+        if val:
+            db.session.add(CustomFieldResponse(
+                registration_id=new_reg.id,
+                field_id=field.id,
+                field_value=val
+            ))
+
+    db.session.commit()
+    flash(f"Spot student '{student_name}' ({roll_number}) successfully registered for '{event.title}'!", 'success')
+    return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+
+@organizer_bp.route('/events/<int:event_id>/spot-registration/<int:registration_id>/edit', methods=['POST'])
+@organizer_required
+def edit_spot_student(event_id, registration_id):
+    """
+    Organizer edits spot student information (Name, Email, Roll Number, Phone, Department, Year, Section, Custom fields).
+    Changes are reflected everywhere in the system.
+    """
+    user = get_current_user()
+    event = Event.query.get_or_404(event_id)
+
+    if event.organizer_id != user.id and not user.is_admin:
+        abort(403)
+
+    reg = EventRegistration.query.filter_by(id=registration_id, event_id=event.id).first_or_404()
+
+    new_name = request.form.get('student_name', '').strip()
+    new_email = request.form.get('email', '').strip().lower()
+    new_roll = request.form.get('roll_number', '').strip().upper()
+    new_phone = request.form.get('phone', '').strip()
+    new_department = request.form.get('department', '').strip().upper()
+    new_year_str = request.form.get('year', '').strip()
+    new_section = request.form.get('section', '').strip().upper()
+    new_payment_status = request.form.get('payment_status', '').strip().upper()
+
+    if not new_name or not new_email:
+        flash('Student Name and Email cannot be empty.', 'danger')
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    student = reg.student
+    if student:
+        # Check email conflict
+        if new_email != student.email:
+            existing_email_user = User.query.filter(User.email == new_email, User.id != student.id).first()
+            if existing_email_user:
+                flash(f"Email '{new_email}' is already in use by another account.", 'danger')
+                return redirect(url_for('organizer.manage_event', event_id=event.id))
+            student.email = new_email
+
+        student.name = new_name
+        if new_phone:
+            student.phone = new_phone
+
+        profile = student.student_profile
+        if not profile:
+            profile = StudentProfile(
+                user_id=student.id,
+                roll_number=new_roll or f"SPOT-{student.id}",
+                department=new_department or 'CSE',
+                year=int(new_year_str) if new_year_str.isdigit() else 1,
+                section=new_section or 'A'
+            )
+            db.session.add(profile)
+        else:
+            if new_roll:
+                # Check roll number conflict
+                if new_roll != profile.roll_number:
+                    existing_roll = StudentProfile.query.filter(StudentProfile.roll_number == new_roll, StudentProfile.id != profile.id).first()
+                    if existing_roll:
+                        flash(f"Roll Number '{new_roll}' is already assigned to another student.", 'danger')
+                        return redirect(url_for('organizer.manage_event', event_id=event.id))
+                    profile.roll_number = new_roll
+            if new_department:
+                profile.department = new_department
+            if new_year_str and new_year_str.isdigit():
+                profile.year = int(new_year_str)
+            if new_section:
+                profile.section = new_section
+
+    # Update payment if requested
+    if reg.payment and new_payment_status:
+        if new_payment_status in (PaymentStatus.VERIFIED, 'SUCCESS'):
+            reg.payment.status = PaymentStatus.VERIFIED
+            reg.payment.verified_at = datetime.utcnow()
+            reg.payment.verified_by_id = user.id
+        elif new_payment_status == PaymentStatus.PENDING:
+            reg.payment.status = PaymentStatus.PENDING
+
+    # Update custom answers
+    for field in event.custom_fields:
+        form_val = request.form.get(f"custom_field_{field.id}", '').strip()
+        resp = CustomFieldResponse.query.filter_by(registration_id=reg.id, field_id=field.id).first()
+        if resp:
+            resp.field_value = form_val
+        elif form_val:
+            db.session.add(CustomFieldResponse(
+                registration_id=reg.id,
+                field_id=field.id,
+                field_value=form_val
+            ))
+
+    db.session.commit()
+    flash(f"Spot student information for '{new_name}' updated successfully!", 'success')
+    return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+
+@organizer_bp.route('/events/<int:event_id>/spot-registration/close', methods=['POST'])
+@organizer_required
+def close_spot_registration(event_id):
+    """
+    Organizer closes spot registration.
+    Calculates unused spot slots and notifies the Department HOD if unused slots > 0.
+    Prevents duplicate notifications.
+    """
+    user = get_current_user()
+    event = Event.query.get_or_404(event_id)
+
+    if event.organizer_id != user.id and not user.is_admin:
+        abort(403)
+
+    if event.spot_registration_closed:
+        flash('Spot registration is already closed for this event.', 'info')
+        return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+    event.spot_registration_closed = True
+    db.session.commit()
+
+    # Trigger HOD notification for unused spot slots
+    from services.capacity_notification_service import notify_hod_spot_registration_closed
+    notif_data = None
+    try:
+        notif_data = notify_hod_spot_registration_closed(event)
+    except Exception as exc:
+        current_app.logger.error(f"Error notifying HOD of closed spot registration for event #{event.id}: {exc}")
+
+    spot_slots = event.spot_registration_slots or 0
+    spot_registered = event.spot_registrations_count
+    unused = max(0, spot_slots - spot_registered)
+
+    if notif_data:
+        flash(f"Spot registration closed! HOD notified of {unused} unused spot slot(s).", 'success')
+    elif unused <= 0:
+        flash(f"Spot registration closed! All {spot_slots} spot slots were utilized (0 unused).", 'success')
+    else:
+        flash("Spot registration closed successfully.", 'info')
+
+    return redirect(url_for('organizer.manage_event', event_id=event.id))
+
+
+@organizer_bp.route('/events/<int:event_id>/spot-registration/reopen', methods=['POST'])
+@organizer_required
+def reopen_spot_registration(event_id):
+    """
+    Allows organizer to reopen spot registration if necessary.
+    """
+    user = get_current_user()
+    event = Event.query.get_or_404(event_id)
+
+    if event.organizer_id != user.id and not user.is_admin:
+        abort(403)
+
+    event.spot_registration_closed = False
+    db.session.commit()
+    flash('Spot registration has been reopened.', 'info')
+    return redirect(url_for('organizer.manage_event', event_id=event.id))
+
 
 
 @organizer_bp.route('/events/<int:event_id>/participants')
@@ -615,11 +1037,18 @@ def participants(event_id):
     filter_status = request.args.get('status', '').strip()
     filter_attendance = request.args.get('attendance', '').strip()
     filter_team_id = request.args.get('team_id', '').strip()
+    filter_type = request.args.get('type', '').strip().upper()
 
     query = EventRegistration.query.filter_by(event_id=event.id)
 
     if filter_status:
         query = query.filter_by(status=filter_status)
+
+    if filter_type:
+        if filter_type == 'SPOT':
+            query = query.filter_by(registration_type='SPOT')
+        elif filter_type == 'ONLINE':
+            query = query.filter(db.or_(EventRegistration.registration_type == 'ONLINE', EventRegistration.registration_type.is_(None)))
 
     if filter_team_id:
         try:
@@ -677,6 +1106,7 @@ def participants(event_id):
         filter_status=filter_status,
         filter_attendance=filter_attendance,
         filter_team_id=filter_team_id,
+        filter_type=filter_type,
         departments=departments
     )
 
@@ -1239,22 +1669,29 @@ def start_event(event_id):
 
     # 4-9. Execute HOD empty slots notification trigger
     from services.capacity_notification_service import notify_hod_event_started
-    notif_result = None
+    notif_results = []
     try:
-        notif_result = notify_hod_event_started(event, force=False)
+        res = notify_hod_event_started(event, force=False)
+        if isinstance(res, list):
+            notif_results = res
+        elif isinstance(res, dict):
+            notif_results = [res]
     except Exception as e:
         current_app.logger.error(f"Error during HOD empty slots capacity check for event #{event.id}: {e}", exc_info=True)
 
     # 10. Return response
     total_slots = event.max_participants or 0
-    confirmed = event.confirmed_registrations_count
-    empty = max(0, total_slots - confirmed)
+    online_count = event.online_registrations_count
+    spot_count = event.spot_registrations_count
+    total_occupied = online_count + spot_count
+    empty = max(0, total_slots - total_occupied)
 
     msg = f"Event '{event.title}' has been successfully STARTED!"
-    if notif_result:
-        msg += f" Responsible HOD ({notif_result.get('hod_email')}) notified of {notif_result.get('empty_slots')} empty slots."
-    elif empty <= 0:
-        msg += f" Event is fully booked ({confirmed}/{total_slots} participants)."
+    if notif_results:
+        dept_names = ", ".join([nr.get('dept_display', nr.get('department', '')) for nr in notif_results])
+        msg += f" Notifications sent to HOD(s) of: {dept_names}."
+    elif total_occupied >= total_slots and total_slots > 0:
+        msg += f" Event is fully booked ({total_occupied}/{total_slots} participants)."
     elif was_already_started:
         msg += " Event was already in progress."
 
@@ -1265,10 +1702,15 @@ def start_event(event_id):
             'event_id': event.id,
             'status': event.status,
             'total_slots': total_slots,
-            'confirmed_registrations': confirmed,
+            'online_registrations': online_count,
+            'spot_registrations': spot_count,
+            'total_occupied': total_occupied,
             'empty_slots': empty,
-            'notification_dispatched': bool(notif_result),
-            'notification_info': notif_result
+            'notification_dispatched': bool(notif_results),
+            'notifications': notif_results,
+            # Backwards compatibility fields for legacy tests
+            'confirmed_registrations': total_occupied,
+            'notification_info': notif_results[0] if notif_results else None
         }), 200
 
     flash(msg, 'success')

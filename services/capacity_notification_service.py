@@ -20,181 +20,282 @@ _SCHEDULER_LOCK = threading.Lock()
 _SCHEDULER_STARTED = False
 
 
+def get_hod_for_department(dept_code):
+    """
+    Finds the HOD user associated with a given department code from existing
+    user, role, and department data without creating any duplicates.
+    Priority:
+    1. CollegeDepartment (matching code, normalized code, or name) -> dept.hod or dept.hod_id
+    2. User with role == 'hod' whose FacultyProfile.department matches
+    3. User with role == 'hod' whose email contains hod.<dept_code>
+    """
+    if not dept_code:
+        return None
+    from models import User, UserRole, FacultyProfile, CollegeDepartment, Department
+
+    norm = Department.normalize_code(dept_code)
+
+    # 1. Look up in CollegeDepartment by code, normalized code, or name
+    college_dept = CollegeDepartment.query.filter(
+        (CollegeDepartment.code == dept_code) |
+        (CollegeDepartment.code == norm) |
+        (CollegeDepartment.name == dept_code)
+    ).first()
+
+    if college_dept:
+        if getattr(college_dept, 'hod', None):
+            return college_dept.hod
+        if college_dept.hod_id:
+            h = User.query.get(college_dept.hod_id)
+            if h:
+                return h
+
+    # 2. Look up User where role == HOD and FacultyProfile.department matches
+    hod_user = User.query.filter(
+        User.role == UserRole.HOD
+    ).join(FacultyProfile, FacultyProfile.user_id == User.id, isouter=True).filter(
+        (FacultyProfile.department == dept_code) |
+        (FacultyProfile.department == norm) |
+        (FacultyProfile.department == getattr(college_dept, 'name', None)) |
+        (FacultyProfile.department == getattr(college_dept, 'code', None))
+    ).first()
+
+    if hod_user:
+        return hod_user
+
+    # 3. Fallback: check User with email containing hod.<dept>
+    hod_fallback = User.query.filter(
+        User.role == UserRole.HOD,
+        User.email.ilike(f"%hod.{dept_code.lower()}%")
+    ).first()
+
+    return hod_fallback
+
+
 def notify_hod_event_started(event, force=False):
     """
-    Evaluates an active/started event and dispatches an empty slots capacity notification
-    to the responsible Department HOD if unfilled slots remain.
+    Called ONLY when the Organizer manually starts an event.
+    Calculates at that exact moment:
+    - Total event slots
+    - Online registered students
+    - On-spot registrations
+    - Total occupied slots
+    - Remaining/empty slots
 
-    Sequence:
-    1. Validate event status & state.
-    2. Enforce duplicate prevention via empty_slot_notification_sent and EventNotificationLog.
-    3. Calculate total_capacity, confirmed_count, and empty_slots.
-    4. Log EVENT_STARTED and EMPTY_SLOT_CHECK.
-    5. If empty_slots <= 0, mark processed and return.
-    6. Resolve responsible HOD for event's department.
-    7. Create In-App Notification for HOD.
-    8. Create EventNotificationLog record.
-    9. Mark event.empty_slot_notification_sent = True.
-    10. Dispatch Email notification if email service is active.
+    DEPARTMENT-WISE HOD NOTIFICATION:
+    - Identifies the department of every registered/spot-registered student.
+    - Groups the registrations department-wise.
+    - Finds the HOD associated with each department from existing data.
+    - Sends the notification ONLY to the respective department HODs.
+    - Does NOT send every department's info to unrelated HODs.
+    - If an event has students from only one department, notifies only that department's HOD.
+    - If an event has no students from a particular department, does not notify that department's HOD.
+    - Prevents duplicate notifications if clicked again or refreshed.
+
+    Notification Format:
+    Event Started: [Event Name]
+    Department: [Department Name]
+    Total Event Slots: [number]
+    Online Registrations: [number]
+    On-Spot Registrations: [number]
+    Total Occupied: [number]
+    Empty Slots: [number]
 
     Returns:
-        dict or None: Result metadata if notification was created, None otherwise.
+        list: Dispatched notification summaries for each department.
     """
     if not event:
-        return None
+        return []
 
-    # Do not alert for cancelled, rejected, or completed events
+    # Do not alert for cancelled, rejected, draft, or completed events
     if event.status in (EventStatus.CANCELLED, EventStatus.REJECTED, EventStatus.DRAFT,
                         EventStatus.COMPLETED, 'EVENT_COMPLETED'):
         logger.info(f"[EMPTY_SLOT_CHECK] Event ID {event.id} ('{event.title}') is in {event.status} state. Skipping.")
-        return None
+        return []
 
-    # Check if event end_time has already passed (alert must only be active during event)
     now = datetime.utcnow()
     if event.end_time and event.end_time <= now:
-        logger.info(f"[EMPTY_SLOT_CHECK] Event ID {event.id} ('{event.title}') has already ended (end_time: {event.end_time}). Skipping notification.")
-        return None
+        logger.info(f"[EMPTY_SLOT_CHECK] Event ID {event.id} ('{event.title}') has already ended. Skipping.")
+        return []
 
-    # Duplicate prevention: Check if alert was already dispatched
+    # Duplicate prevention: Check if alert was already dispatched for this event
     if event.empty_slot_notification_sent and not force:
         logger.info(f"[EMPTY_SLOT_CHECK] Capacity alert already dispatched for Event ID {event.id}. Skipping duplicate.")
-        return None
+        return []
 
-    total_capacity = event.max_participants or 0
-    confirmed_count = event.confirmed_registrations_count
-    empty_slots = max(0, total_capacity - confirmed_count)
-
-    logger.info(f"[EVENT_STARTED] Event ID {event.id} ('{event.title}') - Status: {event.status}")
-    logger.info(
-        f"[EMPTY_SLOT_CHECK] Event ID {event.id} ('{event.title}'): "
-        f"Total Capacity: {total_capacity}, Confirmed: {confirmed_count}, Empty Slots: {empty_slots}"
+    from models import (
+        User, UserRole, FacultyProfile, CollegeDepartment, Department,
+        EventRegistration, RegistrationStatus
     )
 
-    # If no empty slots (fully booked / 0 empty slots), do NOT send notification
-    if empty_slots <= 0:
-        logger.info(f"[EMPTY_SLOT_CHECK] Event ID {event.id} has 0 empty slots (fully booked). Notification not required.")
-        event.empty_slot_notification_sent = True
-        db.session.add(event)
-        db.session.commit()
-        return None
+    # 1. Total event capacity: Every event has ONE Total Event Capacity (event.max_participants)
+    total_event_slots = event.max_participants or 0
 
-    # Resolve responsible Department HOD
-    hod = event.get_responsible_hod()
-    if not hod:
-        logger.warning(
-            f"[HOD_IDENTIFIED] Event ID {event.id} ('{event.title}') has {empty_slots} empty slots, "
-            f"but no responsible HOD could be resolved for department '{event.department}'."
+    # 2. Get all confirmed registrations
+    confirmed_regs = event.registrations.filter(
+        EventRegistration.status == RegistrationStatus.CONFIRMED
+    ).all()
+
+    # If the event is fully booked (0 empty slots), do not dispatch empty slots capacity alerts
+    total_confirmed = len(confirmed_regs)
+    if total_event_slots > 0 and total_confirmed >= total_event_slots:
+        logger.info(
+            f"[EMPTY_SLOT_CHECK] Event #{event.id} is fully booked ({total_confirmed}/{total_event_slots}). "
+            f"No empty slot notifications to dispatch."
         )
-        # Mark as notified to avoid spamming unresolved logs every scheduler tick
-        event.empty_slot_notification_sent = True
-        db.session.add(event)
-        db.session.commit()
-        return None
+        return []
 
-    logger.info(f"[HOD_IDENTIFIED] Responsible HOD resolved: {hod.name} ({hod.email}, ID: {hod.id}) for Department '{event.department}'")
+    # 3. Group registrations department-wise
+    # dept_groups: { dept_code: {'online': count, 'spot': count} }
+    dept_groups = {}
+    for reg in confirmed_regs:
+        st_dept = None
+        if reg.student and reg.student.student_profile and reg.student.student_profile.department:
+            st_dept = reg.student.student_profile.department.strip()
+        elif reg.student and getattr(reg.student, 'department', None):
+            st_dept = reg.student.department.strip()
 
-    # Enforce database unique constraint / duplicate log check
-    existing_log = EventNotificationLog.query.filter_by(
-        event_id=event.id,
-        notification_type=NotificationType.EVENT_CAPACITY_ALERT,
-        recipient_user_id=hod.id
-    ).first()
+        dept_code = Department.normalize_code(st_dept) if st_dept else (Department.normalize_code(event.department) or 'General')
+        if not dept_code:
+            dept_code = 'General'
 
-    if existing_log and not force:
-        logger.info(f"[HOD_NOTIFICATION_ALREADY_SENT] Capacity alert already logged for Event {event.id} and HOD {hod.id}. Skipping.")
-        event.empty_slot_notification_sent = True
-        db.session.add(event)
-        db.session.commit()
-        return None
+        if dept_code not in dept_groups:
+            dept_groups[dept_code] = {'online': 0, 'spot': 0}
 
-    # Also check if an active (non-expired) in-app Notification already exists for this event and HOD
-    existing_active_notif = Notification.query.filter_by(
-        user_id=hod.id,
-        event_id=event.id,
-        type=NotificationType.EVENT_CAPACITY_ALERT,
-        is_expired=False
-    ).first()
-    if existing_active_notif and not force:
-        logger.info(f"[HOD_NOTIFICATION_ALREADY_SENT] Active in-app capacity alert already exists for Event {event.id} and HOD {hod.id}. Skipping.")
-        event.empty_slot_notification_sent = True
-        db.session.add(event)
-        db.session.commit()
-        return None
+        reg_type = getattr(reg, 'registration_type', 'ONLINE') or 'ONLINE'
+        if reg_type == 'SPOT':
+            dept_groups[dept_code]['spot'] += 1
+        else:
+            dept_groups[dept_code]['online'] += 1
 
-    from services.timezone_service import format_ist_datetime
-    start_time_ist = format_ist_datetime(event.start_time) if event.start_time else "N/A"
-    organizer_name = event.organizer.name if event.organizer else "Event Organizer"
-    dept_display = event.department or (event.department_rel.name if event.department_rel else "Department")
+    # If no students registered at all, include event's primary hosting department
+    if not dept_groups and event.department:
+        primary_code = Department.normalize_code(event.department) or event.department
+        dept_groups[primary_code] = {'online': 0, 'spot': 0}
 
-    # 1. Create In-App Notification with configured event start time, empty slots, event_id and expires_at
-    notification_title = f"🔔 Event Started (Event Capacity Alert): {event.title}"
-    notification_message = (
-        f"Event \"{event.title}\" (ID: #{event.id}) in {dept_display} has started and currently has {empty_slots} empty slots out of {total_capacity} ({empty_slots} empty slots remaining).\n"
-        f"Department: {dept_display} | Organizer: {organizer_name} | "
-        f"Confirmed Students: {confirmed_count} | Empty Slots: {empty_slots} | "
-        f"Event Start Time: {start_time_ist}"
-    )
+    # 4. Determine department quota for empty slots calculation
+    allowed_list = []
+    if event.allowed_departments and event.allowed_departments != 'ALL':
+        allowed_list = [Department.normalize_code(d.strip()) for d in event.allowed_departments.split(',') if d.strip()]
 
-    in_app_notif = Notification(
-        user_id=hod.id,
-        title=notification_title,
-        message=notification_message,
-        type=NotificationType.EVENT_CAPACITY_ALERT,
-        link=f"/events/{event.id}",
-        event_id=event.id,
-        expires_at=event.end_time,
-        is_expired=False,
-        is_read=False,
-        created_at=now
-    )
-    db.session.add(in_app_notif)
+    num_depts = len(allowed_list) if len(allowed_list) > 1 else len(dept_groups)
+    dept_quota = (total_event_slots // num_depts) if num_depts > 1 else total_event_slots
 
-    # 2. Log in EventNotificationLog for audit & unique constraint guarantee
-    log_entry = EventNotificationLog(
-        event_id=event.id,
-        notification_type=NotificationType.EVENT_CAPACITY_ALERT,
-        recipient_user_id=hod.id,
-        sent_at=now,
-        status='SENT',
-        details=f"Empty slots: {empty_slots}/{total_capacity} (Confirmed: {confirmed_count}, Organizer: {organizer_name})"
-    )
-    db.session.add(log_entry)
+    dispatched = []
 
-    # 3. Mark event flag as sent
+    for dept_code, counts in dept_groups.items():
+        online_count = counts['online']
+        spot_count = counts['spot']
+        occupied_count = online_count + spot_count
+        empty_slots = max(0, dept_quota - occupied_count)
+
+        # Resolve responsible HOD for this specific department
+        hod = get_hod_for_department(dept_code)
+        if not hod and dept_code == Department.normalize_code(event.department):
+            hod = event.get_responsible_hod()
+
+        if not hod:
+            logger.warning(
+                f"[HOD_NOT_FOUND] Could not resolve HOD for department '{dept_code}' in Event #{event.id}."
+            )
+            continue
+
+        # Prevent duplicate notification to this HOD
+        existing_log = EventNotificationLog.query.filter_by(
+            event_id=event.id,
+            notification_type=NotificationType.EVENT_CAPACITY_ALERT,
+            recipient_user_id=hod.id
+        ).first()
+
+        existing_notif = Notification.query.filter_by(
+            user_id=hod.id,
+            event_id=event.id,
+            type=NotificationType.EVENT_CAPACITY_ALERT,
+            is_expired=False
+        ).first()
+
+        if (existing_log or existing_notif) and not force:
+            logger.info(f"[HOD_NOTIFICATION_ALREADY_SENT] Capacity alert already exists for Event #{event.id} and HOD {hod.email}. Skipping.")
+            continue
+
+        dept_obj = CollegeDepartment.query.filter(
+            (CollegeDepartment.code == dept_code) | (CollegeDepartment.name == dept_code)
+        ).first()
+        dept_display = dept_obj.name if dept_obj else Department.CODE_TO_NAME.get(dept_code, dept_code)
+
+        notif_title = f"Event Started: {event.title}"
+        notif_message = (
+            f"Event Started: {event.title}\n"
+            f"Department: {dept_display}\n"
+            f"Total Event Slots: {total_event_slots}\n"
+            f"Online Registrations: {online_count}\n"
+            f"On-Spot Registrations: {spot_count}\n"
+            f"Total Occupied: {occupied_count}\n"
+            f"Empty Slots: {empty_slots}"
+        )
+
+        in_app_notif = Notification(
+            user_id=hod.id,
+            title=notif_title,
+            message=notif_message,
+            type=NotificationType.EVENT_CAPACITY_ALERT,
+            link=f"/events/{event.id}",
+            event_id=event.id,
+            expires_at=event.end_time,
+            is_expired=False,
+            is_read=False,
+            created_at=now
+        )
+        db.session.add(in_app_notif)
+
+        log_entry = EventNotificationLog(
+            event_id=event.id,
+            notification_type=NotificationType.EVENT_CAPACITY_ALERT,
+            recipient_user_id=hod.id,
+            sent_at=now,
+            status='SENT',
+            details=f"Dept: {dept_code} | Total: {total_event_slots} | Online: {online_count} | Spot: {spot_count} | Occupied: {occupied_count} | Empty: {empty_slots}"
+        )
+        db.session.add(log_entry)
+
+        # Dispatch Email
+        email_sent = False
+        try:
+            from services.email_service import send_dept_event_started_hod_email
+            email_sent = send_dept_event_started_hod_email(
+                hod=hod,
+                event=event,
+                dept_name=dept_display,
+                total_slots=total_event_slots,
+                online_count=online_count,
+                spot_count=spot_count,
+                occupied_count=occupied_count,
+                empty_slots=empty_slots
+            )
+        except Exception as mail_err:
+            logger.error(f"[HOD_EMAIL_FAILED] Failed to send email to HOD {hod.email}: {mail_err}")
+
+        dispatched.append({
+            'hod_id': hod.id,
+            'hod_email': hod.email,
+            'department': dept_code,
+            'dept_display': dept_display,
+            'total_slots': total_event_slots,
+            'online_count': online_count,
+            'spot_count': spot_count,
+            'occupied_count': occupied_count,
+            'empty_slots': empty_slots,
+            'in_app_id': in_app_notif.id,
+            'email_sent': email_sent
+        })
+
+    # Mark global event flag as sent
     event.empty_slot_notification_sent = True
     db.session.add(event)
-
     db.session.commit()
-    logger.info(f"[HOD_NOTIFICATION_CREATED] In-app notification #{in_app_notif.id} created for HOD {hod.email} (User ID: {hod.id}, Expires: {event.end_time})")
 
-    # 4. Dispatch Email to HOD (failsafe, caught so in-app is never broken)
-    email_dispatched = False
-    try:
-        email_dispatched = send_empty_slots_hod_email(
-            hod=hod,
-            event=event,
-            empty_slots=empty_slots,
-            total_capacity=total_capacity,
-            confirmed_count=confirmed_count
-        )
-        if email_dispatched:
-            logger.info(f"[HOD_EMAIL_SENT] Capacity notification email dispatched to HOD {hod.email}")
-        else:
-            logger.info(f"[HOD_EMAIL_SENT] Email dispatch skipped (no SMTP credentials or disabled)")
-    except Exception as mail_err:
-        logger.error(f"[HOD_EMAIL_FAILED] Failed to send capacity notification email to HOD {hod.email}: {mail_err}")
-
-    return {
-        'event_id': event.id,
-        'event_title': event.title,
-        'hod_id': hod.id,
-        'hod_email': hod.email,
-        'empty_slots': empty_slots,
-        'total_capacity': total_capacity,
-        'confirmed_students': confirmed_count,
-        'in_app_notification_id': in_app_notif.id,
-        'email_sent': email_dispatched
-    }
+    logger.info(f"[EVENT_STARTED_NOTIFIED] Dispatched notifications for event #{event.id} to {len(dispatched)} department HOD(s).")
+    return dispatched
 
 
 
@@ -324,56 +425,17 @@ def update_event_capacity_alert_expiration(event):
 
 def check_and_notify_empty_slots(app=None):
     """
-    Scans events that have reached their start time (start_time <= now) or are active/started.
-    - First cleans up any expired capacity alerts where expires_at <= current IST time or event has ended.
-    - Transitions their lifecycle status to STARTED if appropriate.
-    - If unfilled slots remain (empty_slots > 0), sends an in-app notification
-      and an email to the responsible HOD.
-    - Prevents duplicate alerts via event.empty_slot_notification_sent flag,
-      EventNotificationLog records, and existing active Notification checks.
+    Background maintenance task:
+    - Cleans up any expired capacity alerts where expires_at <= current IST time or event has ended.
+    - NOTE: Events do NOT start automatically based on date or time.
+    - Only the Organizer can manually click the "Start Event" button.
+    - Notifications are NOT triggered when the event merely reaches its scheduled start time.
     Returns:
-        list: Summary of processed event notifications
+        list: Empty list (manual trigger only)
     """
-    # 1. Clean up any expired capacity notifications
+    # Clean up any expired capacity notifications
     cleanup_expired_capacity_notifications()
-
-    now = datetime.utcnow()
-    processed_alerts = []
-
-    try:
-        # Fetch events that have reached start time OR are currently marked STARTED/ONGOING
-        events = Event.query.filter(
-            Event.status.notin_([
-                EventStatus.COMPLETED,
-                'EVENT_COMPLETED',
-                EventStatus.CANCELLED,
-                EventStatus.REJECTED,
-                EventStatus.DRAFT
-            ]),
-            (Event.start_time <= now) | (Event.status.in_([EventStatus.STARTED, EventStatus.ONGOING, 'Started']))
-        ).all()
-
-        for event in events:
-            # Check dual approval / publishing
-            if not event.is_published_and_approved:
-                continue
-
-            # Automatically transition status to STARTED if currently UPCOMING or APPROVED or REGISTRATION_OPEN
-            if event.status in (EventStatus.UPCOMING, EventStatus.APPROVED, EventStatus.REGISTRATION_OPEN):
-                event.status = EventStatus.STARTED
-                db.session.add(event)
-                db.session.commit()
-                logger.info(f"[EVENT_STARTED] Event ID {event.id} ('{event.title}') auto-transitioned to STARTED")
-
-            alert_result = notify_hod_event_started(event)
-            if alert_result:
-                processed_alerts.append(alert_result)
-
-    except Exception as e:
-        logger.error(f"Error checking and notifying empty slots: {e}", exc_info=True)
-        db.session.rollback()
-
-    return processed_alerts
+    return []
 
 
 def start_capacity_monitoring_scheduler(app, interval_seconds=60):
@@ -411,3 +473,122 @@ def start_capacity_monitoring_scheduler(app, interval_seconds=60):
         thread.start()
         _SCHEDULER_STARTED = True
         logger.info("Capacity monitoring scheduler background thread launched.")
+
+
+def notify_hod_spot_registration_closed(event, force=False):
+    """
+    Called ONLY when the organizer explicitly closes spot registration.
+    Calculates unused spot slots:
+        unused_spot_slots = spot_registration_slots - spot_registered
+    
+    If unused_spot_slots > 0 and notification not yet sent:
+        Dispatches in-app notification and email to responsible HOD.
+    If unused_spot_slots == 0:
+        Does NOT notify HOD.
+    Enforces duplicate prevention.
+    """
+    if not event:
+        return None
+
+    # Duplicate prevention: Check if spot empty slot notification was already sent
+    if event.spot_empty_slot_notification_sent and not force:
+        logger.info(f"[SPOT_NOTIFICATION] Spot empty slot notification already sent for event #{event.id}. Skipping duplicate.")
+        return None
+
+    spot_slots = event.spot_registration_slots or 0
+    spot_registered = event.spot_registrations_count
+    unused_slots = max(0, spot_slots - spot_registered)
+
+    logger.info(
+        f"[SPOT_REGISTRATION_CLOSED] Event #{event.id} ('{event.title}'): "
+        f"Spot Slots: {spot_slots}, Registered: {spot_registered}, Unused: {unused_slots}"
+    )
+
+    # If no spot slots or no unused spot slots, do NOT notify HOD
+    if spot_slots <= 0 or unused_slots <= 0:
+        logger.info(f"[SPOT_NOTIFICATION] Event #{event.id} has 0 unused spot slots. Notification not required.")
+        event.spot_empty_slot_notification_sent = True
+        db.session.add(event)
+        db.session.commit()
+        return None
+
+    # Resolve responsible Department HOD
+    hod = event.get_responsible_hod()
+    if not hod:
+        logger.warning(
+            f"[SPOT_NOTIFICATION] Event #{event.id} ('{event.title}') has {unused_slots} unused spot slots, "
+            f"but no responsible HOD could be resolved for department '{event.department}'."
+        )
+        event.spot_empty_slot_notification_sent = True
+        db.session.add(event)
+        db.session.commit()
+        return None
+
+    now = datetime.utcnow()
+    notification_title = f"Spot Registration Completed: {unused_slots} Unused Slots - {event.title}"
+    notification_message = (
+        f"Event: {event.title}\n"
+        f"Spot Registration Completed\n"
+        f"Spot slots provided by organizer: {spot_slots}\n"
+        f"Students registered through spot registration: {spot_registered}\n"
+        f"Unused spot slots: {unused_slots}\n\n"
+        f"{unused_slots} spot-registration slots remained unused."
+    )
+
+    in_app_notif = Notification(
+        user_id=hod.id,
+        title=notification_title,
+        message=notification_message,
+        type=NotificationType.SPOT_CAPACITY_ALERT,
+        link=f"/events/{event.id}",
+        event_id=event.id,
+        expires_at=event.end_time,
+        is_expired=False,
+        is_read=False,
+        created_at=now
+    )
+    db.session.add(in_app_notif)
+
+    # Log in EventNotificationLog for audit & duplicate protection
+    log_entry = EventNotificationLog(
+        event_id=event.id,
+        notification_type=NotificationType.SPOT_CAPACITY_ALERT,
+        recipient_user_id=hod.id,
+        sent_at=now,
+        status='SENT',
+        details=f"Spot slots provided: {spot_slots}, Registered: {spot_registered}, Unused: {unused_slots}"
+    )
+    db.session.add(log_entry)
+
+    # Mark event flag as sent
+    event.spot_empty_slot_notification_sent = True
+    db.session.add(event)
+    db.session.commit()
+
+    logger.info(f"[SPOT_NOTIFICATION_CREATED] In-app notification #{in_app_notif.id} created for HOD {hod.email}")
+
+    # Dispatch Email to HOD (failsafe)
+    email_dispatched = False
+    try:
+        from services.email_service import send_spot_empty_slots_hod_email
+        email_dispatched = send_spot_empty_slots_hod_email(
+            hod=hod,
+            event=event,
+            spot_slots=spot_slots,
+            spot_registered=spot_registered,
+            unused_slots=unused_slots
+        )
+    except Exception as e:
+        logger.error(f"[SPOT_NOTIFICATION] Error sending spot empty slots email for event #{event.id}: {e}")
+
+    return {
+        'event_id': event.id,
+        'hod_id': hod.id,
+        'hod_email': hod.email,
+        'spot_slots': spot_slots,
+        'spot_registered': spot_registered,
+        'unused_slots': unused_slots,
+        'in_app_id': in_app_notif.id,
+        'email_sent': email_dispatched
+    }
+

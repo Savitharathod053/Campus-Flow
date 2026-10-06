@@ -59,6 +59,16 @@ class TestHODEmptySlotsNotification(unittest.TestCase):
                 )
                 db.session.add(fp)
 
+            if role == UserRole.STUDENT:
+                sp = StudentProfile(
+                    user_id=user.id,
+                    roll_number=f"ROLL-{user.id}",
+                    department=dept or "CSE",
+                    year=3,
+                    section="A"
+                )
+                db.session.add(sp)
+
         return user
 
     def _get_or_create_dept(self, code, name, hod_user):
@@ -167,10 +177,12 @@ class TestHODEmptySlotsNotification(unittest.TestCase):
         self.assertGreater(len(notifs_cse), 0)
         latest_notif = notifs_cse[-1]
         self.assertIn("Python Workshop", latest_notif.title)
-        self.assertIn("15 empty slots remaining", latest_notif.message)
-        self.assertIn("Python Workshop", latest_notif.message)
-        self.assertIn("CSE", latest_notif.message)
-        self.assertIn("John Organizer", latest_notif.message)
+        self.assertIn("Event Started: Python Workshop", latest_notif.message)
+        self.assertIn("Department: Computer Science & Engineering", latest_notif.message)
+        self.assertIn("Total Event Slots: 50", latest_notif.message)
+        self.assertIn("Online Registrations: 35", latest_notif.message)
+        self.assertIn("Total Occupied: 35", latest_notif.message)
+        self.assertIn("Empty Slots: 15", latest_notif.message)
 
         # Verify unread count increased for CSE HOD
         final_unread_cse = Notification.query.filter_by(user_id=cse_hod.id, is_read=False).count()

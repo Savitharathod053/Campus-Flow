@@ -287,7 +287,7 @@
                                 <td class="text-end text-nowrap">
                                     <div class="d-inline-flex align-items-center gap-1 flex-wrap justify-content-end">
                                         {% if event.status in ['APPROVED', 'UPCOMING', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED'] %}
-                                        <form method="POST" action="{{ url_for('organizer.start_event', event_id=event.id) }}" class="d-inline" onsubmit="return confirm('Start {{ event.title }} now? This will notify your Department HOD of empty slots.');">
+                                        <form method="POST" action="{{ url_for('organizer.start_event', event_id=event.id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to start this event?');">
                                             <button type="submit" class="btn btn-sm btn-success text-white fw-bold" title="Start Event">
                                                 <i class="bi bi-play-fill"></i> Start
                                             </button>

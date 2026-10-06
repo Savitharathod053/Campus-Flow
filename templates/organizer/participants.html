@@ -56,7 +56,14 @@
                     <option value="absent" {% if filter_attendance == 'absent' %}selected{% endif %}>Absent / Pending</option>
                 </select>
             </div>
-            <div class="col-md-{% if event.allows_team_registration and teams %}3{% else %}5{% endif %} col-6">
+            <div class="col-md-2 col-6">
+                <select name="type" class="form-select form-select-sm">
+                    <option value="">All Reg Types</option>
+                    <option value="ONLINE" {% if filter_type == 'ONLINE' %}selected{% endif %}>Online</option>
+                    <option value="SPOT" {% if filter_type == 'SPOT' %}selected{% endif %}>Spot</option>
+                </select>
+            </div>
+            <div class="col-md-{% if event.allows_team_registration and teams %}2{% else %}3{% endif %} col-6">
                 <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">
                     <i class="bi bi-filter me-1"></i> Filter
                 </button>
@@ -77,6 +84,7 @@
                             <th>Branch & Year</th>
                             <th>Contact</th>
                             <th>Reg. Code</th>
+                            <th>Type</th>
                             <th>Reg. Status</th>
                             <th>Attendance</th>
                             <th>Custom Answers</th>
@@ -118,6 +126,17 @@
                                 </td>
                                 <td>
                                     <code class="small">{{ reg.registration_code }}</code>
+                                </td>
+                                <td>
+                                    {% if reg.registration_type == 'SPOT' %}
+                                        <span class="badge bg-purple text-white" style="background-color: #6f42c1;">
+                                            <i class="bi bi-person-badge me-1"></i> Spot
+                                        </span>
+                                    {% else %}
+                                        <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25">
+                                            <i class="bi bi-globe me-1"></i> Online
+                                        </span>
+                                    {% endif %}
                                 </td>
                                 <td>
                                     {% if reg.status == 'CONFIRMED' %}
