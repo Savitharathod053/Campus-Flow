@@ -226,6 +226,22 @@ def sync_missing_columns():
             ('event_id', 'INTEGER', None, True),
             ('expires_at', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
             ('is_expired', 'BOOLEAN' if 'postgres' in dialect else ('BIT' if 'mssql' in dialect else 'BOOLEAN'), 'FALSE' if 'postgres' in dialect else '0', False),
+        ],
+        'event_queries': [
+            ('event_id', 'INTEGER', None, False),
+            ('student_id', 'INTEGER', None, False),
+            ('organizer_id', 'INTEGER', None, False),
+            ('student_name', 'VARCHAR(100)', "''", False),
+            ('student_roll_number', 'VARCHAR(50)', None, True),
+            ('student_email', 'VARCHAR(150)', "''", False),
+            ('event_name', 'VARCHAR(200)', "''", False),
+            ('subject', 'VARCHAR(200)', None, True),
+            ('query_text', 'TEXT', "''", False),
+            ('reply_text', 'TEXT', None, True),
+            ('status', 'VARCHAR(20)', "'Pending'", False),
+            ('created_at', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
+            ('replied_at', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
+            ('closed_at', 'TIMESTAMP' if 'postgres' in dialect else 'DATETIME', None, True),
         ]
     }
 

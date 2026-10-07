@@ -15,7 +15,7 @@ from models import (
     Announcement, Certificate, CertificateStatus, User, StudentProfile, OrganizerProfile,
     Team, TeamStatus, TeamPaymentStatus, TeamRole, TeamMemberStatus, InvitationStatus, TeamMember, TeamInvitation,
     EventRegistrationType, TeamPaymentType, Department, CollegeDepartment,
-    EventRequest, EventRequestStatus, NotificationType
+    EventRequest, EventRequestStatus, NotificationType, EventQuery, QueryStatus
 )
 from routes.auth import organizer_required, get_current_user
 from services.export_service import export_participants_excel, export_participants_csv
@@ -100,6 +100,19 @@ def dashboard():
             EventRegistration.event_id.in_(event_ids)
         ).order_by(EventRegistration.created_at.desc()).limit(10).all()
 
+    # Student queries for organizer's events
+    all_queries = EventQuery.query.filter_by(organizer_id=user.id).order_by(
+        db.case(
+            (EventQuery.status == QueryStatus.PENDING, 1),
+            (EventQuery.status == QueryStatus.REPLIED, 2),
+            else_=3
+        ),
+        EventQuery.created_at.desc()
+    ).all()
+    pending_queries_count = sum(1 for q in all_queries if q.is_pending)
+    total_queries_count = len(all_queries)
+    recent_queries = all_queries[:8]
+
     return render_template(
         'organizer/dashboard.html',
         user=user,
@@ -119,6 +132,9 @@ def dashboard():
         attended_count=attended_count,
         recent_registrations=recent_registrations,
         pending_payments=pending_payments,
+        recent_queries=recent_queries,
+        pending_queries_count=pending_queries_count,
+        total_queries_count=total_queries_count,
         current_tab=tab
     )
 
@@ -1934,6 +1950,147 @@ def reject_student_payment(payment_id):
 
     flash(f"Payment proof has been REJECTED. Reason: {reason}", 'warning')
     return redirect(request.referrer or url_for('organizer.dashboard'))
+
+
+@organizer_bp.route('/queries')
+@organizer_required
+def queries():
+    """
+    Displays student queries for events managed by the current organizer.
+    Supports filtering by specific event, query status (Pending, Replied, Closed), and keyword search.
+    """
+    user = get_current_user()
+    event_id = request.args.get('event_id', type=int)
+    status_filter = request.args.get('status', 'all').strip()
+    search = request.args.get('q', '').strip()
+
+    # Events managed by this organizer for filtering dropdown
+    organizer_events = Event.query.filter_by(organizer_id=user.id).order_by(Event.start_time.desc()).all()
+    selected_event = Event.query.get(event_id) if event_id else None
+
+    # Base query: only queries for events this organizer manages
+    base_query = EventQuery.query.filter_by(organizer_id=user.id)
+
+    if event_id:
+        base_query = base_query.filter_by(event_id=event_id)
+
+    if status_filter in [QueryStatus.PENDING, QueryStatus.REPLIED, QueryStatus.CLOSED]:
+        base_query = base_query.filter_by(status=status_filter)
+
+    if search:
+        search_filter = f"%{search}%"
+        base_query = base_query.filter(
+            db.or_(
+                EventQuery.student_name.ilike(search_filter),
+                EventQuery.student_roll_number.ilike(search_filter),
+                EventQuery.student_email.ilike(search_filter),
+                EventQuery.event_name.ilike(search_filter),
+                EventQuery.query_text.ilike(search_filter),
+                EventQuery.reply_text.ilike(search_filter)
+            )
+        )
+
+    # Order: Pending first, then Replied, then Closed, and newest first
+    queries_list = base_query.order_by(
+        db.case(
+            (EventQuery.status == QueryStatus.PENDING, 1),
+            (EventQuery.status == QueryStatus.REPLIED, 2),
+            else_=3
+        ),
+        EventQuery.created_at.desc()
+    ).all()
+
+    # Counters for metrics and badge pills
+    all_organizer_queries = EventQuery.query.filter_by(organizer_id=user.id)
+    if event_id:
+        all_organizer_queries = all_organizer_queries.filter_by(event_id=event_id)
+
+    total_count = all_organizer_queries.count()
+    pending_count = all_organizer_queries.filter_by(status=QueryStatus.PENDING).count()
+    replied_count = all_organizer_queries.filter_by(status=QueryStatus.REPLIED).count()
+    closed_count = all_organizer_queries.filter_by(status=QueryStatus.CLOSED).count()
+
+    return render_template(
+        'organizer/queries.html',
+        queries=queries_list,
+        organizer_events=organizer_events,
+        selected_event=selected_event,
+        selected_event_id=event_id,
+        status_filter=status_filter,
+        search=search,
+        total_count=total_count,
+        pending_count=pending_count,
+        replied_count=replied_count,
+        closed_count=closed_count,
+        user=user
+    )
+
+
+@organizer_bp.route('/queries/<int:query_id>/reply', methods=['POST'])
+@organizer_required
+def reply_query(query_id):
+    """
+    Submits organizer's reply to a student query and notifies the student.
+    """
+    user = get_current_user()
+    event_query = EventQuery.query.get_or_404(query_id)
+
+    if event_query.organizer_id != user.id:
+        abort(403)
+
+    reply_text = request.form.get('reply_text', '').strip()
+    if not reply_text:
+        flash('Reply message cannot be empty.', 'warning')
+        return redirect(request.referrer or url_for('organizer.queries'))
+
+    mark_closed = request.form.get('mark_closed') in ('1', 'true', 'on')
+
+    event_query.reply_text = reply_text
+    event_query.replied_at = datetime.utcnow()
+    if mark_closed:
+        event_query.status = QueryStatus.CLOSED
+        event_query.closed_at = datetime.utcnow()
+    else:
+        event_query.status = QueryStatus.REPLIED
+
+    db.session.commit()
+
+    # Notify student in their Campus Flow account
+    reply_snippet = (reply_text[:100] + '...') if len(reply_text) > 100 else reply_text
+    event_slug = event_query.event.slug if event_query.event else ''
+    redirect_link = (url_for('public.event_detail', slug=event_slug) + '#queries') if event_slug else url_for('student.my_queries')
+    create_notification(
+        user_id=event_query.student_id,
+        title=f"Query Replied: {event_query.event_name}",
+        message=f"The organizer replied to your query: \"{reply_snippet}\"",
+        notification_type=NotificationType.QUERY_REPLY,
+        link=redirect_link,
+        event_id=event_query.event_id
+    )
+
+    flash(f"Reply sent to {event_query.student_name} successfully.", 'success')
+    return redirect(request.referrer or url_for('organizer.queries'))
+
+
+@organizer_bp.route('/queries/<int:query_id>/close', methods=['POST'])
+@organizer_required
+def close_query(query_id):
+    """
+    Marks a resolved student query as Closed.
+    """
+    user = get_current_user()
+    event_query = EventQuery.query.get_or_404(query_id)
+
+    if event_query.organizer_id != user.id:
+        abort(403)
+
+    event_query.status = QueryStatus.CLOSED
+    event_query.closed_at = datetime.utcnow()
+    db.session.commit()
+
+    flash(f"Query #{event_query.id} from {event_query.student_name} marked as Closed.", 'success')
+    return redirect(request.referrer or url_for('organizer.queries'))
+
 
 
 

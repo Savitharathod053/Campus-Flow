@@ -1,7 +1,11 @@
 from datetime import datetime
-from flask import Blueprint, render_template, request, url_for, abort, jsonify
-from models import db, Event, EventStatus, EventType, EventRegistration, User, StudentProfile, Department, Notification, CollegeDepartment
+from flask import Blueprint, render_template, request, url_for, abort, jsonify, flash, redirect
+from models import (
+    db, Event, EventStatus, EventType, EventRegistration, User, StudentProfile,
+    Department, Notification, NotificationType, CollegeDepartment, EventQuery, QueryStatus
+)
 from routes.auth import get_current_user
+from services.notification_service import create_notification
 
 public_bp = Blueprint('public', __name__)
 
@@ -219,6 +223,14 @@ def event_detail(slug=None, event_id=None):
     # Active announcements for this event
     announcements = event.announcements
 
+    # Queries submitted by this student for this event
+    student_queries = []
+    if current_user and current_user.is_student:
+        student_queries = EventQuery.query.filter_by(
+            event_id=event.id,
+            student_id=current_user.id
+        ).order_by(EventQuery.created_at.desc()).all()
+
     return render_template(
         'public/event_detail.html',
         event=event,
@@ -228,8 +240,66 @@ def event_detail(slug=None, event_id=None):
         is_eligible=is_eligible,
         eligibility_message=eligibility_message,
         announcements=announcements,
+        student_queries=student_queries,
         current_user=current_user
     )
+
+
+@public_bp.route('/events/<int:event_id>/query', methods=['POST'])
+def submit_event_query(event_id):
+    """
+    Allows a student to directly ask a query / message to the event organizer.
+    """
+    current_user = get_current_user()
+    if not current_user:
+        flash('Please log in with your student account to ask a query.', 'warning')
+        return redirect(url_for('auth.login', next=request.referrer or url_for('public.event_detail', event_id=event_id)))
+
+    if not current_user.is_student:
+        flash('Only students can submit queries to event organizers.', 'danger')
+        return redirect(request.referrer or url_for('public.event_detail', event_id=event_id))
+
+    event = Event.query.get_or_404(event_id)
+
+    query_text = (request.form.get('query_text') or request.form.get('message') or '').strip()
+    if not query_text:
+        flash('Please enter your query message before submitting.', 'warning')
+        return redirect(url_for('public.event_detail', slug=event.slug) + '#queries')
+
+    subject = (request.form.get('subject') or '').strip()
+    student_roll = current_user.student_profile.roll_number if current_user.student_profile else 'N/A'
+
+    event_query = EventQuery(
+        event_id=event.id,
+        student_id=current_user.id,
+        organizer_id=event.organizer_id,
+        student_name=current_user.name,
+        student_roll_number=student_roll,
+        student_email=current_user.email,
+        event_name=event.title,
+        subject=subject or f"Query regarding {event.title}",
+        query_text=query_text,
+        status=QueryStatus.PENDING,
+        created_at=datetime.utcnow()
+    )
+
+    db.session.add(event_query)
+    db.session.commit()
+
+    # In-app notification to the event organizer
+    query_snippet = (query_text[:100] + '...') if len(query_text) > 100 else query_text
+    create_notification(
+        user_id=event.organizer_id,
+        title=f"New Student Query: {event.title}",
+        message=f"{current_user.name} ({student_roll}) asked: \"{query_snippet}\"",
+        notification_type=NotificationType.STUDENT_QUERY,
+        link=url_for('organizer.queries', event_id=event.id),
+        event_id=event.id
+    )
+
+    flash('Your query has been sent to the organizer.', 'success')
+    return redirect(url_for('public.event_detail', slug=event.slug) + '#queries')
+
 
 
 @public_bp.route('/events/<int:event_id>/capacity', methods=['GET'])

@@ -74,6 +74,12 @@
                                     {% elif 'REQUEST' in n.type %}
                                         {% set icon_class = 'bi-file-earmark-text-fill text-info' %}
                                         {% set icon_bg = 'bg-info-subtle' %}
+                                    {% elif n.type == 'STUDENT_QUERY' %}
+                                        {% set icon_class = 'bi-question-circle-fill text-warning' %}
+                                        {% set icon_bg = 'bg-warning-subtle' %}
+                                    {% elif n.type == 'QUERY_REPLY' %}
+                                        {% set icon_class = 'bi-chat-left-text-fill text-success' %}
+                                        {% set icon_bg = 'bg-success-subtle' %}
                                     {% endif %}
                                     <div class="notification-item {% if not n.is_read %}notification-unread{% else %}notification-read{% endif %}"
                                          id="notif-dropdown-item-{{ n.id }}"
@@ -211,6 +217,9 @@
                                 <a class="nav-link" href="{{ url_for('organizer.dashboard') }}"><i class="bi bi-speedometer2 me-1"></i> Organizer Portal</a>
                             </li>
                             <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('organizer.queries') }}"><i class="bi bi-chat-dots me-1"></i> Student Queries</a>
+                            </li>
+                            <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('organizer.create_event') }}"><i class="bi bi-plus-circle me-1"></i> Create Event Request</a>
                             </li>
                         {% elif current_user.is_student %}
@@ -222,6 +231,9 @@
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('student.my_events') }}"><i class="bi bi-ticket-perforated me-1"></i> My Passes</a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('student.my_queries') }}"><i class="bi bi-chat-dots me-1"></i> My Queries</a>
                             </li>
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('student.certificates') }}"><i class="bi bi-award me-1"></i> Certificates</a>

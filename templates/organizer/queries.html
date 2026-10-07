@@ -1,0 +1,256 @@
+{% extends "base.html" %}
+{% block title %}Student Queries - Organizer Console - Campus Flow{% endblock %}
+
+{% block content %}
+<div class="py-4 mb-4" style="background: linear-gradient(135deg, #0b1329 0%, #1e3a8a 60%, #172554 100%); border-radius: 0 0 1.5rem 1.5rem; box-shadow: 0 10px 30px -10px rgba(15, 23, 42, 0.4);">
+    <div class="container py-2">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge bg-warning text-dark fw-bold px-2 py-1 text-uppercase" style="letter-spacing: 0.5px; font-size: 0.72rem;">Organizer Console</span>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace" style="font-size: 0.72rem;">Student Queries Hub</span>
+                </div>
+                <h2 class="fw-bold text-white mb-1 tracking-tight">Student Queries & Inquiries</h2>
+                <p class="text-light opacity-80 small mb-0">Review questions submitted by students and provide direct organizer replies.</p>
+            </div>
+            <div class="d-flex flex-wrap gap-2">
+                <a href="{{ url_for('organizer.dashboard') }}" class="btn btn-outline-light btn-sm fw-bold px-3 py-2 rounded-pill shadow-sm">
+                    <i class="bi bi-speedometer2 me-1"></i> Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Stat Metrics Row -->
+    <div class="row g-3 mb-4">
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card shadow-3d">
+                <div class="metric-icon-box bg-primary text-white">
+                    <i class="bi bi-chat-dots"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ total_count }}</div>
+                    <div class="metric-label">Total Queries</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card shadow-3d">
+                <div class="metric-icon-box bg-warning text-dark">
+                    <i class="bi bi-hourglass-split"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ pending_count }}</div>
+                    <div class="metric-label">Pending Reply</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card shadow-3d">
+                <div class="metric-icon-box bg-success text-white">
+                    <i class="bi bi-chat-check"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ replied_count }}</div>
+                    <div class="metric-label">Replied</div>
+                </div>
+            </div>
+        </div>
+        <div class="col-sm-6 col-lg-3">
+            <div class="metric-card shadow-3d">
+                <div class="metric-icon-box bg-secondary text-white">
+                    <i class="bi bi-archive"></i>
+                </div>
+                <div>
+                    <div class="metric-number">{{ closed_count }}</div>
+                    <div class="metric-label">Closed</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters & Search Toolbar -->
+    <div class="ff-card p-3 mb-4 shadow-sm">
+        <form method="GET" action="{{ url_for('organizer.queries') }}" class="row g-2 align-items-center">
+            <div class="col-md-4">
+                <select name="event_id" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="">All Events ({{ organizer_events|length }})</option>
+                    {% for ev in organizer_events %}
+                        <option value="{{ ev.id }}" {% if selected_event_id == ev.id %}selected{% endif %}>
+                            {{ ev.title }} ({{ ev.event_type }})
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                    <option value="all" {% if status_filter == 'all' or not status_filter %}selected{% endif %}>All Statuses</option>
+                    <option value="Pending" {% if status_filter == 'Pending' %}selected{% endif %}>Pending Only ({{ pending_count }})</option>
+                    <option value="Replied" {% if status_filter == 'Replied' %}selected{% endif %}>Replied Only ({{ replied_count }})</option>
+                    <option value="Closed" {% if status_filter == 'Closed' %}selected{% endif %}>Closed Only ({{ closed_count }})</option>
+                </select>
+            </div>
+            <div class="col-md-4">
+                <div class="input-group input-group-sm">
+                    <input type="text" name="q" class="form-control" placeholder="Search name, roll, email, query..." value="{{ search }}">
+                    <button class="btn btn-primary" type="submit"><i class="bi bi-search"></i></button>
+                </div>
+            </div>
+            <div class="col-md-1 text-md-end">
+                <a href="{{ url_for('organizer.queries') }}" class="btn btn-outline-secondary btn-sm w-100" title="Reset Filters">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                </a>
+            </div>
+        </form>
+    </div>
+
+    {% if queries %}
+        <div class="ff-card shadow-sm overflow-hidden">
+            <div class="table-responsive">
+                <table class="table align-middle ff-table mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="min-width: 170px;">Student Details</th>
+                            <th style="min-width: 160px;">Event Name</th>
+                            <th style="min-width: 250px;">Student Query</th>
+                            <th style="min-width: 130px;">Date & Time</th>
+                            <th style="min-width: 100px;">Status</th>
+                            <th style="min-width: 150px;" class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for q in queries %}
+                            <tr class="{% if q.is_pending %}table-warning table-opacity-10{% endif %}">
+                                <td>
+                                    <div class="fw-bold text-dark">{{ q.student_name }}</div>
+                                    <div class="small text-muted">
+                                        <i class="bi bi-person-badge me-1"></i><strong>{{ q.student_roll_number or 'N/A' }}</strong>
+                                    </div>
+                                    <div class="small text-muted text-truncate" style="max-width: 190px;" title="{{ q.student_email }}">
+                                        <i class="bi bi-envelope me-1"></i>{{ q.student_email }}
+                                    </div>
+                                </td>
+                                <td>
+                                    <div class="fw-semibold text-dark">{{ q.event_name }}</div>
+                                    {% if q.event %}
+                                        <a href="{{ url_for('organizer.manage_event', event_id=q.event_id) }}" class="small text-primary text-decoration-none">
+                                            <i class="bi bi-gear-fill me-1"></i>Manage Event
+                                        </a>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="p-2 bg-light rounded text-dark small" style="white-space: pre-line; max-height: 120px; overflow-y: auto;">
+                                        {{ q.query_text }}
+                                    </div>
+                                    {% if q.reply_text %}
+                                        <div class="mt-2 p-2 bg-success bg-opacity-10 border border-success border-opacity-25 rounded small">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <strong class="text-success" style="font-size: 0.75rem;"><i class="bi bi-reply-fill me-1"></i>Your Reply:</strong>
+                                                {% if q.replied_at %}
+                                                    <span class="text-muted" style="font-size: 0.7rem;">{{ q.replied_at|datetimeformat }}</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="text-dark" style="white-space: pre-line;">{{ q.reply_text }}</div>
+                                        </div>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <div class="small fw-semibold">{{ q.created_at|datetimeformat }}</div>
+                                    <span class="badge bg-light text-muted border font-monospace">#{{ q.id }}</span>
+                                </td>
+                                <td>
+                                    {% if q.is_pending %}
+                                        <span class="badge bg-warning text-dark fw-bold"><i class="bi bi-hourglass-split me-1"></i> Pending</span>
+                                    {% elif q.is_replied %}
+                                        <span class="badge bg-success text-white fw-bold"><i class="bi bi-check-circle-fill me-1"></i> Replied</span>
+                                    {% elif q.is_closed %}
+                                        <span class="badge bg-secondary text-white fw-bold"><i class="bi bi-archive-fill me-1"></i> Closed</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end text-nowrap">
+                                    <div class="d-inline-flex align-items-center gap-1">
+                                        <button type="button" class="btn btn-sm btn-primary fw-bold" data-bs-toggle="modal" data-bs-target="#replyModal{{ q.id }}">
+                                            <i class="bi bi-reply me-1"></i> {% if q.reply_text %}Edit Reply{% else %}Reply{% endif %}
+                                        </button>
+                                        {% if not q.is_closed %}
+                                            <form method="POST" action="{{ url_for('organizer.close_query', query_id=q.id) }}" class="d-inline" onsubmit="return confirm('Mark this query as Closed?');">
+                                                <button type="submit" class="btn btn-sm btn-outline-secondary" title="Mark as Closed">
+                                                    <i class="bi bi-check2-circle"></i> Close
+                                                </button>
+                                            </form>
+                                        {% endif %}
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <!-- Reply Modal for Query #{{ q.id }} -->
+                            <div class="modal fade" id="replyModal{{ q.id }}" tabindex="-1" aria-labelledby="replyModalLabel{{ q.id }}" aria-hidden="true">
+                                <div class="modal-dialog modal-dialog-centered">
+                                    <div class="modal-content border-0 shadow-lg text-start">
+                                        <div class="modal-header bg-primary text-white">
+                                            <h5 class="modal-title fw-bold" id="replyModalLabel{{ q.id }}">
+                                                <i class="bi bi-reply-fill me-2"></i> Reply to {{ q.student_name }}
+                                            </h5>
+                                            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <form method="POST" action="{{ url_for('organizer.reply_query', query_id=q.id) }}">
+                                            <div class="modal-body p-4">
+                                                <div class="p-3 bg-light rounded-3 mb-3 border">
+                                                    <div class="d-flex justify-content-between small text-muted mb-1">
+                                                        <span><strong>Event:</strong> {{ q.event_name }}</span>
+                                                        <span><strong>Roll:</strong> {{ q.student_roll_number }}</span>
+                                                    </div>
+                                                    <div class="small fw-bold text-secondary text-uppercase mb-1" style="font-size: 0.72rem;">Student's Query:</div>
+                                                    <div class="text-dark small" style="white-space: pre-line;">{{ q.query_text }}</div>
+                                                </div>
+
+                                                <div class="mb-3">
+                                                    <label for="reply_text_{{ q.id }}" class="form-label small fw-bold text-dark mb-1">
+                                                        Your Response to Student <span class="text-danger">*</span>
+                                                    </label>
+                                                    <textarea class="form-control" id="reply_text_{{ q.id }}" name="reply_text" rows="4" placeholder="Enter your detailed reply to the student..." required>{{ q.reply_text or '' }}</textarea>
+                                                </div>
+
+                                                <div class="form-check mb-2">
+                                                    <input class="form-check-input" type="checkbox" name="mark_closed" value="true" id="markClosedCheck{{ q.id }}" {% if q.is_closed %}checked{% endif %}>
+                                                    <label class="form-check-label small text-muted" for="markClosedCheck{{ q.id }}">
+                                                        Also mark query as <strong>Closed</strong> after sending reply
+                                                    </label>
+                                                </div>
+
+                                                <div class="small text-muted">
+                                                    <i class="bi bi-bell text-primary me-1"></i> The student will receive an in-app notification linking to this response.
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer bg-light">
+                                                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                                                <button type="submit" class="btn btn-primary btn-sm fw-bold px-3">
+                                                    <i class="bi bi-send-fill me-1"></i> Send Reply
+                                                </button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    {% else %}
+        <div class="ff-card p-5 text-center text-muted">
+            <i class="bi bi-inbox fs-1 d-block mb-3 opacity-50 text-secondary"></i>
+            <h5 class="fw-bold">No student queries found</h5>
+            <p class="small text-muted mb-0">
+                {% if selected_event_id or status_filter != 'all' or search %}
+                    No queries match your current filter criteria.
+                {% else %}
+                    You have not received any queries from students yet. Queries submitted on your event pages will appear here.
+                {% endif %}
+            </p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

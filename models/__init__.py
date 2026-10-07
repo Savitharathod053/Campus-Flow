@@ -11,8 +11,11 @@ from .certificate import Certificate, CertificateStatus
 from .audit_log import AuditLog
 from .request import OrganizerRequest, OrganizerRequestStatus, EventRequest, EventRequestStatus
 from .notification import Notification, NotificationType, EventNotificationLog
+from .query import EventQuery, QueryStatus
 
 __all__ = [
+    'EventQuery',
+    'QueryStatus',
     'OrganizerRequest',
     'OrganizerRequestStatus',
     'EventRequest',

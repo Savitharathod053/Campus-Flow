@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}My Event Queries - Campus Flow{% endblock %}
+
+{% block content %}
+<div class="bg-primary text-white py-4 mb-4">
+    <div class="container">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <h2 class="fw-bold mb-1"><i class="bi bi-chat-dots me-2"></i> My Event Queries</h2>
+                <p class="text-light opacity-90 mb-0">Track your questions to event organizers and their responses.</p>
+            </div>
+            <a href="{{ url_for('public.events') }}" class="btn btn-outline-light btn-sm fw-bold">
+                <i class="bi bi-compass me-1"></i> Explore Events
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="container pb-5">
+    <!-- Filter Tabs -->
+    <ul class="nav nav-pills mb-4 flex-wrap gap-1">
+        <li class="nav-item">
+            <a class="nav-link {% if current_tab == 'all' %}active fw-bold{% endif %}" href="{{ url_for('student.my_queries', tab='all') }}">
+                All Queries <span class="badge {% if current_tab == 'all' %}bg-white text-primary{% else %}bg-secondary{% endif %} ms-1">{{ total_count }}</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if current_tab == 'pending' %}active fw-bold{% endif %}" href="{{ url_for('student.my_queries', tab='pending') }}">
+                <i class="bi bi-hourglass-split me-1"></i> Pending <span class="badge {% if current_tab == 'pending' %}bg-white text-primary{% else %}bg-secondary{% endif %} ms-1">{{ pending_count }}</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if current_tab == 'replied' %}active fw-bold{% endif %}" href="{{ url_for('student.my_queries', tab='replied') }}">
+                <i class="bi bi-check-circle-fill me-1"></i> Replied <span class="badge {% if current_tab == 'replied' %}bg-white text-primary{% else %}bg-secondary{% endif %} ms-1">{{ replied_count }}</span>
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link {% if current_tab == 'closed' %}active fw-bold{% endif %}" href="{{ url_for('student.my_queries', tab='closed') }}">
+                <i class="bi bi-archive-fill me-1"></i> Closed <span class="badge {% if current_tab == 'closed' %}bg-white text-primary{% else %}bg-secondary{% endif %} ms-1">{{ closed_count }}</span>
+            </a>
+        </li>
+    </ul>
+
+    {% if queries %}
+        <div class="d-flex flex-column gap-3">
+            {% for q in queries %}
+                <div class="ff-card p-4 shadow-sm border {% if q.is_pending %}border-warning border-opacity-50{% elif q.is_replied %}border-success border-opacity-50{% else %}border-secondary border-opacity-25{% endif %}">
+                    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3 pb-2 border-bottom">
+                        <div>
+                            <div class="d-flex flex-wrap align-items-center gap-2 mb-1">
+                                {% if q.is_pending %}
+                                    <span class="badge bg-warning text-dark fw-bold"><i class="bi bi-hourglass-split me-1"></i> Pending</span>
+                                {% elif q.is_replied %}
+                                    <span class="badge bg-success text-white fw-bold"><i class="bi bi-check-circle-fill me-1"></i> Replied</span>
+                                {% elif q.is_closed %}
+                                    <span class="badge bg-secondary text-white fw-bold"><i class="bi bi-archive-fill me-1"></i> Closed</span>
+                                {% endif %}
+                                <span class="badge bg-light text-dark border">{{ q.event.event_type if q.event else 'Event' }}</span>
+                                <span class="small text-muted"><i class="bi bi-clock me-1"></i> {{ q.created_at|datetimeformat }}</span>
+                            </div>
+                            <h5 class="fw-bold mb-0">
+                                {% if q.event %}
+                                    <a href="{{ url_for('public.event_detail', slug=q.event.slug) }}#queries" class="text-decoration-none text-dark hover-primary">
+                                        {{ q.event.title }}
+                                    </a>
+                                {% else %}
+                                    {{ q.event_name }}
+                                {% endif %}
+                            </h5>
+                        </div>
+                        <div class="text-sm-end">
+                            <span class="small text-muted font-monospace">Query #{{ q.id }}</span>
+                            {% if q.event %}
+                                <div class="mt-1">
+                                    <a href="{{ url_for('public.event_detail', slug=q.event.slug) }}#queries" class="btn btn-outline-primary btn-sm py-0 px-2 fw-semibold" style="font-size: 0.8rem;">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i> View Event
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Student Question -->
+                    <div class="mb-3">
+                        <div class="small fw-bold text-muted text-uppercase mb-1" style="font-size: 0.72rem;">Your Query:</div>
+                        <div class="p-3 bg-light rounded-3 text-dark" style="white-space: pre-line; line-height: 1.6;">
+                            {{ q.query_text }}
+                        </div>
+                    </div>
+
+                    <!-- Organizer Reply -->
+                    {% if q.reply_text %}
+                        <div class="p-3 rounded-3 bg-success bg-opacity-10 border border-success border-opacity-25">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center mb-1">
+                                <span class="small fw-bold text-success">
+                                    <i class="bi bi-reply-fill me-1"></i> Organizer Reply ({{ q.organizer.name if q.organizer else 'Organizer' }}):
+                                </span>
+                                {% if q.replied_at %}
+                                    <span class="small text-muted"><i class="bi bi-clock me-1"></i> {{ q.replied_at|datetimeformat }}</span>
+                                {% endif %}
+                            </div>
+                            <div class="text-dark small" style="white-space: pre-line; line-height: 1.6;">
+                                {{ q.reply_text }}
+                            </div>
+                        </div>
+                    {% elif q.is_pending %}
+                        <div class="p-2 px-3 rounded-3 bg-warning bg-opacity-10 text-muted small">
+                            <i class="bi bi-info-circle text-warning me-1"></i> The event organizer has been notified of your query and will reply soon.
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="ff-card p-5 text-center text-muted">
+            <i class="bi bi-chat-square-dots fs-1 d-block mb-3 opacity-50 text-secondary"></i>
+            <h5 class="fw-bold">No queries found</h5>
+            <p class="small text-muted mb-4">
+                {% if current_tab != 'all' %}
+                    You have no queries with status "{{ current_tab|capitalize }}".
+                {% else %}
+                    You haven't submitted any questions to event organizers yet. You can submit questions directly from any event's page.
+                {% endif %}
+            </p>
+            <a href="{{ url_for('public.events') }}" class="btn btn-primary btn-sm fw-bold">
+                <i class="bi bi-compass me-1"></i> Browse Events
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

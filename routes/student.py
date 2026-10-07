@@ -7,7 +7,8 @@ from models import (
     Certificate, CertificateStatus, Announcement, AttendanceRecord,
     Team, TeamStatus, TeamPaymentStatus, TeamRole, TeamMemberStatus,
     InvitationStatus, TeamMember, TeamInvitation, EventRegistrationType, TeamPaymentType,
-    CollegeDepartment, OrganizerRequest, OrganizerRequestStatus, NotificationType
+    CollegeDepartment, OrganizerRequest, OrganizerRequestStatus, NotificationType,
+    EventQuery, QueryStatus
 )
 from routes.auth import student_required, login_required, get_current_user
 from services.qr_service import generate_ticket_qr
@@ -768,3 +769,41 @@ def preview_certificate(cert_id):
         return redirect(cert.file_url)
 
     abort(404)
+
+
+@student_bp.route('/queries')
+@student_required
+def my_queries():
+    """
+    Displays all queries submitted by the student across events with organizer replies and status.
+    """
+    user = get_current_user()
+    current_tab = request.args.get('tab', 'all').lower()
+
+    base_query = EventQuery.query.filter_by(student_id=user.id)
+
+    if current_tab == 'pending':
+        base_query = base_query.filter_by(status=QueryStatus.PENDING)
+    elif current_tab == 'replied':
+        base_query = base_query.filter_by(status=QueryStatus.REPLIED)
+    elif current_tab == 'closed':
+        base_query = base_query.filter_by(status=QueryStatus.CLOSED)
+
+    queries = base_query.order_by(EventQuery.created_at.desc()).all()
+
+    total_count = EventQuery.query.filter_by(student_id=user.id).count()
+    pending_count = EventQuery.query.filter_by(student_id=user.id, status=QueryStatus.PENDING).count()
+    replied_count = EventQuery.query.filter_by(student_id=user.id, status=QueryStatus.REPLIED).count()
+    closed_count = EventQuery.query.filter_by(student_id=user.id, status=QueryStatus.CLOSED).count()
+
+    return render_template(
+        'student/my_queries.html',
+        queries=queries,
+        current_tab=current_tab,
+        total_count=total_count,
+        pending_count=pending_count,
+        replied_count=replied_count,
+        closed_count=closed_count,
+        user=user
+    )
+

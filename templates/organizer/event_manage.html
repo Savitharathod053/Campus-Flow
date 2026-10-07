@@ -338,6 +338,32 @@
             </div>
         </div>
 
+        <!-- Student Queries Action Card -->
+        <div class="col-md-6 col-lg-4">
+            <div class="ff-card p-4 h-100 d-flex flex-column justify-content-between border-primary border-opacity-50">
+                <div>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div class="d-flex align-items-center gap-2 text-primary">
+                            <i class="bi bi-chat-dots-fill fs-3"></i>
+                            <h5 class="fw-bold mb-0 text-dark">Student Queries</h5>
+                        </div>
+                        {% set ev_pending_queries = event.queries|selectattr('is_pending')|list|length %}
+                        {% if ev_pending_queries > 0 %}
+                            <span class="badge bg-warning text-dark">{{ ev_pending_queries }} Pending</span>
+                        {% else %}
+                            <span class="badge bg-light text-dark border">{{ event.queries|length }} Total</span>
+                        {% endif %}
+                    </div>
+                    <p class="small text-muted mb-3">View and reply to questions submitted by students specifically for this event.</p>
+                </div>
+                <div class="d-flex flex-column gap-2">
+                    <a href="{{ url_for('organizer.queries', event_id=event.id) }}" class="btn btn-outline-primary btn-sm fw-bold">
+                        <i class="bi bi-reply-fill me-1"></i> Manage Queries ({{ event.queries|length }})
+                    </a>
+                </div>
+            </div>
+        </div>
+
         <!-- Event Info Summary -->
         <div class="col-md-6 col-lg-4">
             <div class="ff-card p-4 h-100 d-flex flex-column justify-content-between bg-light">

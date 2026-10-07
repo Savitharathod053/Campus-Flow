@@ -143,6 +143,7 @@ class Event(db.Model):
     announcements = db.relationship('Announcement', back_populates='event', cascade='all, delete-orphan', order_by='Announcement.created_at.desc()')
     attendance_records = db.relationship('AttendanceRecord', back_populates='event', cascade='all, delete-orphan')
     certificates = db.relationship('Certificate', back_populates='event', cascade='all, delete-orphan')
+    queries = db.relationship('EventQuery', back_populates='event', cascade='all, delete-orphan', order_by='EventQuery.created_at.desc()')
 
     def __init__(self, **kwargs):
         super(Event, self).__init__(**kwargs)

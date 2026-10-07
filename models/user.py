@@ -41,6 +41,8 @@ class User(db.Model):
     registrations = db.relationship('EventRegistration', back_populates='student', lazy='dynamic', cascade='all, delete-orphan')
     announcements = db.relationship('Announcement', back_populates='author', lazy='dynamic')
     audit_logs = db.relationship('AuditLog', back_populates='admin', lazy='dynamic')
+    student_queries = db.relationship('EventQuery', foreign_keys='EventQuery.student_id', back_populates='student', lazy='dynamic', cascade='all, delete-orphan')
+    organizer_queries = db.relationship('EventQuery', foreign_keys='EventQuery.organizer_id', back_populates='organizer', lazy='dynamic', cascade='all, delete-orphan')
     
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)

@@ -116,6 +116,90 @@
                     <p class="small text-muted mt-3 mb-0"><i class="bi bi-info-circle me-1"></i> {{ event.eligibility_notes }}</p>
                 {% endif %}
             </div>
+
+            <!-- Contact Organizer & Student Queries Section -->
+            <div class="ff-card p-4 mb-4 border-start border-4 border-primary" id="queries">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 border-bottom pb-2">
+                    <div>
+                        <h4 class="fw-bold mb-1 text-dark">
+                            <i class="bi bi-chat-dots-fill text-primary me-2"></i> Contact Organizer / Ask a Query
+                        </h4>
+                        <p class="small text-muted mb-0">Have doubts about guidelines, schedule, or prerequisites? Send a direct query to the organizer.</p>
+                    </div>
+                    {% if current_user and current_user.is_student %}
+                        <button type="button" class="btn btn-primary btn-sm fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#askQueryModal">
+                            <i class="bi bi-question-circle me-1"></i> Ask a Query
+                        </button>
+                    {% elif not current_user %}
+                        <a href="{{ url_for('auth.login', next=request.url) }}" class="btn btn-outline-primary btn-sm fw-bold">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> Log In to Ask
+                        </a>
+                    {% endif %}
+                </div>
+
+                {% if current_user and current_user.is_student %}
+                    {% if student_queries %}
+                        <h6 class="fw-bold text-secondary mb-3"><i class="bi bi-clock-history me-1"></i> Your Submitted Queries for this Event</h6>
+                        <div class="d-flex flex-column gap-3">
+                            {% for q in student_queries %}
+                                <div class="p-3 rounded-3 border {% if q.is_pending %}bg-light border-warning-subtle{% elif q.is_replied %}bg-white border-success-subtle shadow-sm{% else %}bg-light border-secondary-subtle{% endif %}">
+                                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                                        <div class="d-flex align-items-center gap-2">
+                                            {% if q.is_pending %}
+                                                <span class="badge bg-warning text-dark fw-bold"><i class="bi bi-hourglass-split me-1"></i> Pending</span>
+                                            {% elif q.is_replied %}
+                                                <span class="badge bg-success text-white fw-bold"><i class="bi bi-check-circle-fill me-1"></i> Replied</span>
+                                            {% elif q.is_closed %}
+                                                <span class="badge bg-secondary text-white fw-bold"><i class="bi bi-archive-fill me-1"></i> Closed</span>
+                                            {% endif %}
+                                            <span class="small text-muted"><i class="bi bi-calendar3 me-1"></i> {{ q.created_at|datetimeformat }}</span>
+                                        </div>
+                                        <span class="small text-muted font-monospace">Query #{{ q.id }}</span>
+                                    </div>
+                                    <div class="mb-2">
+                                        <div class="small fw-bold text-muted text-uppercase" style="font-size: 0.72rem;">Your Query:</div>
+                                        <div class="text-dark fw-medium" style="white-space: pre-line;">{{ q.query_text }}</div>
+                                    </div>
+                                    {% if q.reply_text %}
+                                        <div class="p-3 rounded-3 bg-success bg-opacity-10 border border-success border-opacity-25 mt-2">
+                                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                                <span class="small fw-bold text-success"><i class="bi bi-reply-fill me-1"></i> Organizer Reply:</span>
+                                                {% if q.replied_at %}
+                                                    <span class="small text-muted">{{ q.replied_at|datetimeformat }}</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="text-dark small" style="white-space: pre-line;">{{ q.reply_text }}</div>
+                                        </div>
+                                    {% elif q.is_pending %}
+                                        <div class="small text-muted mt-2 fst-italic">
+                                            <i class="bi bi-info-circle me-1 text-warning"></i> Your query has been delivered to the organizer. You will be notified when they reply.
+                                        </div>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="p-3 bg-light rounded-3 text-center text-muted">
+                            <i class="bi bi-chat-left-text fs-4 d-block mb-1 text-secondary opacity-50"></i>
+                            <p class="small mb-2">You haven't submitted any queries for this event yet.</p>
+                            <button type="button" class="btn btn-outline-primary btn-sm fw-bold" data-bs-toggle="modal" data-bs-target="#askQueryModal">
+                                <i class="bi bi-question-circle me-1"></i> Contact Organizer
+                            </button>
+                        </div>
+                    {% endif %}
+                {% elif not current_user %}
+                    <div class="p-3 bg-light rounded-3 text-center text-muted">
+                        <p class="small mb-2">Have questions about this event? Log in to directly contact the organizer.</p>
+                        <a href="{{ url_for('auth.login', next=request.url) }}" class="btn btn-outline-primary btn-sm fw-bold">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> Log In to Submit Query
+                        </a>
+                    </div>
+                {% else %}
+                    <div class="p-3 bg-light rounded-3 text-muted small">
+                        <i class="bi bi-info-circle me-1 text-primary"></i> You are logged in as <strong>{{ current_user.role }}</strong>. Direct student query box is available for student accounts.
+                    </div>
+                {% endif %}
+            </div>
         </div>
 
         <!-- Sidebar Right Column (Registration Box & Coordinators) -->
@@ -333,9 +417,79 @@
                     {% if event.contact_info %}
                         <div class="small text-muted mt-1"><i class="bi bi-telephone me-1"></i> {{ event.contact_info }}</div>
                     {% endif %}
+                    {% if current_user and current_user.is_student %}
+                        <button type="button" class="btn btn-outline-primary btn-sm w-100 fw-bold mt-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#askQueryModal">
+                            <i class="bi bi-chat-dots me-1"></i> Contact Organizer
+                        </button>
+                    {% elif not current_user %}
+                        <a href="{{ url_for('auth.login', next=request.url) }}" class="btn btn-outline-primary btn-sm w-100 fw-bold mt-3">
+                            <i class="bi bi-box-arrow-in-right me-1"></i> Log In to Ask Query
+                        </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Ask a Query Modal -->
+{% if current_user and current_user.is_student %}
+<div class="modal fade" id="askQueryModal" tabindex="-1" aria-labelledby="askQueryModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="askQueryModalLabel">
+                    <i class="bi bi-question-circle-fill me-2"></i> Ask a Query to Organizer
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form method="POST" action="{{ url_for('public.submit_event_query', event_id=event.id) }}">
+                <div class="modal-body p-4">
+                    <p class="small text-muted mb-3">
+                        Submit a direct query to <strong>{{ event.organizer.name }}</strong> regarding <strong>{{ event.title }}</strong>.
+                    </p>
+
+                    <!-- Auto-filled Student Details -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted mb-1">Student Name</label>
+                            <input type="text" class="form-control bg-light form-control-sm" value="{{ current_user.name }}" readonly>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold text-muted mb-1">Student Roll Number</label>
+                            <input type="text" class="form-control bg-light form-control-sm" value="{{ current_user.student_profile.roll_number if current_user.student_profile else 'N/A' }}" readonly>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-bold text-muted mb-1">Email</label>
+                            <input type="email" class="form-control bg-light form-control-sm" value="{{ current_user.email }}" readonly>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label small fw-bold text-muted mb-1">Event Name</label>
+                            <input type="text" class="form-control bg-light form-control-sm" value="{{ event.title }}" readonly>
+                        </div>
+                    </div>
+
+                    <!-- Query/Message Text Box -->
+                    <div class="mb-3">
+                        <label for="query_text" class="form-label small fw-bold text-dark mb-1">
+                            Query / Message <span class="text-danger">*</span>
+                        </label>
+                        <textarea class="form-control" id="query_text" name="query_text" rows="4" placeholder="Type your query or question for the event organizer here..." required></textarea>
+                    </div>
+
+                    <div class="small text-muted">
+                        <i class="bi bi-shield-check text-success me-1"></i> The organizer will be notified immediately and can reply directly to your Campus Flow account.
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm fw-bold px-3">
+                        <i class="bi bi-send-fill me-1"></i> Submit Query
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
