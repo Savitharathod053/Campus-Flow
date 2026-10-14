@@ -17,13 +17,16 @@ test.describe('Authentication & Role-Based Access Control (RBAC)', () => {
     await expect(page).toHaveURL(/\/(#.*)?$/);
   });
 
-  test('student can log in using email address', async ({ page }) => {
-    await loginAs(page, {
-      ...TEST_USERS.student,
-      identifier: TEST_USERS.student.email,
-    });
-    await expect(page).toHaveURL(new RegExp(TEST_USERS.student.expectedDashboardPath));
-    await logout(page);
+  test('student attempting to log in using email address is rejected and instructed to use roll number', async ({ page }) => {
+    await page.goto('/auth/login', { waitUntil: 'domcontentloaded' });
+    await page.fill('input[name="identifier"]', TEST_USERS.student.email);
+    await page.fill('input[name="password"]', TEST_USERS.student.password);
+    await page.click('button[type="submit"]');
+
+    await expect(page).toHaveURL(/\/auth\/login/);
+    await expect(page.locator('.alert-danger, div[role="alert"]')).toContainText(
+      /Students and organizers must log in using their roll number/i
+    );
   });
 
   test('login with invalid password shows error notification and rejects access', async ({ page }) => {

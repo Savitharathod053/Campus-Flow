@@ -12,13 +12,33 @@ export async function loginAs(page: Page, user: TestUser): Promise<void> {
   await page.fill('input[name="identifier"]', user.identifier);
   await page.fill('input[name="password"]', user.password);
 
-  // Submit form
+  // Submit form and wait for POST response
   await Promise.all([
-    page.waitForNavigation({ waitUntil: 'domcontentloaded' }).catch(() => {}),
-    page.click('button[type="submit"]'),
+    page.waitForResponse(
+      (resp) => resp.url().includes('/auth/login') && resp.request().method() === 'POST',
+      { timeout: 30000 }
+    ).catch(() => null),
+    page.click('button[type="submit"]', { timeout: 30000 }),
   ]);
 
-  // Wait for redirect to dashboard or expected URL
+  await page.waitForLoadState('domcontentloaded');
+
+  // Check if redirection succeeded
+  const currentUrl = page.url();
+  if (currentUrl.endsWith('/auth/login')) {
+    const alertEl = page.locator('.alert-danger, div[role="alert"]');
+    const alertCount = await alertEl.count();
+    let alertMsg = '';
+    if (alertCount > 0) {
+      alertMsg = (await alertEl.first().textContent())?.trim() || '';
+    }
+    throw new Error(
+      `Login failed for role "${user.role}" with identifier "${user.identifier}". ` +
+      `URL remained at "${page.url()}". ${alertMsg ? `Server alert: "${alertMsg}"` : 'No alert message displayed.'}`
+    );
+  }
+
+  // Ensure redirect away from login page
   await expect(page).not.toHaveURL(/\/auth\/login$/);
 }
 

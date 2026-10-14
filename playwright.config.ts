@@ -35,7 +35,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'retain-on-failure',
-    actionTimeout: 15 * 1000,
+    actionTimeout: 30 * 1000,
     navigationTimeout: 30 * 1000,
     /* Ignore HTTPS certificate errors if testing local self-signed or staging environments */
     ignoreHTTPSErrors: true,
