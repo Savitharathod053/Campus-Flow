@@ -1,4 +1,8 @@
+
 # Campus Flow - College Event Management & Registration Platform
+
+> Simplifying campus events, registrations, and participation.
+
 
 A centralized, production-grade web application for college campuses to manage event discovery, student registrations, custom application questions, online payments, verifiable QR ticketing, camera-based attendance tracking, and AI/OCR-powered certificate distribution.
 
